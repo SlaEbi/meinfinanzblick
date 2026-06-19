@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .db import Base, engine
-from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth
+from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,7 @@ app.include_router(spending.router, prefix='/api/v1')
 app.include_router(versicherungen.router, prefix='/api/v1')
 app.include_router(notfall.router, prefix='/api/v1')
 app.include_router(networth.router, prefix='/api/v1')
+app.include_router(system.router, prefix='/api/v1')
 
 FRONTEND = os.path.join(os.path.dirname(__file__), '..', 'frontend')
 

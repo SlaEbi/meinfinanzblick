@@ -2060,6 +2060,81 @@ window.deleteNotfallEintrag = async (id, titel) => {
   } catch (e) { toast(e.message); }
 };
 
+// ── Update ──────────────────────────────────────────────────────────────────
+
+window.triggerUpdate = async () => {
+  const modal = document.getElementById('update-modal');
+  const body  = document.getElementById('update-modal-body');
+  const btn   = document.getElementById('update-btn');
+
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('open'), 10);
+  body.innerHTML = `
+    <div class="update-spinner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28" class="spin">
+        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+      </svg>
+      <span>Update wird geladen…</span>
+    </div>`;
+  btn.classList.add('loading');
+
+  try {
+    const res = await fetch('/api/v1/system/update', { method: 'POST' });
+    const data = await res.json();
+
+    const msgClass = data.success ? 'success' : 'error';
+    const log = [data.git_output, data.pip_output].filter(Boolean).join('\n\n').trim();
+    const reloadBtn = (data.success && !data.message.includes('neuesten Stand'))
+      ? `<button class="update-reload-btn" onclick="location.reload()">Seite neu laden</button>`
+      : '';
+
+    body.innerHTML = `
+      <p class="update-result-msg ${msgClass}">${escHtml(data.message)}</p>
+      ${log ? `<pre class="update-log">${escHtml(log)}</pre>` : ''}
+      ${reloadBtn}`;
+  } catch (e) {
+    body.innerHTML = `<p class="update-result-msg error">Verbindungsfehler: ${escHtml(e.message)}</p>`;
+  } finally {
+    btn.classList.remove('loading');
+  }
+};
+
+window.triggerPublish = async () => {
+  const modal = document.getElementById('update-modal');
+  const body  = document.getElementById('update-modal-body');
+  const btn   = document.getElementById('publish-btn');
+
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('open'), 10);
+  body.innerHTML = `
+    <div class="update-spinner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28" class="spin">
+        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+      </svg>
+      <span>Wird veröffentlicht…</span>
+    </div>`;
+  btn.classList.add('loading');
+
+  try {
+    const res  = await fetch('/api/v1/system/publish', { method: 'POST' });
+    const data = await res.json();
+    const msgClass = data.success ? 'success' : 'error';
+    body.innerHTML = `
+      <p class="update-result-msg ${msgClass}">${escHtml(data.message)}</p>
+      ${data.output ? `<pre class="update-log">${escHtml(data.output)}</pre>` : ''}`;
+  } catch (e) {
+    body.innerHTML = `<p class="update-result-msg error">Fehler: ${escHtml(e.message)}</p>`;
+  } finally {
+    btn.classList.remove('loading');
+  }
+};
+
+window.closeUpdateModal = () => {
+  const modal = document.getElementById('update-modal');
+  modal.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 300);
+};
+
 // ── Globale Exports (für onclick-Handler in HTML) ───────────────────────────
 
 window.navigate         = navigate;

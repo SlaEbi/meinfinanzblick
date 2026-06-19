@@ -1473,3 +1473,142 @@ html[data-theme="fintech"] .theme-toggle-thumb {
 .bitwarden-btn {
   text-decoration: none;
 }
+
+/* ── Update Button ───────────────────────────────────────────────────────────── */
+
+.system-btns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-3);
+}
+
+.update-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.update-btn:hover {
+  background: rgba(255,255,255,0.10);
+  color: var(--sidebar-text);
+}
+
+.update-btn.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.update-btn svg {
+  flex-shrink: 0;
+}
+
+.publish-btn {
+  background: rgba(201,168,76,0.08);
+  border-color: rgba(201,168,76,0.2);
+  color: #C9A84C;
+}
+
+.publish-btn:hover {
+  background: rgba(201,168,76,0.16);
+  color: #D4B870;
+}
+
+/* ── Update Modal ────────────────────────────────────────────────────────────── */
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--ink-wash-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 420px;
+  max-width: 90vw;
+  padding: var(--space-6);
+  animation: modal-in 200ms var(--ease-out);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.modal-header h3 {
+  font-family: var(--font-serif);
+  font-size: var(--text-h3);
+  font-weight: 600;
+}
+
+.update-modal-body {
+  min-height: 80px;
+}
+
+.update-spinner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--wash-grey);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.update-result-msg {
+  font-family: var(--font-serif);
+  font-size: var(--text-body);
+  margin-bottom: var(--space-4);
+  font-weight: 500;
+}
+
+.update-result-msg.success { color: #2d7a3a; }
+html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
+.update-result-msg.error { color: var(--seal-red); }
+
+.update-log {
+  background: var(--surface-alt);
+  border: 1px solid var(--ink-wash-md);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--wash-grey);
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: var(--space-5);
+}
+
+.update-reload-btn {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--seal-red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 150ms ease-out;
+}
+
+.update-reload-btn:hover { background: var(--seal-red-dark); }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
