@@ -17,7 +17,7 @@ Beim Installieren unbedingt **„Add Python to PATH"** anklicken.
 Öffne das Terminal (auf dem Mac: Launchpad → „Terminal") und gib ein:
 
 ```bash
-git clone https://github.com/DEIN-BENUTZERNAME/meinfinanzblick.git
+git clone https://github.com/SlaEbi/meinfinanzblick.git
 cd meinfinanzblick
 ```
 
