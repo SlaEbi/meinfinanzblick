@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
   <link rel="stylesheet" href="/css/tokens.css?v=3">
-  <link rel="stylesheet" href="/css/app.css?v=7">
+  <link rel="stylesheet" href="/css/app.css?v=8">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -83,31 +83,26 @@
       </div>
     </nav>
 
-    <!-- Theme Switcher -->
+    <!-- Theme + System Controls -->
     <div class="theme-switcher">
       <button class="theme-toggle" id="theme-toggle-btn" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='fintech'?'sumi':'fintech')" title="Design wechseln">
         <span class="theme-toggle-track">
           <span class="theme-toggle-thumb"></span>
         </span>
       </button>
-    </div>
-
-    <div class="system-btns">
-      <button class="update-btn" onclick="triggerUpdate()" id="update-btn" title="Updates von GitHub holen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14">
+      <button class="icon-btn" onclick="triggerUpdate()" id="update-btn" title="Updates von GitHub holen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15">
           <polyline points="23 4 23 10 17 10"/>
           <polyline points="1 20 1 14 7 14"/>
           <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
         </svg>
-        Update
       </button>
-      <button class="update-btn publish-btn" onclick="triggerPublish()" id="publish-btn" title="Änderungen auf GitHub veröffentlichen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14">
+      <button class="icon-btn icon-btn-publish" onclick="triggerPublish()" id="publish-btn" title="Änderungen auf GitHub veröffentlichen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/>
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        Veröffentlichen
       </button>
     </div>
 
