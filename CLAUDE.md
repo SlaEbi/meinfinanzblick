@@ -13,7 +13,7 @@ Ein **privates, lokales Finanz- & Notfall-Dashboard** für eine Privatperson (+ 
 3. **Notfall-/Nachlass-Übersicht** — „Wo liegt was", Anleitung für die Ehefrau, Kontakte
 4. **Versicherungen & Verträge** — Policen, Laufzeiten, Kündigungsfristen, Fristen-Warnungen
 
-**Leitprinzip:** Erst Wert liefern (manuelle Eingabe), dann Komfort (Bankanbindung). Jede Phase endet mit etwas Benutzbarem.
+**Leitprinzip:** Manuelle Eingabe — einmal im Monat, strukturiert, übersichtlich. Keine Bankanbindung. Jede Phase endet mit etwas Benutzbarem.
 
 ---
 
@@ -21,11 +21,10 @@ Ein **privates, lokales Finanz- & Notfall-Dashboard** für eine Privatperson (+ 
 
 | Schicht | Wahl | Begründung |
 |---|---|---|
-| Backend | **Python + FastAPI** | beste FinTS-Bibliothek in Python, Finanzmathematik trivial |
+| Backend | **Python + FastAPI** | Finanzmathematik trivial, solide Basis |
 | Datenbank | **SQLite** (eine Datei) | kein Server, leicht zu sichern, später via SQLCipher verschlüsselbar |
 | Frontend | **HTML + Chart.js** zum Start, später optional React | schnelle Ergebnisse, geringe Komplexität |
 | Betrieb | **localhost**, Start per Skript | keine Cloud, Daten bleiben auf dem Rechner |
-| Bankanbindung | **FinTS via `python-fints`** (erst Phase 5) | deutscher Standard, liest Salden/Umsätze/Depots |
 
 **Harte Grundsätze:**
 - **Lokal only.** Keine Daten verlassen den Rechner. Keine externen Cloud-Calls mit Finanzdaten.
@@ -43,7 +42,7 @@ MeinFinanzblick/
 │   ├── models.py              # SQLAlchemy-Modelle
 │   ├── db.py                  # DB-Verbindung/Session
 │   ├── routers/               # konten, darlehen, depots, versicherungen, notfall, planung
-│   └── services/              # tilgung.py, networth.py, fints_client.py (Phase 5)
+│   └── services/              # tilgung.py, networth.py
 ├── frontend/
 │   ├── index.html
 │   ├── css/tokens.css         # Design-Tokens aus design.md
@@ -97,7 +96,7 @@ Option B (Passwörter verschlüsselt im Tool) ist bewusst zurückgestellt — nu
 
 Grundschutz immer: lokaler Login, SQLite verschlüsselbar (SQLCipher), regelmäßiges verschlüsseltes Backup, keine Klartext-Exporte.
 
-**Für Claude Code:** Niemals Secrets/Zugangsdaten/PINs in Code, Logs oder die DB im Klartext schreiben. FinTS-Zugangsdaten (Phase 5) nur zur Laufzeit abfragen, nicht persistent im Klartext ablegen.
+**Für Claude Code:** Niemals Secrets/Zugangsdaten/PINs in Code, Logs oder die DB im Klartext schreiben.
 
 ---
 
@@ -110,8 +109,7 @@ Aktueller Stand: **Planung abgeschlossen, Phase 0 noch nicht begonnen.**
 - **Phase 2 — Finanzplanung:** Tilgungsplan (Annuität), Szenario-Rechner, Vermögens-Prognose, Net-Worth-Verlauf.
 - **Phase 3 — Versicherungen & Verträge:** Erfassung + Fristen-Dashboard mit Warnungen + Kontakte.
 - **Phase 4 — Notfall-/Nachlass-Modul:** „Wo liegt was", druckbare Ernstfall-Anleitung (PDF) für die Ehefrau, Dokumenten-Checkliste. *(Hoch priorisieren — schützt die Familie.)*
-- **Phase 5 — Bankanbindung (optional):** FinTS via `python-fints`, Bank für Bank, automatische Snapshots.
-- **Phase 6 — Feinschliff:** Verschlüsselung/Backup härten, Mobile, Mehrbenutzer, Budget-Analyse, PDF-Reports.
+- **Phase 5 — Feinschliff:** Verschlüsselung/Backup härten, PDF-Reports, Budget-Analyse.
 
 **Empfohlener nächster Schritt:** Phase 0 + 1 zusammen umsetzen.
 
@@ -134,7 +132,7 @@ Aktueller Stand: **Planung abgeschlossen, Phase 0 noch nicht begonnen.**
 ```bash
 # einrichten
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt          # fastapi, uvicorn, sqlalchemy, python-fints (Phase 5), pydantic
+pip install -r requirements.txt          # fastapi, uvicorn, sqlalchemy, pydantic
 
 # starten (Backend serviert auch das Frontend)
 uvicorn backend.main:app --reload --port 8000
@@ -153,7 +151,6 @@ cp data/finanzblick.db backups/finanzblick_$(date +%F).db
 ## 9. Offene Entscheidungen
 
 - Ehefrau: eigener Login zum Mitnutzen, oder nur Ernstfall-Zugriff?
-- Welche Banken sollen in Phase 5 angebunden werden (FinTS-Machbarkeit prüfen)?
 - Mobiler Zugriff nötig oder reicht Desktop?
 
 ---
