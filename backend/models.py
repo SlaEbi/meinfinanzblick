@@ -15,6 +15,8 @@ class Konto(Base):
     iban = Column(String)
     saldo = Column(Numeric(14, 2), nullable=False, default=0)
     waehrung = Column(String, default='EUR')
+    kontoinhaber = Column(String)
+    notiz = Column(String)
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -26,6 +28,8 @@ class Depot(Base):
     bank = Column(String, nullable=False)
     depotnummer = Column(String)
     wert_aktuell = Column(Numeric(14, 2), nullable=False, default=0)
+    kontoinhaber = Column(String)
+    notiz = Column(String)
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     positionen = relationship(
         'DepotPosition', back_populates='depot', cascade='all, delete-orphan'

@@ -616,12 +616,12 @@ body::before {
 .form-textarea {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid rgba(0,0,0,0.15);
+  border: 1px solid var(--input-border, rgba(0,0,0,0.15));
   border-radius: var(--radius);
   font-family: var(--font-serif);
   font-size: var(--text-body);
   color: var(--ink-black);
-  background: #fff;
+  background: var(--input-bg, #fff);
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
   appearance: none;
 }

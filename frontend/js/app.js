@@ -346,11 +346,18 @@ function renderKonten() {
 
   tbody.innerHTML = state.konten.map(k => `
     <tr>
-      <td><strong>${k.name}</strong></td>
+      <td>
+        <strong>${k.name}</strong>
+        ${k.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(k.kontoinhaber)}</span>` : ''}
+        ${k.notiz ? `<br><span class="text-muted" style="font-size:0.72rem;font-style:italic">${escapeHtml(k.notiz)}</span>` : ''}
+      </td>
       <td>${k.bank}</td>
       <td><span class="badge badge-${k.typ}">${k.typ}</span></td>
       <td class="mono">${k.iban ? maskIBAN(k.iban) : '—'}</td>
-      <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">${fmt.eur(k.saldo)}</td>
+      <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">
+        ${fmt.eur(k.saldo)}
+        <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(k.aktualisiert_am)}</span>
+      </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openKontoForm(${k.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -412,6 +419,14 @@ window.openKontoForm = function(id = null) {
         </select>
       </div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Kontoinhaber</label>
+      <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(konto?.kontoinhaber ?? '')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext, z. B. Verwendungszweck, Bitwarden-Eintrag…">${escapeHtml(konto?.notiz ?? '')}</textarea>
+    </div>
   `;
   document.getElementById('modal-submit').onclick = submitKontoForm;
   openModal();
@@ -422,9 +437,11 @@ async function submitKontoForm() {
     name:     document.getElementById('f-name').value.trim(),
     bank:     document.getElementById('f-bank').value.trim(),
     typ:      document.getElementById('f-typ').value,
-    iban:     document.getElementById('f-iban').value.trim() || null,
-    saldo:    parseFloat(document.getElementById('f-saldo').value) || 0,
-    waehrung: document.getElementById('f-waehrung').value,
+    iban:          document.getElementById('f-iban').value.trim() || null,
+    saldo:         parseFloat(document.getElementById('f-saldo').value) || 0,
+    waehrung:      document.getElementById('f-waehrung').value,
+    kontoinhaber:  document.getElementById('f-kontoinhaber').value.trim() || null,
+    notiz:         document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.name || !data.bank) return toast('Bitte Name und Bank ausfüllen.');
   try {
@@ -625,10 +642,17 @@ function renderDepots() {
 
   tbody.innerHTML = state.depots.map(dep => `
     <tr>
-      <td><strong>${dep.name}</strong></td>
+      <td>
+        <strong>${dep.name}</strong>
+        ${dep.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(dep.kontoinhaber)}</span>` : ''}
+        ${dep.notiz ? `<br><span class="text-muted" style="font-size:0.72rem;font-style:italic">${escapeHtml(dep.notiz)}</span>` : ''}
+      </td>
       <td>${dep.bank}</td>
       <td class="mono text-muted" style="font-size:0.8rem">${dep.depotnummer ?? '—'}</td>
-      <td class="right mono">${fmt.eur(dep.wert_aktuell)}</td>
+      <td class="right mono">
+        ${fmt.eur(dep.wert_aktuell)}
+        <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(dep.aktualisiert_am)}</span>
+      </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openDepotForm(${dep.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -666,6 +690,14 @@ window.openDepotForm = function(id = null) {
       <input id="f-wert" class="form-input" type="number" step="0.01" value="${dep?.wert_aktuell ?? 0}">
       <p class="form-hint">Summe aller Positionen zum heutigen Kurs</p>
     </div>
+    <div class="form-group">
+      <label class="form-label">Kontoinhaber</label>
+      <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.kontoinhaber ?? '')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext, z. B. Anlagestrategie, Bitwarden-Eintrag…">${escapeHtml(dep?.notiz ?? '')}</textarea>
+    </div>
   `;
   document.getElementById('modal-submit').onclick = submitDepotForm;
   openModal();
@@ -675,8 +707,10 @@ async function submitDepotForm() {
   const data = {
     name:        document.getElementById('f-name').value.trim(),
     bank:        document.getElementById('f-bank').value.trim(),
-    depotnummer: document.getElementById('f-depotnr').value.trim() || null,
+    depotnummer:  document.getElementById('f-depotnr').value.trim() || null,
     wert_aktuell: parseFloat(document.getElementById('f-wert').value) || 0,
+    kontoinhaber: document.getElementById('f-kontoinhaber').value.trim() || null,
+    notiz:        document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.name || !data.bank) return toast('Bitte Name und Bank ausfüllen.');
   try {

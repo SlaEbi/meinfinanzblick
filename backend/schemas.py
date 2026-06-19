@@ -12,6 +12,8 @@ class KontoBase(BaseModel):
     iban: Optional[str] = None
     saldo: float
     waehrung: str = 'EUR'
+    kontoinhaber: Optional[str] = None
+    notiz: Optional[str] = None
 
 
 class KontoCreate(KontoBase):
@@ -25,6 +27,8 @@ class KontoUpdate(BaseModel):
     iban: Optional[str] = None
     saldo: Optional[float] = None
     waehrung: Optional[str] = None
+    kontoinhaber: Optional[str] = None
+    notiz: Optional[str] = None
 
 
 class KontoResponse(KontoBase):
@@ -58,6 +62,8 @@ class DepotBase(BaseModel):
     bank: str
     depotnummer: Optional[str] = None
     wert_aktuell: float
+    kontoinhaber: Optional[str] = None
+    notiz: Optional[str] = None
 
 
 class DepotCreate(DepotBase):
@@ -69,6 +75,8 @@ class DepotUpdate(BaseModel):
     bank: Optional[str] = None
     depotnummer: Optional[str] = None
     wert_aktuell: Optional[float] = None
+    kontoinhaber: Optional[str] = None
+    notiz: Optional[str] = None
 
 
 class DepotResponse(DepotBase):
