@@ -1544,6 +1544,13 @@ html[data-theme="fintech"] .theme-toggle-thumb {
   font-weight: 500;
 }
 
+.update-detail {
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  color: var(--wash-grey);
+  margin-bottom: var(--space-4);
+}
+
 .update-result-msg.success { color: #2d7a3a; }
 html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
 .update-result-msg.error { color: var(--seal-red); }

@@ -2081,19 +2081,16 @@ window.triggerUpdate = async () => {
   try {
     const res = await fetch('/api/v1/system/update', { method: 'POST' });
     const data = await res.json();
-
     const msgClass = data.success ? 'success' : 'error';
-    const log = [data.git_output, data.pip_output].filter(Boolean).join('\n\n').trim();
-    const reloadBtn = (data.success && !data.message.includes('neuesten Stand'))
+    const reloadBtn = (data.success && data.detail)
       ? `<button class="update-reload-btn" onclick="location.reload()">Seite neu laden</button>`
       : '';
-
     body.innerHTML = `
       <p class="update-result-msg ${msgClass}">${escHtml(data.message)}</p>
-      ${log ? `<pre class="update-log">${escHtml(log)}</pre>` : ''}
+      ${data.detail ? `<p class="update-detail">${escHtml(data.detail)}</p>` : ''}
       ${reloadBtn}`;
   } catch (e) {
-    body.innerHTML = `<p class="update-result-msg error">Verbindungsfehler: ${escHtml(e.message)}</p>`;
+    body.innerHTML = `<p class="update-result-msg error">Keine Verbindung zur App. Bitte Seite neu laden.</p>`;
   } finally {
     btn.classList.remove('loading');
   }
@@ -2121,9 +2118,9 @@ window.triggerPublish = async () => {
     const msgClass = data.success ? 'success' : 'error';
     body.innerHTML = `
       <p class="update-result-msg ${msgClass}">${escHtml(data.message)}</p>
-      ${data.output ? `<pre class="update-log">${escHtml(data.output)}</pre>` : ''}`;
+      ${data.detail ? `<p class="update-detail">${escHtml(data.detail)}</p>` : ''}`;
   } catch (e) {
-    body.innerHTML = `<p class="update-result-msg error">Fehler: ${escHtml(e.message)}</p>`;
+    body.innerHTML = `<p class="update-result-msg error">Keine Verbindung zur App. Bitte Seite neu laden.</p>`;
   } finally {
     btn.classList.remove('loading');
   }

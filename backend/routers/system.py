@@ -1,6 +1,5 @@
 import subprocess
 import sys
-import os
 from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -12,22 +11,32 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class UpdateResult(BaseModel):
     success: bool
-    git_output: str
-    pip_output: str
+    detail: str
     message: str
 
 
 class PublishResult(BaseModel):
     success: bool
-    output: str
+    detail: str
     message: str
+
+
+def _friendly_git_error(raw: str) -> str:
+    if 'no tracking information' in raw or 'no such remote' in raw.lower():
+        return 'Kein GitHub-Repository verbunden. Bitte einmalig "git remote add origin …" ausführen.'
+    if 'Could not resolve host' in raw or 'unable to connect' in raw.lower():
+        return 'Keine Internetverbindung. Bitte Verbindung prüfen und erneut versuchen.'
+    if 'Authentication failed' in raw or 'Permission denied' in raw:
+        return 'Zugriff auf GitHub verweigert. Bitte SSH-Key prüfen.'
+    if 'conflict' in raw.lower():
+        return 'Es gibt einen Konflikt mit lokalen Änderungen. Bitte Slava kontaktieren.'
+    if 'not a git repository' in raw:
+        return 'Kein Git-Repository gefunden. Bitte Slava kontaktieren.'
+    return 'Unbekannter Fehler beim Update. Bitte Slava kontaktieren.'
 
 
 @router.post('/system/update', response_model=UpdateResult)
 def run_update():
-    git_out = ''
-    pip_out = ''
-
     # git pull
     git_result = subprocess.run(
         ['git', 'pull', '--ff-only'],
@@ -36,17 +45,16 @@ def run_update():
         text=True,
         timeout=60,
     )
-    git_out = (git_result.stdout + git_result.stderr).strip()
+    git_raw = (git_result.stdout + git_result.stderr).strip()
 
     if git_result.returncode != 0:
         return UpdateResult(
             success=False,
-            git_output=git_out,
-            pip_output='',
-            message='Git-Update fehlgeschlagen.',
+            detail='',
+            message=_friendly_git_error(git_raw),
         )
 
-    already_current = 'Already up to date' in git_out or 'Bereits aktuell' in git_out
+    already_current = 'Already up to date' in git_raw or 'Bereits aktuell' in git_raw
 
     # pip install
     pip_result = subprocess.run(
@@ -56,63 +64,53 @@ def run_update():
         text=True,
         timeout=120,
     )
-    pip_out = (pip_result.stdout + pip_result.stderr).strip()
 
     if pip_result.returncode != 0:
         return UpdateResult(
             success=False,
-            git_output=git_out,
-            pip_output=pip_out,
-            message='Abhängigkeiten konnten nicht installiert werden.',
+            detail='',
+            message='Neue Programm-Bausteine konnten nicht installiert werden. Bitte Slava kontaktieren.',
         )
 
     if already_current:
-        message = 'Bereits auf dem neuesten Stand.'
+        message = 'Die App ist bereits auf dem neuesten Stand.'
+        detail = ''
     else:
-        message = 'Update erfolgreich. Bitte die Seite neu laden.'
+        message = 'Update erfolgreich! Bitte die Seite neu laden.'
+        detail = 'Neue Version wurde heruntergeladen und installiert.'
 
-    return UpdateResult(
-        success=True,
-        git_output=git_out,
-        pip_output=pip_out,
-        message=message,
-    )
+    return UpdateResult(success=True, detail=detail, message=message)
 
 
 @router.post('/system/publish', response_model=PublishResult)
 def run_publish():
-    out = ''
-
     # git add -A
-    r = subprocess.run(['git', 'add', '-A'], cwd=PROJECT_ROOT, capture_output=True, text=True)
-    out += (r.stdout + r.stderr).strip()
-
-    # Gibt es überhaupt Änderungen?
-    status = subprocess.run(['git', 'status', '--porcelain'], cwd=PROJECT_ROOT, capture_output=True, text=True)
-    if not status.stdout.strip() and r.returncode == 0:
-        # Nichts zu committen — trotzdem pushen falls lokale Commits ausstehen
-        pass
+    subprocess.run(['git', 'add', '-A'], cwd=PROJECT_ROOT, capture_output=True, text=True)
 
     # git commit
     r = subprocess.run(
         ['git', 'commit', '-m', 'Update via MeinFinanzblick'],
         cwd=PROJECT_ROOT, capture_output=True, text=True,
     )
-    commit_out = (r.stdout + r.stderr).strip()
-    out = (out + '\n' + commit_out).strip()
-    nothing_to_commit = 'nothing to commit' in commit_out or 'nichts zu committen' in commit_out
+    commit_raw = (r.stdout + r.stderr).strip()
+    nothing_to_commit = 'nothing to commit' in commit_raw or 'nichts zu committen' in commit_raw
 
     # git push
     r = subprocess.run(['git', 'push'], cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=60)
-    push_out = (r.stdout + r.stderr).strip()
-    out = (out + '\n' + push_out).strip()
+    push_raw = (r.stdout + r.stderr).strip()
 
     if r.returncode != 0:
-        return PublishResult(success=False, output=out, message='Push fehlgeschlagen.')
+        return PublishResult(
+            success=False,
+            detail='',
+            message=_friendly_git_error(push_raw),
+        )
 
     if nothing_to_commit:
-        message = 'Keine neuen Änderungen — bereits veröffentlicht.'
+        message = 'Keine neuen Änderungen vorhanden — alles bereits veröffentlicht.'
+        detail = ''
     else:
         message = 'Erfolgreich auf GitHub veröffentlicht.'
+        detail = 'Andere Geräte können jetzt mit "Update" die neue Version laden.'
 
-    return PublishResult(success=True, output=out, message=message)
+    return PublishResult(success=True, detail=detail, message=message)
