@@ -29,20 +29,24 @@ cd meinfinanzblick
 make setup
 ```
 
-Das dauert einige Minuten — die App installiert alle nötigen Bausteine automatisch.
+Das dauert einige Minuten — die App installiert alle nötigen Bausteine automatisch und erstellt die **MeinFinanzblick.app**.
+
+### Schritt 4 — App in den Programme-Ordner ziehen (empfohlen)
+
+Im Finder den Ordner `meinfinanzblick` öffnen. Die Datei `MeinFinanzblick.app` in den **Programme**-Ordner ziehen. Ab jetzt ist sie im Launchpad verfügbar und kann ins Dock gezogen werden.
 
 ---
 
 ## App starten
 
+**Einfachste Methode:** Doppelklick auf `MeinFinanzblick.app` — der Browser öffnet sich automatisch.
+
+Zum Beenden: nochmal Doppelklick auf die App → „Beenden" wählen.
+
+**Alternativ per Terminal:**
 ```bash
 make start
 ```
-
-Danach öffnet sich der Browser automatisch auf `http://localhost:8000`.
-
-Das Terminal-Fenster muss **offen bleiben**, solange du die App nutzt.
-Zum Beenden: Terminal-Fenster schließen oder `Strg + C` drücken.
 
 ---
 
