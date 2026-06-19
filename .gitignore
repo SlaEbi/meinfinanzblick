@@ -1,0 +1,27 @@
+# Sensible Daten — NIEMALS committen
+data/
+*.db
+*.sqlite
+*.sqlite3
+backups/
+.env
+*.key
+*.pem
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Node (falls später React)
+node_modules/
+dist/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

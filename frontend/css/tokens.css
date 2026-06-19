@@ -1,0 +1,86 @@
+/* Design Tokens — Sumi-e Tech Scroll (default) + FinTech Plataforma */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Farben */
+  --rice-paper:   #F4F1E8;
+  --ink-black:    #0D0D0D;
+  --seal-red:     #8A1C15;
+  --seal-red-dark:#761812;
+  --wash-grey:    #808080;
+  --ink-wash:     rgba(0, 0, 0, 0.10);
+  --ink-wash-md:  rgba(0, 0, 0, 0.18);
+
+  /* Surfaces */
+  --surface:      #FDFBF5;
+  --surface-alt:  #F0EDE0;
+  --sidebar-bg:   #111110;
+  --sidebar-text: #E8E4D8;
+  --sidebar-muted:#8A8678;
+
+  /* Typografie */
+  --font-serif:  'Noto Serif JP', 'Georgia', serif;
+  --font-mono:   'JetBrains Mono', 'Courier New', monospace;
+
+  /* Schriftgrößen (fluid) */
+  --text-hero: clamp(2rem, 4vw, 3rem);
+  --text-h1:   2rem;
+  --text-h2:   1.375rem;
+  --text-h3:   1.125rem;
+  --text-body: 1rem;
+  --text-sm:   0.875rem;
+  --text-xs:   0.75rem;
+
+  /* Abstände */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Komponenten */
+  --radius:       0.5rem;
+  --radius-sm:    0.25rem;
+  --radius-lg:    0.75rem;
+  --shadow-card:  0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 20px rgba(0, 0, 0, 0.10);
+  --shadow-lg:    0 8px 32px rgba(0, 0, 0, 0.14);
+
+  /* Sidebar */
+  --sidebar-w: 240px;
+
+  /* Motion */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 200ms;
+  --duration-mid:  300ms;
+}
+
+/* ── FinTech Plataforma Financeira — Dark Gold Theme ──────────────────────── */
+
+html[data-theme="fintech"] {
+  --rice-paper:    #1A1A1A;
+  --ink-black:     #F0F0EE;
+  --seal-red:      #C9A84C;
+  --seal-red-dark: #B8943E;
+  --wash-grey:     #888888;
+  --ink-wash:      rgba(255, 255, 255, 0.08);
+  --ink-wash-md:   rgba(255, 255, 255, 0.16);
+
+  --surface:       #242424;
+  --surface-alt:   #2E2E2E;
+  --sidebar-bg:    #080808;
+  --sidebar-text:  #F0F0EE;
+  --sidebar-muted: #666666;
+
+  --font-serif: 'Inter', 'Helvetica Neue', sans-serif;
+
+  --shadow-card: 0 1px 1px rgba(0,0,0,0.6), 0 2px 12px rgba(0,0,0,0.4);
+  --shadow-md:   0 0 0 1px rgba(201,168,76,0.12), 0 4px 20px rgba(0,0,0,0.5);
+  --shadow-lg:   0 0 0 1px rgba(201,168,76,0.15), 0 8px 32px rgba(0,0,0,0.6);
+}
