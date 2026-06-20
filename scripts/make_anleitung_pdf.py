@@ -22,8 +22,8 @@ BORDER  = colors.HexColor("#E0DDD5")
 
 def make_styles():
     return {
-        "title":    ParagraphStyle("title",    fontName="Helvetica-Bold",    fontSize=22, textColor=DARK,  spaceAfter=4),
-        "subtitle": ParagraphStyle("subtitle", fontName="Helvetica",         fontSize=11, textColor=MUTED, spaceAfter=16),
+        "title":    ParagraphStyle("title",    fontName="Helvetica-Bold",    fontSize=22, textColor=DARK,  spaceAfter=2,  alignment=TA_LEFT),
+        "subtitle": ParagraphStyle("subtitle", fontName="Helvetica",         fontSize=11, textColor=MUTED, spaceAfter=14, alignment=TA_LEFT),
         "section":  ParagraphStyle("section",  fontName="Helvetica-Bold",    fontSize=9.5, textColor=GOLD, spaceAfter=5, spaceBefore=4),
         "heading":  ParagraphStyle("heading",  fontName="Helvetica-Bold",    fontSize=13, textColor=DARK,  spaceAfter=6),
         "body":     ParagraphStyle("body",     fontName="Helvetica",         fontSize=10.5, textColor=DARK, spaceAfter=6, leading=16),
@@ -71,7 +71,7 @@ def build():
     story.append(Paragraph("SCHRITT 1", s["section"]))
     story.append(Paragraph("Terminal oeffnen", s["heading"]))
     story.append(Paragraph(
-        "Druecke gleichzeitig <b>Command (&amp;#8984;) + Leertaste</b>, "
+        "Druecke gleichzeitig <b>Command (Cmd) + Leertaste</b>, "
         "tippe <b>Terminal</b> ein und druecke <b>Enter</b>.", s["body"]))
     story.append(Paragraph(
         "Ein Fenster oeffnet sich &mdash; das ist das Terminal. Dort tippst du gleich Befehle ein.",
