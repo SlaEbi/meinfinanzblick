@@ -1152,7 +1152,6 @@ async function renderSpendinPlan() {
           onkeydown="if(event.key==='Enter')this.blur()">
         <p style="font-size:var(--text-sm);color:var(--wash-grey);margin-top:0.25rem">
           Stand: ${spPlan.stand ? new Date(spPlan.stand).toLocaleDateString('de-DE') : '—'}
-          · IWT Conscious Spending Plan
         </p>
       </div>
       <button class="btn btn-ghost" onclick="spCreateNew()">
