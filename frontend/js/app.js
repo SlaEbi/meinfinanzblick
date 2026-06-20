@@ -349,7 +349,7 @@ function renderKonten() {
       <td>
         <strong>${k.name}</strong>
         ${k.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(k.kontoinhaber)}</span>` : ''}
-        ${k.notiz ? `<br><span class="text-muted" style="font-size:0.72rem;font-style:italic">${escapeHtml(k.notiz)}</span>` : ''}
+        ${k.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(k.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(k.bitwarden_name)}</a>` : ''}
       </td>
       <td>${k.bank}</td>
       <td><span class="badge badge-${k.typ}">${k.typ}</span></td>
@@ -424,8 +424,13 @@ window.openKontoForm = function(id = null) {
       <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(konto?.kontoinhaber ?? '')}">
     </div>
     <div class="form-group">
+      <label class="form-label">Bitwarden-Eintrag</label>
+      <input id="f-bitwarden" class="form-input" placeholder="z. B. Sparkasse Girokonto" value="${escapeHtml(konto?.bitwarden_name ?? '')}">
+      <p class="form-hint">Klick in der Tabelle öffnet vault.bitwarden.com</p>
+    </div>
+    <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext, z. B. Verwendungszweck, Bitwarden-Eintrag…">${escapeHtml(konto?.notiz ?? '')}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(konto?.notiz ?? '')}</textarea>
     </div>
   `;
   document.getElementById('modal-submit').onclick = submitKontoForm;
@@ -440,8 +445,9 @@ async function submitKontoForm() {
     iban:          document.getElementById('f-iban').value.trim() || null,
     saldo:         parseFloat(document.getElementById('f-saldo').value) || 0,
     waehrung:      document.getElementById('f-waehrung').value,
-    kontoinhaber:  document.getElementById('f-kontoinhaber').value.trim() || null,
-    notiz:         document.getElementById('f-notiz').value.trim() || null,
+    kontoinhaber:   document.getElementById('f-kontoinhaber').value.trim() || null,
+    bitwarden_name: document.getElementById('f-bitwarden').value.trim() || null,
+    notiz:          document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.name || !data.bank) return toast('Bitte Name und Bank ausfüllen.');
   try {
@@ -625,7 +631,7 @@ function renderDepots() {
   if (!tbody) return;
 
   if (!state.depots.length) {
-    tbody.innerHTML = `<tr><td colspan="5">
+    tbody.innerHTML = `<tr><td colspan="6">
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -643,12 +649,13 @@ function renderDepots() {
   tbody.innerHTML = state.depots.map(dep => `
     <tr>
       <td>
-        <strong>${dep.name}</strong>
-        ${dep.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(dep.kontoinhaber)}</span>` : ''}
-        ${dep.notiz ? `<br><span class="text-muted" style="font-size:0.72rem;font-style:italic">${escapeHtml(dep.notiz)}</span>` : ''}
+        <strong>${escapeHtml(dep.name)}</strong>
+        ${dep.depotinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(dep.depotinhaber)}</span>` : ''}
+        ${dep.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(dep.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(dep.bitwarden_name)}</a>` : ''}
       </td>
-      <td>${dep.bank}</td>
-      <td class="mono text-muted" style="font-size:0.8rem">${dep.depotnummer ?? '—'}</td>
+      <td>${dep.broker ? escapeHtml(dep.broker) : '—'}</td>
+      <td class="mono text-muted" style="font-size:0.8rem">${dep.wertpapierdepot_nr ?? '—'}</td>
+      <td class="mono text-muted" style="font-size:0.8rem">${dep.verrechnungskonto ?? '—'}</td>
       <td class="right mono">
         ${fmt.eur(dep.wert_aktuell)}
         <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(dep.aktualisiert_am)}</span>
@@ -671,19 +678,33 @@ window.openDepotForm = function(id = null) {
 
   document.getElementById('modal-title').textContent = id ? 'Depot bearbeiten' : 'Depot hinzufügen';
   document.getElementById('modal-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Name <span class="required">*</span></label>
+        <input id="f-name" class="form-input" placeholder="ETF-Depot" value="${escapeHtml(dep?.name ?? '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Broker</label>
+        <input id="f-broker" class="form-input" placeholder="comdirect, ING, Scalable…" value="${escapeHtml(dep?.broker ?? '')}">
+      </div>
+    </div>
     <div class="form-group">
-      <label class="form-label">Name <span class="required">*</span></label>
-      <input id="f-name" class="form-input" placeholder="ETF-Depot" value="${escapeHtml(dep?.name ?? '')}">
+      <label class="form-label">Depotinhaber</label>
+      <input id="f-depotinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.depotinhaber ?? '')}">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Bank / Broker <span class="required">*</span></label>
-        <input id="f-bank" class="form-input" placeholder="comdirect, ING…" value="${escapeHtml(dep?.bank ?? '')}">
+        <label class="form-label">Wertpapierdepot-Nr.</label>
+        <input id="f-depot-nr" class="form-input mono" placeholder="123456789" value="${escapeHtml(dep?.wertpapierdepot_nr ?? '')}">
       </div>
       <div class="form-group">
-        <label class="form-label">Depotnummer</label>
-        <input id="f-depotnr" class="form-input mono" placeholder="123456789" value="${escapeHtml(dep?.depotnummer ?? '')}">
+        <label class="form-label">Verrechnungskonto</label>
+        <input id="f-verrechnungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.verrechnungskonto ?? '')}">
       </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Auszahlungskonto</label>
+      <input id="f-auszahlungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.auszahlungskonto ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label">Aktueller Gesamtwert (€) <span class="required">*</span></label>
@@ -691,12 +712,13 @@ window.openDepotForm = function(id = null) {
       <p class="form-hint">Summe aller Positionen zum heutigen Kurs</p>
     </div>
     <div class="form-group">
-      <label class="form-label">Kontoinhaber</label>
-      <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.kontoinhaber ?? '')}">
+      <label class="form-label">Passwortsafe-Eintrag</label>
+      <input id="f-bitwarden" class="form-input" placeholder="z. B. comdirect Depot" value="${escapeHtml(dep?.bitwarden_name ?? '')}">
+      <p class="form-hint">Klick in der Tabelle öffnet vault.bitwarden.com</p>
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext, z. B. Anlagestrategie, Bitwarden-Eintrag…">${escapeHtml(dep?.notiz ?? '')}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(dep?.notiz ?? '')}</textarea>
     </div>
   `;
   document.getElementById('modal-submit').onclick = submitDepotForm;
@@ -705,14 +727,17 @@ window.openDepotForm = function(id = null) {
 
 async function submitDepotForm() {
   const data = {
-    name:        document.getElementById('f-name').value.trim(),
-    bank:        document.getElementById('f-bank').value.trim(),
-    depotnummer:  document.getElementById('f-depotnr').value.trim() || null,
-    wert_aktuell: parseFloat(document.getElementById('f-wert').value) || 0,
-    kontoinhaber: document.getElementById('f-kontoinhaber').value.trim() || null,
-    notiz:        document.getElementById('f-notiz').value.trim() || null,
+    name:               document.getElementById('f-name').value.trim(),
+    broker:             document.getElementById('f-broker').value.trim() || null,
+    depotinhaber:       document.getElementById('f-depotinhaber').value.trim() || null,
+    wertpapierdepot_nr: document.getElementById('f-depot-nr').value.trim() || null,
+    verrechnungskonto:  document.getElementById('f-verrechnungskonto').value.trim() || null,
+    auszahlungskonto:   document.getElementById('f-auszahlungskonto').value.trim() || null,
+    wert_aktuell:       parseFloat(document.getElementById('f-wert').value) || 0,
+    bitwarden_name:     document.getElementById('f-bitwarden').value.trim() || null,
+    notiz:              document.getElementById('f-notiz').value.trim() || null,
   };
-  if (!data.name || !data.bank) return toast('Bitte Name und Bank ausfüllen.');
+  if (!data.name) return toast('Bitte einen Namen eingeben.');
   try {
     if (state.editingId) {
       await api.depots.update(state.editingId, data);

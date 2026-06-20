@@ -17,6 +17,7 @@ class Konto(Base):
     waehrung = Column(String, default='EUR')
     kontoinhaber = Column(String)
     notiz = Column(String)
+    bitwarden_name = Column(String)
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -25,10 +26,13 @@ class Depot(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    bank = Column(String, nullable=False)
-    depotnummer = Column(String)
+    broker = Column(String)
+    depotinhaber = Column(String)
+    wertpapierdepot_nr = Column(String)
+    verrechnungskonto = Column(String)
+    auszahlungskonto = Column(String)
     wert_aktuell = Column(Numeric(14, 2), nullable=False, default=0)
-    kontoinhaber = Column(String)
+    bitwarden_name = Column(String)
     notiz = Column(String)
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     positionen = relationship(

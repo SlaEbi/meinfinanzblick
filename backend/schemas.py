@@ -14,6 +14,7 @@ class KontoBase(BaseModel):
     waehrung: str = 'EUR'
     kontoinhaber: Optional[str] = None
     notiz: Optional[str] = None
+    bitwarden_name: Optional[str] = None
 
 
 class KontoCreate(KontoBase):
@@ -29,6 +30,7 @@ class KontoUpdate(BaseModel):
     waehrung: Optional[str] = None
     kontoinhaber: Optional[str] = None
     notiz: Optional[str] = None
+    bitwarden_name: Optional[str] = None
 
 
 class KontoResponse(KontoBase):
@@ -59,10 +61,13 @@ class DepotPositionResponse(DepotPositionBase):
 
 class DepotBase(BaseModel):
     name: str
-    bank: str
-    depotnummer: Optional[str] = None
+    broker: Optional[str] = None
+    depotinhaber: Optional[str] = None
+    wertpapierdepot_nr: Optional[str] = None
+    verrechnungskonto: Optional[str] = None
+    auszahlungskonto: Optional[str] = None
     wert_aktuell: float
-    kontoinhaber: Optional[str] = None
+    bitwarden_name: Optional[str] = None
     notiz: Optional[str] = None
 
 
@@ -72,10 +77,13 @@ class DepotCreate(DepotBase):
 
 class DepotUpdate(BaseModel):
     name: Optional[str] = None
-    bank: Optional[str] = None
-    depotnummer: Optional[str] = None
+    broker: Optional[str] = None
+    depotinhaber: Optional[str] = None
+    wertpapierdepot_nr: Optional[str] = None
+    verrechnungskonto: Optional[str] = None
+    auszahlungskonto: Optional[str] = None
     wert_aktuell: Optional[float] = None
-    kontoinhaber: Optional[str] = None
+    bitwarden_name: Optional[str] = None
     notiz: Optional[str] = None
 
 
