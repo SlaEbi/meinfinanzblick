@@ -171,6 +171,20 @@ class NotfallEintrag(Base):
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class Dokument(Base):
+    __tablename__ = 'dokumente'
+
+    id = Column(Integer, primary_key=True, index=True)
+    titel = Column(String, nullable=False)
+    kategorie = Column(String, nullable=False)  # testament, vollmacht, patientenverfuegung, immobilien, rente, steuer, versicherung, sonstiges
+    aufbewahrungsort = Column(String)            # Safe, Notar, Ordner, etc.
+    aussteller = Column(String)                  # Notar, Anwalt, Finanzamt, etc.
+    datum = Column(Date)                         # Datum des Dokuments
+    gueltig_bis = Column(Date)                   # Ablaufdatum (optional)
+    notiz = Column(String)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class NetWorthSnapshot(Base):
     __tablename__ = 'networth_snapshots'
 

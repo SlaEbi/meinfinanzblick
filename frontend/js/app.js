@@ -41,6 +41,7 @@ const state = {
   vertraege: [],
   kontakte: [],
   notfall: [],
+  dokumente: [],
   networth: null,
   charts: {},
   editingId: null,
@@ -72,7 +73,7 @@ function navigate(view) {
 // ── Daten laden ─────────────────────────────────────────────────────────────
 
 async function loadAll() {
-  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, networth] = await Promise.all([
+  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, dokumente, networth] = await Promise.all([
     api.konten.list(),
     api.darlehen.list(),
     api.depots.list(),
@@ -81,6 +82,7 @@ async function loadAll() {
     api.vertraege.list(),
     api.kontakte.list(),
     api.notfall.list(),
+    api.dokumente.list(),
     api.networth.get(),
   ]);
   state.konten         = konten;
@@ -90,6 +92,7 @@ async function loadAll() {
   state.versicherungen = versicherungen;
   state.vertraege      = vertraege;
   state.kontakte       = kontakte;
+  state.dokumente      = dokumente;
   state.notfall        = notfall;
   state.networth       = networth;
 }
@@ -103,6 +106,7 @@ function renderCurrentView() {
   if (state.view === 'spending')       renderSpending();
   if (state.view === 'versicherungen') renderVersicherungen();
   if (state.view === 'vertraege')      renderVertraege();
+  if (state.view === 'dokumente')      renderDokumente();
   if (state.view === 'notfall')        renderNotfall();
 }
 
@@ -1804,6 +1808,140 @@ window.deleteVertrag = async function(id, name) {
     state.vertraege = state.vertraege.filter(x => x.id !== id);
     renderVertraege();
     toast('Vertrag gelöscht.');
+  } catch (e) { toast(e.message); }
+};
+
+// ── Dokumente ────────────────────────────────────────────────────────────────
+
+const DOK_KAT_LABEL = {
+  testament:           'Testament',
+  vollmacht:           'Vollmacht',
+  patientenverfuegung: 'Patientenverfügung',
+  sorgerechtsverfuegung: 'Sorgerechtsverfügung',
+  immobilien:          'Immobilien',
+  rente:               'Rente / Pension',
+  steuer:              'Steuer',
+  versicherung:        'Versicherungspolice',
+  sonstiges:           'Sonstiges',
+};
+
+function renderDokumente() {
+  const docs = state.dokumente ?? [];
+  const tbody = document.getElementById('dokumente-tbody');
+  if (!tbody) return;
+  if (!docs.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Noch keine Dokumente erfasst</td></tr>`;
+    return;
+  }
+  const fmtDate = s => s ? new Date(s).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  const today = new Date(); today.setHours(0,0,0,0);
+  tbody.innerHTML = docs.map(d => {
+    const katLabel = DOK_KAT_LABEL[d.kategorie] ?? d.kategorie;
+    const abgelaufen = d.gueltig_bis && new Date(d.gueltig_bis) < today;
+    const bald = d.gueltig_bis && !abgelaufen && (new Date(d.gueltig_bis) - today) / 86400000 <= 90;
+    const gueltigCell = d.gueltig_bis
+      ? `<span class="vs-laufzeit-cell${abgelaufen ? ' urgent' : bald ? ' soon' : ''}">${fmtDate(d.gueltig_bis)}${abgelaufen ? ' ⚠' : ''}</span>`
+      : '<span style="color:var(--wash-grey)">unbefristet</span>';
+    return `<tr>
+      <td><span class="vs-art-badge vs-badge-${d.kategorie}">${escapeHtml(katLabel)}</span></td>
+      <td><strong>${escapeHtml(d.titel)}</strong></td>
+      <td>${d.aufbewahrungsort ? escapeHtml(d.aufbewahrungsort) : '<span style="color:var(--wash-grey)">—</span>'}</td>
+      <td>${d.aussteller ? escapeHtml(d.aussteller) : '<span style="color:var(--wash-grey)">—</span>'}</td>
+      <td class="mono" style="font-size:var(--text-xs)">${fmtDate(d.datum)}</td>
+      <td>${gueltigCell}</td>
+      <td class="right">
+        <div class="action-cell">
+          <button class="btn-icon" onclick="openDokumentForm(${d.id})" title="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteDokument(${d.id},'${escapeHtml(d.titel)}')" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.openDokumentForm = (id = null) => {
+  state.editingId = id;
+  const d = id ? state.dokumente.find(x => x.id === id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Dokument bearbeiten' : 'Dokument hinzufügen';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Kategorie <span class="required">*</span></label>
+        <select id="f-kategorie" class="form-input">
+          ${Object.entries(DOK_KAT_LABEL).map(([v,l]) =>
+            `<option value="${v}" ${d?.kategorie===v?'selected':''}>${l}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Titel <span class="required">*</span></label>
+        <input id="f-titel" class="form-input" type="text" value="${d?.titel ?? ''}" placeholder="z. B. Testament 2024">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Aufbewahrungsort</label>
+        <input id="f-aufbew" class="form-input" type="text" value="${d?.aufbewahrungsort ?? ''}" placeholder="z. B. Safe im Arbeitszimmer, Notar Müller">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Aussteller</label>
+        <input id="f-aussteller" class="form-input" type="text" value="${d?.aussteller ?? ''}" placeholder="z. B. Notar Dr. Mayer, Finanzamt">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Datum des Dokuments</label>
+        <input id="f-datum" class="form-input" type="date" value="${d?.datum ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gültig bis</label>
+        <input id="f-gueltig" class="form-input" type="date" value="${d?.gueltig_bis ?? ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="2" placeholder="Zusätzliche Hinweise …">${d?.notiz ?? ''}</textarea>
+    </div>
+  `;
+  document.getElementById('modal-submit').onclick = async () => {
+    const data = {
+      titel:            document.getElementById('f-titel').value.trim(),
+      kategorie:        document.getElementById('f-kategorie').value,
+      aufbewahrungsort: document.getElementById('f-aufbew').value.trim() || null,
+      aussteller:       document.getElementById('f-aussteller').value.trim() || null,
+      datum:            document.getElementById('f-datum').value || null,
+      gueltig_bis:      document.getElementById('f-gueltig').value || null,
+      notiz:            document.getElementById('f-notiz').value.trim() || null,
+    };
+    if (!data.titel) return toast('Titel ist Pflichtfeld.');
+    try {
+      if (id) {
+        const upd = await api.dokumente.update(id, data);
+        state.dokumente = state.dokumente.map(x => x.id === id ? upd : x);
+        toast('Dokument aktualisiert.');
+      } else {
+        const neu = await api.dokumente.create(data);
+        state.dokumente.push(neu);
+        toast('Dokument gespeichert.');
+      }
+      closeModal();
+      renderDokumente();
+    } catch (e) { toast(e.message); }
+  };
+  openModal();
+};
+
+window.deleteDokument = async (id, titel) => {
+  if (!confirm(`„${titel}" wirklich löschen?`)) return;
+  try {
+    await api.dokumente.delete(id);
+    state.dokumente = state.dokumente.filter(x => x.id !== id);
+    renderDokumente();
+    toast('Dokument gelöscht.');
   } catch (e) { toast(e.message); }
 };
 

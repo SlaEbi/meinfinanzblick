@@ -85,6 +85,14 @@
         Verträge
       </div>
 
+      <div class="nav-item" data-view="dokumente">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+        </svg>
+        Dokumente
+      </div>
+
       <div class="nav-item" data-view="notfall">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -466,6 +474,36 @@
       </div>
     </section>
 
+    <!-- ────────────────── Dokumente ────────────────── -->
+    <section id="view-dokumente" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Wichtige Dokumente</h2>
+          <p>Testament, Vollmachten, Verfügungen und andere Urkunden</p>
+        </div>
+        <button class="btn btn-primary" onclick="openDokumentForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+          Dokument hinzufügen
+        </button>
+      </div>
+      <div class="card" style="padding:0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Kategorie</th>
+              <th>Titel</th>
+              <th>Aufbewahrungsort</th>
+              <th>Aussteller</th>
+              <th>Datum</th>
+              <th>Gültig bis</th>
+              <th class="right">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="dokumente-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ────────────────── Notfall ────────────────── -->
     <section id="view-notfall" class="view">
       <div class="page-header">
@@ -559,7 +597,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=19"></script>
+<script type="module" src="/js/app.js?v=20"></script>
 
 
 </body>

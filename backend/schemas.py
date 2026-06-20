@@ -355,6 +355,38 @@ class NotfallEintragResponse(NotfallEintragBase):
     erstellt_am: datetime
 
 
+# ── Dokument ───────────────────────────────────────────────────────────────────
+
+class DokumentBase(BaseModel):
+    titel: str
+    kategorie: str
+    aufbewahrungsort: Optional[str] = None
+    aussteller: Optional[str] = None
+    datum: Optional[date] = None
+    gueltig_bis: Optional[date] = None
+    notiz: Optional[str] = None
+
+
+class DokumentCreate(DokumentBase):
+    pass
+
+
+class DokumentUpdate(BaseModel):
+    titel: Optional[str] = None
+    kategorie: Optional[str] = None
+    aufbewahrungsort: Optional[str] = None
+    aussteller: Optional[str] = None
+    datum: Optional[date] = None
+    gueltig_bis: Optional[date] = None
+    notiz: Optional[str] = None
+
+
+class DokumentResponse(DokumentBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    erstellt_am: datetime
+
+
 # ── Net Worth ──────────────────────────────────────────────────────────────────
 
 class NetWorthSummary(BaseModel):

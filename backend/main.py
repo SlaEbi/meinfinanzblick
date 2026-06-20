@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 
 from sqlalchemy import text
 from .db import Base, engine
-from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system
+from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system, dokumente
 
 Base.metadata.create_all(bind=engine)
 
@@ -48,6 +48,7 @@ app.include_router(versicherungen.router, prefix='/api/v1')
 app.include_router(notfall.router, prefix='/api/v1')
 app.include_router(networth.router, prefix='/api/v1')
 app.include_router(system.router, prefix='/api/v1')
+app.include_router(dokumente.router, prefix='/api/v1')
 
 FRONTEND = os.path.join(os.path.dirname(__file__), '..', 'frontend')
 DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')

@@ -92,6 +92,13 @@ export const api = {
     delete: (id)        => request('DELETE', `/notfall/${id}`),
   },
 
+  dokumente: {
+    list:   ()          => request('GET',    '/dokumente/'),
+    create: (data)      => request('POST',   '/dokumente/', data),
+    update: (id, data)  => request('PUT',    `/dokumente/${id}`, data),
+    delete: (id)        => request('DELETE', `/dokumente/${id}`),
+  },
+
   networth: {
     get:      ()  => request('GET',  '/networth/'),
     snapshot: ()  => request('POST', '/networth/snapshot'),
