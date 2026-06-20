@@ -26,6 +26,7 @@ class Depot(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    bank = Column(String, default='')   # Alt-Spalte (NOT NULL in bestehender DB), aus UI entfernt
     broker = Column(String)
     depotinhaber = Column(String)
     wertpapierdepot_nr = Column(String)

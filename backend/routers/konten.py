@@ -16,7 +16,11 @@ def list_konten(db: Session = Depends(get_db)):
 
 @router.post('/', response_model=KontoResponse, status_code=201)
 def create_konto(data: KontoCreate, db: Session = Depends(get_db)):
-    konto = Konto(**data.model_dump(), aktualisiert_am=datetime.now(timezone.utc))
+    payload = data.model_dump()
+    # 'bank' wurde aus der UI entfernt, die Alt-Spalte ist aber NOT NULL → Default setzen
+    if payload.get('bank') is None:
+        payload['bank'] = ''
+    konto = Konto(**payload, aktualisiert_am=datetime.now(timezone.utc))
     db.add(konto)
     db.commit()
     db.refresh(konto)
@@ -36,7 +40,7 @@ def update_konto(konto_id: int, data: KontoUpdate, db: Session = Depends(get_db)
     konto = db.query(Konto).filter(Konto.id == konto_id).first()
     if not konto:
         raise HTTPException(status_code=404, detail='Konto nicht gefunden')
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(konto, field, value)
     konto.aktualisiert_am = datetime.now(timezone.utc)
     db.commit()

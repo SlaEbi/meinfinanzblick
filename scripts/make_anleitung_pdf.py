@@ -9,7 +9,8 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[1]
-OUT = PROJECT / "MeinFinanzblick_Installationsanleitung.pdf"
+# Direkt in den ausgelieferten Ordner schreiben (wird unter /landing/ serviert)
+OUT = PROJECT / "docs" / "MeinFinanzblick_Installationsanleitung.pdf"
 
 GOLD    = colors.HexColor("#C9A84C")
 DARK    = colors.HexColor("#1A1A1A")

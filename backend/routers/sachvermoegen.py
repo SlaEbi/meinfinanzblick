@@ -36,7 +36,7 @@ def update_sachvermoegen(item_id: int, data: SachvermoegenUpdate, db: Session = 
     obj = db.query(Sachvermoegen).filter(Sachvermoegen.id == item_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail='Sachwert nicht gefunden')
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(obj, field, value)
     obj.aktualisiert_am = datetime.now(timezone.utc)
     db.commit()

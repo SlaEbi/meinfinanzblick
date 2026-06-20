@@ -4,3 +4,7 @@ sqlalchemy==2.0.35
 pydantic==2.9.2
 python-multipart==0.0.12
 aiofiles==23.2.1
+
+# Tests
+pytest==8.3.3
+reportlab==4.2.5

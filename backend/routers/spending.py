@@ -79,7 +79,7 @@ def update_plan(plan_id: int, data: SpendingPlanUpdate, db: Session = Depends(ge
     plan = db.query(SpendingPlan).filter(SpendingPlan.id == plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail='Plan nicht gefunden')
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(plan, field, value)
     db.commit()
     db.refresh(plan)
@@ -118,7 +118,7 @@ def update_position(plan_id: int, pos_id: int, data: SpendingPositionUpdate,
     ).first()
     if not pos:
         raise HTTPException(status_code=404, detail='Position nicht gefunden')
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(pos, field, value)
     db.commit()
     db.refresh(pos)

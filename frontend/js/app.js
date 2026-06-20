@@ -1,4 +1,4 @@
-import { api } from './api.js?v=2';
+import { api } from './api.js?v=3';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,85 @@ const fmt = {
     return v.substring(0, 10);
   },
 };
+
+// ── Chart-Helfer ─────────────────────────────────────────────────────────────
+
+function isFintech() {
+  return document.documentElement.getAttribute('data-theme') === 'fintech';
+}
+
+// Liest eine CSS-Variable aus dem aktiven Theme
+function cssVar(name, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+// Theme-abhängige Achsen-/Linienfarben
+function chartTheme() {
+  return {
+    accent: cssVar('--seal-red', '#8A1C15'),
+    grey:   cssVar('--wash-grey', '#808080'),
+    grid:   isFintech() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+  };
+}
+
+// Theme-abhängige Farbpaletten für Donut-/Schulden-Charts
+const CHART_PALETTES = {
+  default: {
+    donut:    ['#8A1C15', '#4A5568', '#6B7532'],
+    schulden: ['#8A1C15', '#A83428', '#C4523C', '#D97A60', '#E8A080', '#F0C0A0'],
+  },
+  fintech: {
+    donut:    ['#C9A84C', '#6E7681', '#8A8C5A'],
+    schulden: ['#C9A84C', '#B8943E', '#A88234', '#98702A', '#876020', '#6E5018'],
+  },
+};
+function palette() {
+  return isFintech() ? CHART_PALETTES.fintech : CHART_PALETTES.default;
+}
+
+// Blendet eine Leer-Meldung ein/aus, OHNE das Canvas zu zerstören.
+// Gibt true zurück, wenn Daten vorhanden sind (Chart soll gezeichnet werden).
+function chartEmptyState(canvasId, isEmpty, message) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return false;
+  const wrap = canvas.parentElement;
+  let overlay = wrap.querySelector('.chart-empty');
+  if (isEmpty) {
+    canvas.style.display = 'none';
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'chart-empty';
+      wrap.appendChild(overlay);
+    }
+    overlay.textContent = message;
+    overlay.style.display = '';
+    return false;
+  }
+  canvas.style.display = '';
+  if (overlay) overlay.remove();
+  return true;
+}
+
+// ── Finanzmathematik ─────────────────────────────────────────────────────────
+
+// Annuitäts-Restlaufzeit in Monaten.
+// zinssatz als Dezimalwert (0.035 = 3,5 %). Gibt {monate} oder {fehler} zurück.
+function restlaufzeitMonate(restschuld, zinssatz, rate) {
+  if (!restschuld || !rate) return { fehler: 'unvollstaendig' };
+  const r = zinssatz / 12;
+  if (r <= 0) return { monate: Math.ceil(restschuld / rate) };
+  const zinsAnteil = restschuld * r;
+  if (rate <= zinsAnteil) return { fehler: 'rate_zu_niedrig' };
+  return { monate: Math.ceil(Math.log(rate / (rate - zinsAnteil)) / Math.log(1 + r)) };
+}
+
+function formatRestlaufzeit(monate) {
+  const jahre  = Math.floor(monate / 12);
+  const monRest = monate % 12;
+  return jahre > 0
+    ? `${jahre} Jahr${jahre !== 1 ? 'e' : ''} ${monRest > 0 ? monRest + ' Monat' + (monRest !== 1 ? 'e' : '') : ''}`.trim()
+    : `${monate} Monat${monate !== 1 ? 'e' : ''}`;
+}
 
 // ── State ───────────────────────────────────────────────────────────────────
 
@@ -145,8 +224,13 @@ function renderDonutChart() {
     nw.summe_sachvermoegen ?? 0,
   ];
 
-  const ctx = document.getElementById('chart-donut')?.getContext('2d');
-  if (!ctx) return;
+  const hatDaten = data.some(v => Number(v) > 0);
+  if (!chartEmptyState('chart-donut', !hatDaten, 'Noch kein Vermögen erfasst')) {
+    if (state.charts.donut) { state.charts.donut.destroy(); state.charts.donut = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-donut').getContext('2d');
+  const theme = chartTheme();
 
   if (state.charts.donut) state.charts.donut.destroy();
 
@@ -156,7 +240,7 @@ function renderDonutChart() {
       labels: ['Konten', 'Depots', 'Sachwerte'],
       datasets: [{
         data,
-        backgroundColor: ['#8A1C15', '#4A5568', '#6B7532'],
+        backgroundColor: palette().donut,
         borderWidth: 0,
         hoverOffset: 6,
       }],
@@ -168,7 +252,7 @@ function renderDonutChart() {
           position: 'bottom',
           labels: {
             font: { family: "'JetBrains Mono', monospace", size: 11 },
-            color: '#808080',
+            color: theme.grey,
             padding: 16,
             usePointStyle: true,
           },
@@ -185,19 +269,18 @@ function renderDonutChart() {
 }
 
 function renderSchuldenChart() {
-  const ctx = document.getElementById('chart-schulden')?.getContext('2d');
-  if (!ctx) return;
+  const darlehen = state.darlehen ?? [];
+
+  if (!chartEmptyState('chart-schulden', !darlehen.length, 'Keine Darlehen erfasst')) {
+    if (state.charts.schulden) { state.charts.schulden.destroy(); state.charts.schulden = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-schulden').getContext('2d');
+  const theme = chartTheme();
 
   if (state.charts.schulden) state.charts.schulden.destroy();
 
-  const darlehen = state.darlehen ?? [];
-
-  if (!darlehen.length) {
-    ctx.canvas.parentElement.innerHTML = '<div class="chart-empty">Keine Darlehen erfasst</div>';
-    return;
-  }
-
-  const SCHULDEN_COLORS = ['#8A1C15', '#A83428', '#C4523C', '#D97A60', '#E8A080', '#F0C0A0'];
+  const SCHULDEN_COLORS = palette().schulden;
   const labels = darlehen.map(d => d.bezeichnung);
   const data   = darlehen.map(d => Number(d.restschuld ?? 0));
   const colors = darlehen.map((_, i) => SCHULDEN_COLORS[i % SCHULDEN_COLORS.length]);
@@ -220,7 +303,7 @@ function renderSchuldenChart() {
           position: 'bottom',
           labels: {
             font: { family: "'JetBrains Mono', monospace", size: 11 },
-            color: '#808080',
+            color: theme.grey,
             padding: 12,
             usePointStyle: true,
           },
@@ -238,16 +321,15 @@ function renderSchuldenChart() {
 
 function renderVerlaufChart() {
   const verlauf = state.networth?.verlauf ?? [];
-  const ctx = document.getElementById('chart-verlauf')?.getContext('2d');
-  if (!ctx) return;
 
-  if (state.charts.verlauf) state.charts.verlauf.destroy();
-
-  if (verlauf.length === 0) {
-    ctx.canvas.parentElement.innerHTML =
-      '<p class="text-muted" style="text-align:center;padding:4rem 0;font-size:0.85rem">Noch keine Verlaufsdaten. Erstelle den ersten Snapshot.</p>';
+  if (!chartEmptyState('chart-verlauf', verlauf.length === 0, 'Noch keine Verlaufsdaten. Erstelle den ersten Snapshot.')) {
+    if (state.charts.verlauf) { state.charts.verlauf.destroy(); state.charts.verlauf = null; }
     return;
   }
+  const ctx = document.getElementById('chart-verlauf').getContext('2d');
+  const theme = chartTheme();
+
+  if (state.charts.verlauf) state.charts.verlauf.destroy();
 
   state.charts.verlauf = new Chart(ctx, {
     type: 'line',
@@ -256,13 +338,13 @@ function renderVerlaufChart() {
       datasets: [{
         label: 'Nettovermögen',
         data: verlauf.map(s => s.netto),
-        borderColor: '#8A1C15',
-        backgroundColor: 'rgba(138,28,21,0.06)',
+        borderColor: theme.accent,
+        backgroundColor: isFintech() ? 'rgba(201,168,76,0.08)' : 'rgba(138,28,21,0.06)',
         borderWidth: 2,
         fill: true,
         tension: 0.4,
         pointRadius: 3,
-        pointBackgroundColor: '#8A1C15',
+        pointBackgroundColor: theme.accent,
       }],
     },
     options: {
@@ -277,16 +359,16 @@ function renderVerlaufChart() {
         y: {
           ticks: {
             font: { family: "'JetBrains Mono', monospace", size: 10 },
-            color: '#808080',
+            color: theme.grey,
             callback: (v) => '€' + (v / 1000).toFixed(0) + 'k',
           },
-          grid: { color: 'rgba(0,0,0,0.04)' },
+          grid: { color: theme.grid },
           border: { dash: [4, 4] },
         },
         x: {
           ticks: {
             font: { family: "'JetBrains Mono', monospace", size: 10 },
-            color: '#808080',
+            color: theme.grey,
           },
           grid: { display: false },
         },
@@ -366,7 +448,7 @@ function renderKonten() {
         <button class="btn-icon" onclick="openKontoForm(${k.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="btn-icon danger" onclick="deleteKonto(${k.id}, '${escapeHtml(k.name)}')" title="Löschen">
+        <button class="btn-icon danger" onclick="deleteKonto(${k.id})" title="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div></td>
@@ -452,7 +534,8 @@ async function submitKontoForm() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteKonto = async function(id, name) {
+window.deleteKonto = async function(id) {
+  const name = state.konten.find(x => x.id === id)?.name ?? '';
   if (!confirm(`Konto „${name}" wirklich löschen?`)) return;
   try {
     await api.konten.delete(id);
@@ -486,6 +569,9 @@ function renderDarlehen() {
 
   tbody.innerHTML = state.darlehen.map(d => {
     const zinsbindungWarning = zinsbindungBald(d.zinsbindung_bis);
+    const rl = restlaufzeitMonate(Number(d.restschuld), Number(d.zinssatz), Number(d.rate_monatlich));
+    const rlText = rl.monate ? `noch ${formatRestlaufzeit(rl.monate)}`
+                 : rl.fehler === 'rate_zu_niedrig' ? 'Rate deckt Zinsen nicht' : '—';
     return `
     <tr>
       <td>
@@ -494,7 +580,10 @@ function renderDarlehen() {
       </td>
       <td class="mono text-red">${fmt.eur(d.restschuld)}</td>
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
-      <td class="mono">${fmt.eur(d.rate_monatlich)} / Mon.</td>
+      <td class="mono">
+        ${fmt.eur(d.rate_monatlich)} / Mon.
+        <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>
+      </td>
       <td>
         <span class="mono" style="font-size:0.75rem ${zinsbindungWarning ? ';color:var(--seal-red)' : ''}">
           ${d.zinsbindung_bis ? fmt.date(d.zinsbindung_bis) : '—'}
@@ -505,7 +594,7 @@ function renderDarlehen() {
         <button class="btn-icon" onclick="openDarlehenForm(${d.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="btn-icon danger" onclick="deleteDarlehen(${d.id}, '${escapeHtml(d.bezeichnung)}')" title="Löschen">
+        <button class="btn-icon danger" onclick="deleteDarlehen(${d.id})" title="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div></td>
@@ -585,26 +674,15 @@ window.openDarlehenForm = function(id = null) {
     const zinssatz     = (parseFloat(document.getElementById('f-zinssatz').value) || 0) / 100;
     const rate         = parseFloat(document.getElementById('f-rate').value) || 0;
     const el           = document.getElementById('f-restlaufzeit-display');
-    if (!restschuld || !rate) { el.textContent = '— Restschuld und Rate eingeben'; return; }
-    const r = zinssatz / 12;
-    let monate;
-    if (r <= 0) {
-      monate = Math.ceil(restschuld / rate);
-    } else {
-      const zinsAnteil = restschuld * r;
-      if (rate <= zinsAnteil) { el.textContent = '⚠ Rate deckt nicht die Zinsen'; return; }
-      monate = Math.ceil(Math.log(rate / (rate - zinsAnteil)) / Math.log(1 + r));
-    }
-    const jahre  = Math.floor(monate / 12);
-    const monRest = monate % 12;
-    const dauer = jahre > 0
-      ? `${jahre} Jahr${jahre !== 1 ? 'e' : ''} ${monRest > 0 ? monRest + ' Monat' + (monRest !== 1 ? 'e' : '') : ''}`.trim()
-      : `${monate} Monat${monate !== 1 ? 'e' : ''}`;
+    delete el.dataset.monate;
+    const res = restlaufzeitMonate(restschuld, zinssatz, rate);
+    if (res.fehler === 'unvollstaendig') { el.textContent = '— Restschuld und Rate eingeben'; return; }
+    if (res.fehler === 'rate_zu_niedrig') { el.textContent = 'Rate deckt nicht die Zinsen'; return; }
     const endDatum = new Date();
-    endDatum.setMonth(endDatum.getMonth() + monate);
+    endDatum.setMonth(endDatum.getMonth() + res.monate);
     const endLabel = endDatum.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-    el.textContent = `${dauer} (abbezahlt ${endLabel})`;
-    el.dataset.monate = monate;
+    el.textContent = `${formatRestlaufzeit(res.monate)} (abbezahlt ${endLabel})`;
+    el.dataset.monate = res.monate;
   }
 
   ['f-restschuld','f-zinssatz','f-rate'].forEach(id =>
@@ -644,7 +722,8 @@ async function submitDarlehenForm() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteDarlehen = async function(id, name) {
+window.deleteDarlehen = async function(id) {
+  const name = state.darlehen.find(x => x.id === id)?.bezeichnung ?? '';
   if (!confirm(`Darlehen „${name}" wirklich löschen?`)) return;
   try {
     await api.darlehen.delete(id);
@@ -692,7 +771,7 @@ function renderDepots() {
         <button class="btn-icon" onclick="openDepotForm(${dep.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="btn-icon danger" onclick="deleteDepot(${dep.id}, '${escapeHtml(dep.name)}')" title="Löschen">
+        <button class="btn-icon danger" onclick="deleteDepot(${dep.id})" title="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div></td>
@@ -772,7 +851,8 @@ async function submitDepotForm() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteDepot = async function(id, name) {
+window.deleteDepot = async function(id) {
+  const name = state.depots.find(x => x.id === id)?.name ?? '';
   if (!confirm(`Depot „${name}" wirklich löschen?`)) return;
   try {
     await api.depots.delete(id);
@@ -833,7 +913,7 @@ function renderSachwerte() {
         <button class="btn-icon" onclick="openSachwertForm(${s.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="btn-icon danger" onclick="deleteSachwert(${s.id}, '${escapeHtml(s.bezeichnung)}')" title="Löschen">
+        <button class="btn-icon danger" onclick="deleteSachwert(${s.id})" title="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
       </div></td>
@@ -908,7 +988,8 @@ async function submitSachwertForm() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteSachwert = async function(id, name) {
+window.deleteSachwert = async function(id) {
+  const name = state.sachwerte.find(x => x.id === id)?.bezeichnung ?? '';
   if (!confirm(`Sachwert „${name}" wirklich löschen?`)) return;
   try {
     await api.sachvermoegen.delete(id);
@@ -1548,7 +1629,7 @@ function renderVersicherungen() {
           <button class="btn-icon" onclick="openVersicherungForm(${v.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteVersicherung(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
+          <button class="btn-icon danger" onclick="deleteVersicherung(${v.id})" title="Löschen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div>
@@ -1592,7 +1673,7 @@ function renderVertraege() {
           <button class="btn-icon" onclick="openVertragForm(${v.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteVertrag(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
+          <button class="btn-icon danger" onclick="deleteVertrag(${v.id})" title="Löschen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div>
@@ -1702,8 +1783,9 @@ window.openVersicherungForm = async function(id = null) {
   openModal();
 };
 
-window.deleteVersicherung = async function(id, name) {
-  if (!confirm(`"${name}" wirklich löschen?`)) return;
+window.deleteVersicherung = async function(id) {
+  const name = state.versicherungen.find(x => x.id === id)?.bezeichnung ?? '';
+  if (!confirm(`„${name}" wirklich löschen?`)) return;
   try {
     await api.versicherungen.delete(id);
     state.versicherungen = state.versicherungen.filter(x => x.id !== id);
@@ -1801,8 +1883,9 @@ window.openVertragForm = async function(id = null) {
   openModal();
 };
 
-window.deleteVertrag = async function(id, name) {
-  if (!confirm(`"${name}" wirklich löschen?`)) return;
+window.deleteVertrag = async function(id) {
+  const name = state.vertraege.find(x => x.id === id)?.bezeichnung ?? '';
+  if (!confirm(`„${name}" wirklich löschen?`)) return;
   try {
     await api.vertraege.delete(id);
     state.vertraege = state.vertraege.filter(x => x.id !== id);
@@ -1854,7 +1937,7 @@ function renderDokumente() {
           <button class="btn-icon" onclick="openDokumentForm(${d.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteDokument(${d.id},'${escapeHtml(d.titel)}')" title="Löschen">
+          <button class="btn-icon danger" onclick="deleteDokument(${d.id})" title="Löschen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div>
@@ -1935,7 +2018,8 @@ window.openDokumentForm = (id = null) => {
   openModal();
 };
 
-window.deleteDokument = async (id, titel) => {
+window.deleteDokument = async (id) => {
+  const titel = state.dokumente.find(x => x.id === id)?.titel ?? '';
   if (!confirm(`„${titel}" wirklich löschen?`)) return;
   try {
     await api.dokumente.delete(id);
@@ -2019,7 +2103,7 @@ function renderNotfall() {
           <button class="btn-icon" onclick="openKontaktForm(${k.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteKontakt(${k.id},'${name}')" title="Löschen">
+          <button class="btn-icon danger" onclick="deleteKontakt(${k.id})" title="Löschen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div></td>
@@ -2056,7 +2140,7 @@ function renderNotfall() {
             <button class="btn-icon" onclick="openNotfallForm(${e.id})" title="Bearbeiten">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button class="btn-icon danger" onclick="deleteNotfallEintrag(${e.id},'${titel}')" title="Löschen">
+            <button class="btn-icon danger" onclick="deleteNotfallEintrag(${e.id})" title="Löschen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
             </button>
           </div></td>
@@ -2077,7 +2161,7 @@ function renderNotfall() {
           <button class="btn-icon" onclick="openNotfallForm(${e.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button class="btn-icon danger" onclick="deleteNotfallEintrag(${e.id},'${titel}')" title="Löschen">
+          <button class="btn-icon danger" onclick="deleteNotfallEintrag(${e.id})" title="Löschen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           </button>
         </div></td>
@@ -2185,7 +2269,8 @@ async function saveKontakt() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteKontakt = async (id, name) => {
+window.deleteKontakt = async (id) => {
+  const name = state.kontakte.find(x => x.id === id)?.name ?? '';
   if (!confirm(`Kontakt „${name}" wirklich löschen?`)) return;
   try {
     await api.kontakte.delete(id);
@@ -2257,7 +2342,8 @@ async function saveNotfallEintrag() {
   } catch (e) { toast(e.message); }
 }
 
-window.deleteNotfallEintrag = async (id, titel) => {
+window.deleteNotfallEintrag = async (id) => {
+  const titel = state.notfall.find(x => x.id === id)?.titel ?? '';
   if (!confirm(`Eintrag „${titel}" wirklich löschen?`)) return;
   try {
     await api.notfall.delete(id);

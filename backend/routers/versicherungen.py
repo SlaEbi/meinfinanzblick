@@ -33,7 +33,7 @@ def update_versicherung(vid: int, data: VersicherungUpdate, db: Session = Depend
     v = db.query(Versicherung).filter(Versicherung.id == vid).first()
     if not v:
         raise HTTPException(status_code=404, detail='Versicherung nicht gefunden')
-    for k, val in data.model_dump(exclude_none=True).items():
+    for k, val in data.model_dump(exclude_unset=True).items():
         setattr(v, k, val)
     db.commit()
     db.refresh(v)
@@ -70,7 +70,7 @@ def update_vertrag(vid: int, data: VertragUpdate, db: Session = Depends(get_db))
     v = db.query(Vertrag).filter(Vertrag.id == vid).first()
     if not v:
         raise HTTPException(status_code=404, detail='Vertrag nicht gefunden')
-    for k, val in data.model_dump(exclude_none=True).items():
+    for k, val in data.model_dump(exclude_unset=True).items():
         setattr(v, k, val)
     db.commit()
     db.refresh(v)

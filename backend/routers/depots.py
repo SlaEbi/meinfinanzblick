@@ -36,7 +36,7 @@ def update_depot(depot_id: int, data: DepotUpdate, db: Session = Depends(get_db)
     depot = db.query(Depot).filter(Depot.id == depot_id).first()
     if not depot:
         raise HTTPException(status_code=404, detail='Depot nicht gefunden')
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(depot, field, value)
     depot.aktualisiert_am = datetime.now(timezone.utc)
     db.commit()
