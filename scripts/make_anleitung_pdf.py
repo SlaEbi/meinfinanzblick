@@ -23,10 +23,10 @@ BORDER  = colors.HexColor("#E0DDD5")
 
 def make_styles():
     return {
-        "title":    ParagraphStyle("title",    fontName="Helvetica-Bold",    fontSize=22, textColor=DARK,  spaceAfter=2,  alignment=TA_LEFT),
-        "subtitle": ParagraphStyle("subtitle", fontName="Helvetica",         fontSize=11, textColor=MUTED, spaceAfter=14, alignment=TA_LEFT),
-        "section":  ParagraphStyle("section",  fontName="Helvetica-Bold",    fontSize=9.5, textColor=GOLD, spaceAfter=5, spaceBefore=4),
-        "heading":  ParagraphStyle("heading",  fontName="Helvetica-Bold",    fontSize=13, textColor=DARK,  spaceAfter=6),
+        "title":    ParagraphStyle("title",    fontName="Helvetica-Bold",    fontSize=22, leading=27, textColor=DARK,  spaceAfter=6,  alignment=TA_LEFT),
+        "subtitle": ParagraphStyle("subtitle", fontName="Helvetica",         fontSize=11, leading=15, textColor=MUTED, spaceAfter=14, alignment=TA_LEFT),
+        "section":  ParagraphStyle("section",  fontName="Helvetica-Bold",    fontSize=9.5, leading=13, textColor=GOLD, spaceAfter=5, spaceBefore=4),
+        "heading":  ParagraphStyle("heading",  fontName="Helvetica-Bold",    fontSize=13, leading=17, textColor=DARK,  spaceAfter=6),
         "body":     ParagraphStyle("body",     fontName="Helvetica",         fontSize=10.5, textColor=DARK, spaceAfter=6, leading=16),
         "hint":     ParagraphStyle("hint",     fontName="Helvetica-Oblique", fontSize=9.5,  textColor=MUTED, spaceAfter=4, leading=14),
         "code":     ParagraphStyle("code",     fontName="Courier-Bold",      fontSize=10.5, textColor=WHITE, spaceAfter=0, leading=16),
@@ -63,13 +63,32 @@ def build():
     story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD, spaceAfter=18))
     story.append(Paragraph(
         "Diese Anleitung fuehrt dich Schritt fuer Schritt durch die Einrichtung. "
-        "Python ist bereits installiert &mdash; das war der schwerste Teil. "
-        "Du brauchst ca. <b>10 Minuten</b> und eine Internetverbindung.",
+        "Du brauchst keinerlei Vorkenntnisse, nur ca. <b>15 Minuten</b> und eine "
+        "Internetverbindung. Folge den Schritten einfach der Reihe nach.",
         s["body"]))
     story.append(Spacer(1, 14))
 
     # Schritt 1
     story.append(Paragraph("SCHRITT 1", s["section"]))
+    story.append(Paragraph("Python installieren", s["heading"]))
+    story.append(Paragraph(
+        "Python ist das Programm, mit dem MeinFinanzblick laeuft. "
+        "Oeffne deinen Browser und gehe auf:", s["body"]))
+    story.append(Spacer(1, 4))
+    story.append(code_block("python.org/downloads", s))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(
+        "Klicke auf den grossen gelben Knopf <b>Download Python</b>. "
+        "Es laedt eine Datei herunter (Endung <b>.pkg</b>). "
+        "Doppelklicke sie und klicke dich durch die Installation "
+        "&mdash; immer auf <b>Weiter</b> bzw. <b>Fortfahren</b> und am Ende <b>Installieren</b>.", s["body"]))
+    story.append(Paragraph(
+        "Falls Python schon installiert ist: einfach weiter zu Schritt 2.",
+        s["hint"]))
+    story.append(Spacer(1, 12))
+
+    # Schritt 2
+    story.append(Paragraph("SCHRITT 2", s["section"]))
     story.append(Paragraph("Terminal oeffnen", s["heading"]))
     story.append(Paragraph(
         "Druecke gleichzeitig <b>Command (Cmd) + Leertaste</b>, "
@@ -79,8 +98,8 @@ def build():
         s["hint"]))
     story.append(Spacer(1, 12))
 
-    # Schritt 2
-    story.append(Paragraph("SCHRITT 2", s["section"]))
+    # Schritt 3
+    story.append(Paragraph("SCHRITT 3", s["section"]))
     story.append(Paragraph("Entwicklerwerkzeuge installieren (einmalig)", s["heading"]))
     story.append(Paragraph("Tippe den folgenden Befehl <b>exakt so</b> ein und druecke <b>Enter</b>:", s["body"]))
     story.append(Spacer(1, 4))
@@ -89,11 +108,11 @@ def build():
     story.append(Paragraph(
         'Falls ein Fenster aufpoppt: auf "Installieren" klicken und warten '
         '(ca. 2-5 Minuten). Falls die Meldung "already installed" erscheint: '
-        'alles gut, weiter zu Schritt 3.', s["hint"]))
+        'alles gut, weiter zu Schritt 4.', s["hint"]))
     story.append(Spacer(1, 12))
 
-    # Schritt 3
-    story.append(Paragraph("SCHRITT 3", s["section"]))
+    # Schritt 4
+    story.append(Paragraph("SCHRITT 4", s["section"]))
     story.append(Paragraph("App herunterladen", s["heading"]))
     story.append(Paragraph("Tippe diese zwei Zeilen nacheinander ein &mdash; jede mit <b>Enter</b> bestaetigen:", s["body"]))
     story.append(Spacer(1, 4))
@@ -102,8 +121,8 @@ def build():
     story.append(code_block("cd meinfinanzblick", s))
     story.append(Spacer(1, 12))
 
-    # Schritt 4
-    story.append(Paragraph("SCHRITT 4", s["section"]))
+    # Schritt 5
+    story.append(Paragraph("SCHRITT 5", s["section"]))
     story.append(Paragraph("App einrichten", s["heading"]))
     story.append(Paragraph("Tippe diesen Befehl ein und druecke <b>Enter</b>:", s["body"]))
     story.append(Spacer(1, 4))
@@ -115,8 +134,8 @@ def build():
         s["hint"]))
     story.append(Spacer(1, 12))
 
-    # Schritt 5
-    story.append(Paragraph("SCHRITT 5", s["section"]))
+    # Schritt 6
+    story.append(Paragraph("SCHRITT 6", s["section"]))
     story.append(Paragraph("App-Symbol in den Programme-Ordner legen", s["heading"]))
     rows = [
         ["1.", "Oeffne den Finder (das blaue Gesicht im Dock)"],
@@ -153,7 +172,9 @@ def build():
     story.append(Paragraph("FALLS ETWAS NICHT FUNKTIONIERT", s["section"]))
     problems = [
         ['"command not found: make"',
-         "Schritt 2 nochmal ausfuehren, Terminal neu oeffnen, ab Schritt 3 wiederholen."],
+         "Schritt 3 nochmal ausfuehren, Terminal neu oeffnen, ab Schritt 4 wiederholen."],
+        ['"command not found: python"',
+         "Schritt 1 wurde uebersprungen &mdash; Python von python.org installieren, Terminal neu oeffnen."],
         ["Weisser Bildschirm im Browser",
          "Kurz warten (10 Sekunden) und Seite neu laden mit Cmd + R."],
         ["Sonstiges",
