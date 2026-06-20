@@ -7,7 +7,7 @@ from typing import Optional
 
 class KontoBase(BaseModel):
     name: str
-    bank: str
+    bank: Optional[str] = None
     typ: str
     iban: Optional[str] = None
     saldo: float
@@ -106,6 +106,7 @@ class DarlehenBase(BaseModel):
     zinsbindung_bis: Optional[date] = None
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: bool = False
+    sondertilgung_betrag: Optional[float] = None
 
 
 class DarlehenCreate(DarlehenBase):
@@ -122,6 +123,7 @@ class DarlehenUpdate(BaseModel):
     zinsbindung_bis: Optional[date] = None
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: Optional[bool] = None
+    sondertilgung_betrag: Optional[float] = None
 
 
 class DarlehenResponse(DarlehenBase):

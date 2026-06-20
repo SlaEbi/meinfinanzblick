@@ -12,16 +12,17 @@ Base.metadata.create_all(bind=engine)
 # Fehlende Spalten in bestehenden Datenbanken ergänzen
 def _migrate():
     migrations = [
-        ("konten", "kontoinhaber",       "TEXT"),
-        ("konten", "notiz",              "TEXT"),
-        ("konten", "bitwarden_name",     "TEXT"),
-        ("depots", "broker",             "TEXT"),
-        ("depots", "depotinhaber",       "TEXT"),
-        ("depots", "wertpapierdepot_nr", "TEXT"),
-        ("depots", "verrechnungskonto",  "TEXT"),
-        ("depots", "auszahlungskonto",   "TEXT"),
-        ("depots", "bitwarden_name",     "TEXT"),
-        ("depots", "notiz",              "TEXT"),
+        ("konten",   "kontoinhaber",         "TEXT"),
+        ("konten",   "notiz",                "TEXT"),
+        ("konten",   "bitwarden_name",       "TEXT"),
+        ("depots",   "broker",               "TEXT"),
+        ("depots",   "depotinhaber",         "TEXT"),
+        ("depots",   "wertpapierdepot_nr",   "TEXT"),
+        ("depots",   "verrechnungskonto",    "TEXT"),
+        ("depots",   "auszahlungskonto",     "TEXT"),
+        ("depots",   "bitwarden_name",       "TEXT"),
+        ("depots",   "notiz",                "TEXT"),
+        ("darlehen", "sondertilgung_betrag", "NUMERIC"),
     ]
     with engine.connect() as conn:
         for table, col, typ in migrations:

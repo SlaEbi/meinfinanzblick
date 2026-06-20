@@ -10,7 +10,7 @@ class Konto(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    bank = Column(String, nullable=False)
+    bank = Column(String)
     typ = Column(String, nullable=False)  # giro, tagesgeld, festgeld, sparkonto
     iban = Column(String)
     saldo = Column(Numeric(14, 2), nullable=False, default=0)
@@ -64,8 +64,9 @@ class Darlehen(Base):
     zinssatz = Column(Numeric(6, 4), nullable=False)   # 0.0350 = 3.50 %
     rate_monatlich = Column(Numeric(14, 2), nullable=False)
     zinsbindung_bis = Column(Date)
-    restlaufzeit = Column(Integer)                      # Monate
+    restlaufzeit = Column(Integer)                      # Monate (berechnet)
     sondertilgung_moeglich = Column(Boolean, default=False)
+    sondertilgung_betrag = Column(Numeric(14, 2))       # max. jährliche Sondertilgung in €
 
 
 class SpendingPlan(Base):

@@ -102,6 +102,7 @@ function renderCurrentView() {
   if (state.view === 'sachwerte')      renderSachwerte();
   if (state.view === 'spending')       renderSpending();
   if (state.view === 'versicherungen') renderVersicherungen();
+  if (state.view === 'vertraege')      renderVertraege();
   if (state.view === 'notfall')        renderNotfall();
 }
 
@@ -329,7 +330,7 @@ function renderKonten() {
   if (!tbody) return;
 
   if (!state.konten.length) {
-    tbody.innerHTML = `<tr><td colspan="6">
+    tbody.innerHTML = `<tr><td colspan="5">
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
@@ -347,11 +348,10 @@ function renderKonten() {
   tbody.innerHTML = state.konten.map(k => `
     <tr>
       <td>
-        <strong>${k.name}</strong>
+        <strong>${escapeHtml(k.name)}</strong>
         ${k.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(k.kontoinhaber)}</span>` : ''}
         ${k.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(k.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(k.bitwarden_name)}</a>` : ''}
       </td>
-      <td>${k.bank}</td>
       <td><span class="badge badge-${k.typ}">${k.typ}</span></td>
       <td class="mono">${k.iban ? maskIBAN(k.iban) : '—'}</td>
       <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">
@@ -382,14 +382,10 @@ window.openKontoForm = function(id = null) {
 
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-group">
-      <label class="form-label">Name <span class="required">*</span></label>
-      <input id="f-name" class="form-input" placeholder="z. B. Girokonto DKB" value="${escapeHtml(konto?.name ?? '')}" required>
-    </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Bank <span class="required">*</span></label>
-        <input id="f-bank" class="form-input" placeholder="DKB, ING, Sparkasse…" value="${escapeHtml(konto?.bank ?? '')}">
+        <label class="form-label">Name <span class="required">*</span></label>
+        <input id="f-name" class="form-input" placeholder="z. B. Girokonto DKB" value="${escapeHtml(konto?.name ?? '')}" required>
       </div>
       <div class="form-group">
         <label class="form-label">Kontotyp <span class="required">*</span></label>
@@ -405,26 +401,16 @@ window.openKontoForm = function(id = null) {
       <input id="f-iban" class="form-input mono" placeholder="DE12 3456 7890 1234 5678 90" value="${escapeHtml(konto?.iban ?? '')}">
       <p class="form-hint">Wird maskiert angezeigt (nur zur Identifikation)</p>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Saldo (€) <span class="required">*</span></label>
-        <input id="f-saldo" class="form-input" type="number" step="0.01" value="${konto?.saldo ?? 0}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Währung</label>
-        <select id="f-waehrung" class="form-select">
-          ${['EUR','USD','CHF','GBP'].map(w =>
-            `<option value="${w}" ${(konto?.waehrung ?? 'EUR') === w ? 'selected' : ''}>${w}</option>`
-          ).join('')}
-        </select>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Saldo (€) <span class="required">*</span></label>
+      <input id="f-saldo" class="form-input" type="number" step="0.01" value="${konto?.saldo ?? 0}">
     </div>
     <div class="form-group">
       <label class="form-label">Kontoinhaber</label>
       <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(konto?.kontoinhaber ?? '')}">
     </div>
     <div class="form-group">
-      <label class="form-label">Bitwarden-Eintrag</label>
+      <label class="form-label">Passwortsafe-Eintrag</label>
       <input id="f-bitwarden" class="form-input" placeholder="z. B. Sparkasse Girokonto" value="${escapeHtml(konto?.bitwarden_name ?? '')}">
       <p class="form-hint">Klick in der Tabelle öffnet vault.bitwarden.com</p>
     </div>
@@ -439,17 +425,16 @@ window.openKontoForm = function(id = null) {
 
 async function submitKontoForm() {
   const data = {
-    name:     document.getElementById('f-name').value.trim(),
-    bank:     document.getElementById('f-bank').value.trim(),
-    typ:      document.getElementById('f-typ').value,
-    iban:          document.getElementById('f-iban').value.trim() || null,
-    saldo:         parseFloat(document.getElementById('f-saldo').value) || 0,
-    waehrung:      document.getElementById('f-waehrung').value,
+    name:           document.getElementById('f-name').value.trim(),
+    typ:            document.getElementById('f-typ').value,
+    iban:           document.getElementById('f-iban').value.trim() || null,
+    saldo:          parseFloat(document.getElementById('f-saldo').value) || 0,
+    waehrung:       'EUR',
     kontoinhaber:   document.getElementById('f-kontoinhaber').value.trim() || null,
     bitwarden_name: document.getElementById('f-bitwarden').value.trim() || null,
     notiz:          document.getElementById('f-notiz').value.trim() || null,
   };
-  if (!data.name || !data.bank) return toast('Bitte Name und Bank ausfüllen.');
+  if (!data.name) return toast('Bitte einen Namen eingeben.');
   try {
     if (state.editingId) {
       await api.konten.update(state.editingId, data);
@@ -567,23 +552,62 @@ window.openDarlehenForm = function(id = null) {
         <input id="f-rate" class="form-input" type="number" step="0.01" value="${d?.rate_monatlich ?? 0}">
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Zinsbindung bis</label>
-        <input id="f-zinsbindung" class="form-input" type="date" value="${fmt.dateISO(d?.zinsbindung_bis)}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Restlaufzeit (Monate)</label>
-        <input id="f-restlaufzeit" class="form-input" type="number" value="${d?.restlaufzeit ?? ''}">
+    <div class="form-group">
+      <label class="form-label">Zinsbindung bis</label>
+      <input id="f-zinsbindung" class="form-input" type="date" value="${fmt.dateISO(d?.zinsbindung_bis)}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Restlaufzeit bei aktuellen Konditionen</label>
+      <div id="f-restlaufzeit-display" class="form-input" style="background:var(--input-bg,#f8f8f8);color:var(--wash-grey);cursor:default;min-height:42px;display:flex;align-items:center">
+        — wird automatisch berechnet
       </div>
     </div>
     <div class="form-group">
       <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
-        <input id="f-sonder" type="checkbox" ${d?.sondertilgung_moeglich ? 'checked' : ''}>
+        <input id="f-sonder" type="checkbox" ${d?.sondertilgung_moeglich ? 'checked' : ''}
+          onchange="document.getElementById('f-sonder-betrag-row').style.display=this.checked?'block':'none'">
         Sondertilgung möglich
       </label>
     </div>
+    <div id="f-sonder-betrag-row" class="form-group" style="display:${d?.sondertilgung_moeglich ? 'block' : 'none'}">
+      <label class="form-label">Max. jährliche Sondertilgung (€)</label>
+      <input id="f-sonder-betrag" class="form-input" type="number" step="0.01"
+        placeholder="z. B. 5000" value="${d?.sondertilgung_betrag ?? ''}">
+    </div>
   `;
+
+  function updateRestlaufzeit() {
+    const restschuld   = parseFloat(document.getElementById('f-restschuld').value) || 0;
+    const zinssatz     = (parseFloat(document.getElementById('f-zinssatz').value) || 0) / 100;
+    const rate         = parseFloat(document.getElementById('f-rate').value) || 0;
+    const el           = document.getElementById('f-restlaufzeit-display');
+    if (!restschuld || !rate) { el.textContent = '— Restschuld und Rate eingeben'; return; }
+    const r = zinssatz / 12;
+    let monate;
+    if (r <= 0) {
+      monate = Math.ceil(restschuld / rate);
+    } else {
+      const zinsAnteil = restschuld * r;
+      if (rate <= zinsAnteil) { el.textContent = '⚠ Rate deckt nicht die Zinsen'; return; }
+      monate = Math.ceil(Math.log(rate / (rate - zinsAnteil)) / Math.log(1 + r));
+    }
+    const jahre  = Math.floor(monate / 12);
+    const monRest = monate % 12;
+    const dauer = jahre > 0
+      ? `${jahre} Jahr${jahre !== 1 ? 'e' : ''} ${monRest > 0 ? monRest + ' Monat' + (monRest !== 1 ? 'e' : '') : ''}`.trim()
+      : `${monate} Monat${monate !== 1 ? 'e' : ''}`;
+    const endDatum = new Date();
+    endDatum.setMonth(endDatum.getMonth() + monate);
+    const endLabel = endDatum.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    el.textContent = `${dauer} (abbezahlt ${endLabel})`;
+    el.dataset.monate = monate;
+  }
+
+  ['f-restschuld','f-zinssatz','f-rate'].forEach(id =>
+    document.getElementById(id)?.addEventListener('input', updateRestlaufzeit)
+  );
+  updateRestlaufzeit();
+
   document.getElementById('modal-submit').onclick = submitDarlehenForm;
   openModal();
 };
@@ -598,8 +622,9 @@ async function submitDarlehenForm() {
     zinssatz:               zinssatzInput / 100,
     rate_monatlich:         parseFloat(document.getElementById('f-rate').value) || 0,
     zinsbindung_bis:        document.getElementById('f-zinsbindung').value || null,
-    restlaufzeit:           parseInt(document.getElementById('f-restlaufzeit').value) || null,
+    restlaufzeit:           parseInt(document.getElementById('f-restlaufzeit-display').dataset.monate) || null,
     sondertilgung_moeglich: document.getElementById('f-sonder').checked,
+    sondertilgung_betrag:   parseFloat(document.getElementById('f-sonder-betrag')?.value) || null,
   };
   if (!data.bezeichnung || !data.glaeubiger) return toast('Bitte Bezeichnung und Gläubiger ausfüllen.');
   try {
@@ -631,7 +656,7 @@ function renderDepots() {
   if (!tbody) return;
 
   if (!state.depots.length) {
-    tbody.innerHTML = `<tr><td colspan="6">
+    tbody.innerHTML = `<tr><td colspan="5">
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -653,7 +678,6 @@ function renderDepots() {
         ${dep.depotinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(dep.depotinhaber)}</span>` : ''}
         ${dep.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(dep.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(dep.bitwarden_name)}</a>` : ''}
       </td>
-      <td>${dep.broker ? escapeHtml(dep.broker) : '—'}</td>
       <td class="mono text-muted" style="font-size:0.8rem">${dep.wertpapierdepot_nr ?? '—'}</td>
       <td class="mono text-muted" style="font-size:0.8rem">${dep.verrechnungskonto ?? '—'}</td>
       <td class="right mono">
@@ -678,15 +702,9 @@ window.openDepotForm = function(id = null) {
 
   document.getElementById('modal-title').textContent = id ? 'Depot bearbeiten' : 'Depot hinzufügen';
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Name <span class="required">*</span></label>
-        <input id="f-name" class="form-input" placeholder="ETF-Depot" value="${escapeHtml(dep?.name ?? '')}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Broker</label>
-        <input id="f-broker" class="form-input" placeholder="comdirect, ING, Scalable…" value="${escapeHtml(dep?.broker ?? '')}">
-      </div>
+    <div class="form-group">
+      <label class="form-label">Name / Broker <span class="required">*</span></label>
+      <input id="f-name" class="form-input" placeholder="z. B. Scalable Capital, Trade Republic…" value="${escapeHtml(dep?.name ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label">Depotinhaber</label>
@@ -728,7 +746,6 @@ window.openDepotForm = function(id = null) {
 async function submitDepotForm() {
   const data = {
     name:               document.getElementById('f-name').value.trim(),
-    broker:             document.getElementById('f-broker').value.trim() || null,
     depotinhaber:       document.getElementById('f-depotinhaber').value.trim() || null,
     wertpapierdepot_nr: document.getElementById('f-depot-nr').value.trim() || null,
     verrechnungskonto:  document.getElementById('f-verrechnungskonto').value.trim() || null,
@@ -1464,19 +1481,16 @@ function vsFristCell(item) {
   return `<span class="vs-frist-cell">${txt}</span>`;
 }
 
-function renderFristenBanner(items) {
+function renderFristenBanner(items, bannerId) {
   const urgent = [];
   for (const item of items) {
     const days = vsDaysTillKuendigung(item);
-    if (days !== null && days <= 90) {
-      urgent.push({ ...item, _days: days });
-    }
+    if (days !== null && days <= 90) urgent.push({ ...item, _days: days });
   }
   urgent.sort((a, b) => a._days - b._days);
-  const banner = document.getElementById('vs-fristen-banner');
+  const banner = document.getElementById(bannerId);
   if (!banner) return;
   if (!urgent.length) { banner.innerHTML = ''; return; }
-
   banner.innerHTML = `<div class="vs-fristen-banner">${urgent.map(item => {
     const cls = item._days <= 30 ? 'urgent' : 'warn';
     const name = item.bezeichnung || item.art;
@@ -1496,95 +1510,91 @@ function renderFristenBanner(items) {
 }
 
 function renderVersicherungen() {
-  const vs  = state.versicherungen ?? [];
-  const vt  = state.vertraege ?? [];
-
-  // Fristen-Banner (alle zusammen prüfen)
-  renderFristenBanner([...vs, ...vt]);
-
-  // Jahressummen
+  const vs = state.versicherungen ?? [];
+  renderFristenBanner(vs, 'vs-fristen-banner');
   const sumVs = vs.reduce((s, v) => s + vsJahresbeitrag(v, 'beitrag'), 0);
-  const sumVt = vt.reduce((s, v) => s + vsJahresbeitrag(v, 'kosten'), 0);
-  const el = id => document.getElementById(id);
-  if (el('vs-sum-versicherungen')) el('vs-sum-versicherungen').textContent = fmt.eur(sumVs);
-  if (el('vs-sum-vertraege'))      el('vs-sum-vertraege').textContent      = fmt.eur(sumVt);
-  if (el('vs-sum-gesamt'))         el('vs-sum-gesamt').textContent         = fmt.eur(sumVs + sumVt);
+  const elSum = document.getElementById('vs-sum-versicherungen');
+  if (elSum) elSum.textContent = fmt.eur(sumVs);
 
-  // Versicherungen-Tabelle
   const vstb = document.getElementById('versicherungen-tbody');
-  if (vstb) {
-    if (!vs.length) {
-      vstb.innerHTML = `<tr><td colspan="8" class="empty-row">Noch keine Versicherungen erfasst</td></tr>`;
-    } else {
-      vstb.innerHTML = vs.map(v => {
-        const artKey = v.art?.toLowerCase().replace(/\s+/g,'') || 'sonstiges';
-        const artLabel = VS_ART_LABEL[artKey] ?? v.art;
-        const jahres = vsJahresbeitrag(v, 'beitrag');
-        return `<tr>
-          <td><span class="vs-art-badge vs-badge-${artKey}">${escapeHtml(artLabel)}</span></td>
-          <td>
-            <strong>${escapeHtml(v.bezeichnung)}</strong>
-            <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${escapeHtml(v.anbieter)}</span>
-          </td>
-          <td class="mono" style="font-size:var(--text-xs)">${v.vertragsnummer ? escapeHtml(v.vertragsnummer) : '—'}</td>
-          <td class="mono">
-            ${fmt.eur(jahres)}
-            <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${fmt.eur(v.beitrag)} / ${v.zahlweise}</span>
-          </td>
-          <td>${vsLaufzeitCell(v)}</td>
-          <td>${vsFristCell(v)}</td>
-          <td class="right">
-            <div class="action-cell">
-              <button class="btn-icon" onclick="openVersicherungForm(${v.id})" title="Bearbeiten">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button class="btn-icon danger" onclick="deleteVersicherung(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-              </button>
-            </div>
-          </td>
-        </tr>`;
-      }).join('');
-    }
+  if (!vstb) return;
+  if (!vs.length) {
+    vstb.innerHTML = `<tr><td colspan="7" class="empty-row">Noch keine Versicherungen erfasst</td></tr>`;
+    return;
   }
+  vstb.innerHTML = vs.map(v => {
+    const artKey = v.art?.toLowerCase().replace(/\s+/g,'') || 'sonstiges';
+    const artLabel = VS_ART_LABEL[artKey] ?? v.art;
+    const jahres = vsJahresbeitrag(v, 'beitrag');
+    return `<tr>
+      <td><span class="vs-art-badge vs-badge-${artKey}">${escapeHtml(artLabel)}</span></td>
+      <td>
+        <strong>${escapeHtml(v.bezeichnung)}</strong>
+        <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${escapeHtml(v.anbieter)}</span>
+      </td>
+      <td class="mono" style="font-size:var(--text-xs)">${v.vertragsnummer ? escapeHtml(v.vertragsnummer) : '—'}</td>
+      <td class="mono">
+        ${fmt.eur(jahres)}
+        <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${fmt.eur(v.beitrag)} / ${v.zahlweise}</span>
+      </td>
+      <td>${vsLaufzeitCell(v)}</td>
+      <td>${vsFristCell(v)}</td>
+      <td class="right">
+        <div class="action-cell">
+          <button class="btn-icon" onclick="openVersicherungForm(${v.id})" title="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteVersicherung(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
 
-  // Verträge-Tabelle
+function renderVertraege() {
+  const vt = state.vertraege ?? [];
+  renderFristenBanner(vt, 'vt-fristen-banner');
+  const sumVt = vt.reduce((s, v) => s + vsJahresbeitrag(v, 'kosten'), 0);
+  const elSum = document.getElementById('vt-sum-vertraege');
+  if (elSum) elSum.textContent = fmt.eur(sumVt);
+
   const vttb = document.getElementById('vertraege-tbody');
-  if (vttb) {
-    if (!vt.length) {
-      vttb.innerHTML = `<tr><td colspan="8" class="empty-row">Noch keine Verträge erfasst</td></tr>`;
-    } else {
-      vttb.innerHTML = vt.map(v => {
-        const artKey = v.art?.toLowerCase().replace(/\s+/g,'') || 'sonstiges';
-        const artLabel = VT_ART_LABEL[artKey] ?? v.art;
-        const jahres = vsJahresbeitrag(v, 'kosten');
-        return `<tr>
-          <td><span class="vs-art-badge vs-badge-${artKey}">${escapeHtml(artLabel)}</span></td>
-          <td>
-            <strong>${escapeHtml(v.bezeichnung)}</strong>
-            <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${escapeHtml(v.anbieter)}</span>
-          </td>
-          <td class="mono" style="font-size:var(--text-xs)">${v.vertragsnummer ? escapeHtml(v.vertragsnummer) : '—'}</td>
-          <td class="mono">
-            ${fmt.eur(jahres)}
-            <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${fmt.eur(v.kosten)} / ${v.zahlweise}</span>
-          </td>
-          <td>${vsLaufzeitCell(v)}</td>
-          <td>${vsFristCell(v)}</td>
-          <td class="right">
-            <div class="action-cell">
-              <button class="btn-icon" onclick="openVertragForm(${v.id})" title="Bearbeiten">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button class="btn-icon danger" onclick="deleteVertrag(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-              </button>
-            </div>
-          </td>
-        </tr>`;
-      }).join('');
-    }
+  if (!vttb) return;
+  if (!vt.length) {
+    vttb.innerHTML = `<tr><td colspan="7" class="empty-row">Noch keine Verträge erfasst</td></tr>`;
+    return;
   }
+  vttb.innerHTML = vt.map(v => {
+    const artKey = v.art?.toLowerCase().replace(/\s+/g,'') || 'sonstiges';
+    const artLabel = VT_ART_LABEL[artKey] ?? v.art;
+    const jahres = vsJahresbeitrag(v, 'kosten');
+    return `<tr>
+      <td><span class="vs-art-badge vs-badge-${artKey}">${escapeHtml(artLabel)}</span></td>
+      <td>
+        <strong>${escapeHtml(v.bezeichnung)}</strong>
+        <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${escapeHtml(v.anbieter)}</span>
+      </td>
+      <td class="mono" style="font-size:var(--text-xs)">${v.vertragsnummer ? escapeHtml(v.vertragsnummer) : '—'}</td>
+      <td class="mono">
+        ${fmt.eur(jahres)}
+        <br><span style="font-size:var(--text-xs);color:var(--wash-grey)">${fmt.eur(v.kosten)} / ${v.zahlweise}</span>
+      </td>
+      <td>${vsLaufzeitCell(v)}</td>
+      <td>${vsFristCell(v)}</td>
+      <td class="right">
+        <div class="action-cell">
+          <button class="btn-icon" onclick="openVertragForm(${v.id})" title="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteVertrag(${v.id},'${escapeHtml(v.bezeichnung)}')" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Versicherung Form ─────────────────────────────────────────────────────────
@@ -1781,7 +1791,7 @@ window.openVertragForm = async function(id = null) {
         toast('Vertrag hinzugefügt.');
       }
       closeModal();
-      renderVersicherungen();
+      renderVertraege();
     } catch (e) { toast(e.message); }
   };
   openModal();
@@ -1792,7 +1802,7 @@ window.deleteVertrag = async function(id, name) {
   try {
     await api.vertraege.delete(id);
     state.vertraege = state.vertraege.filter(x => x.id !== id);
-    renderVersicherungen();
+    renderVertraege();
     toast('Vertrag gelöscht.');
   } catch (e) { toast(e.message); }
 };
@@ -1972,14 +1982,14 @@ window.openKontaktForm = (id = null) => {
   const k = id ? state.kontakte.find(x => x.id === id) : null;
   document.getElementById('modal-title').textContent = id ? 'Kontakt bearbeiten' : 'Kontakt hinzufügen';
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-row two-col">
+    <div class="form-row">
       <div class="form-group">
-        <label>Name*</label>
-        <input id="f-name" type="text" value="${k?.name ?? ''}" placeholder="Max Mustermann">
+        <label class="form-label">Name <span class="required">*</span></label>
+        <input id="f-name" class="form-input" type="text" value="${k?.name ?? ''}" placeholder="Max Mustermann">
       </div>
       <div class="form-group">
-        <label>Rolle*</label>
-        <select id="f-rolle">
+        <label class="form-label">Rolle <span class="required">*</span></label>
+        <select id="f-rolle" class="form-input">
           ${Object.entries(NF_ROLLE_LABEL).map(([v,l]) =>
             `<option value="${v}" ${k?.rolle===v?'selected':''}>${l}</option>`
           ).join('')}
@@ -1987,26 +1997,26 @@ window.openKontaktForm = (id = null) => {
       </div>
     </div>
     <div class="form-group">
-      <label>Firma / Institut</label>
-      <input id="f-firma" type="text" value="${k?.firma ?? ''}" placeholder="z.B. Kanzlei Müller">
+      <label class="form-label">Firma / Institut</label>
+      <input id="f-firma" class="form-input" type="text" value="${k?.firma ?? ''}" placeholder="z. B. Kanzlei Müller">
     </div>
-    <div class="form-row two-col">
+    <div class="form-row">
       <div class="form-group">
-        <label>Telefon</label>
-        <input id="f-telefon" type="text" value="${k?.telefon ?? ''}" placeholder="+49 ...">
+        <label class="form-label">Telefon</label>
+        <input id="f-telefon" class="form-input" type="text" value="${k?.telefon ?? ''}" placeholder="+49 …">
       </div>
       <div class="form-group">
-        <label>E-Mail</label>
-        <input id="f-email" type="email" value="${k?.email ?? ''}" placeholder="name@example.de">
+        <label class="form-label">E-Mail</label>
+        <input id="f-email" class="form-input" type="email" value="${k?.email ?? ''}" placeholder="name@example.de">
       </div>
     </div>
     <div class="form-group">
-      <label>Adresse</label>
-      <input id="f-adresse" type="text" value="${k?.adresse ?? ''}" placeholder="Musterstraße 1, 12345 Stadt">
+      <label class="form-label">Adresse</label>
+      <input id="f-adresse" class="form-input" type="text" value="${k?.adresse ?? ''}" placeholder="Musterstraße 1, 12345 Stadt">
     </div>
     <div class="form-group">
-      <label>Notiz</label>
-      <textarea id="f-notiz" rows="2" placeholder="Zusätzliche Infos...">${k?.notiz ?? ''}</textarea>
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="2" placeholder="Zusätzliche Infos…">${k?.notiz ?? ''}</textarea>
     </div>`;
   document.getElementById('modal-submit').onclick = saveKontakt;
   openModal();
@@ -2053,21 +2063,21 @@ window.openNotfallForm = (id = null) => {
   document.getElementById('modal-title').textContent = id ? 'Eintrag bearbeiten' : 'Notfall-Eintrag hinzufügen';
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group">
-      <label>Titel*</label>
-      <input id="f-titel" type="text" value="${e?.titel ?? ''}" placeholder="z.B. Passwort-Manager, Testament, ...">
+      <label class="form-label">Titel <span class="required">*</span></label>
+      <input id="f-titel" class="form-input" type="text" value="${e?.titel ?? ''}" placeholder="z. B. Passwort-Manager, Testament …">
     </div>
-    <div class="form-row two-col">
+    <div class="form-row">
       <div class="form-group">
-        <label>Kategorie*</label>
-        <select id="f-kategorie">
+        <label class="form-label">Kategorie <span class="required">*</span></label>
+        <select id="f-kategorie" class="form-input">
           ${Object.entries(NF_KAT_LABEL).map(([v,l]) =>
             `<option value="${v}" ${e?.kategorie===v?'selected':''}>${l}</option>`
           ).join('')}
         </select>
       </div>
       <div class="form-group">
-        <label>Priorität</label>
-        <select id="f-prioritaet">
+        <label class="form-label">Priorität</label>
+        <select id="f-prioritaet" class="form-input">
           <option value="1" ${e?.prioritaet===1?'selected':''}>Sofort</option>
           <option value="2" ${(!e||e.prioritaet===2)?'selected':''}>Normal</option>
           <option value="3" ${e?.prioritaet===3?'selected':''}>Irgendwann</option>
@@ -2075,12 +2085,12 @@ window.openNotfallForm = (id = null) => {
       </div>
     </div>
     <div class="form-group">
-      <label>Wo liegt es / Verweis</label>
-      <input id="f-verweis" type="text" value="${e?.verweis ?? ''}" placeholder="z.B. Bitwarden › Kategorie Finanzen / Safe im Arbeitszimmer">
+      <label class="form-label">Wo liegt es / Verweis</label>
+      <input id="f-verweis" class="form-input" type="text" value="${e?.verweis ?? ''}" placeholder="z. B. Bitwarden › Finanzen / Safe im Arbeitszimmer">
     </div>
     <div class="form-group">
-      <label>Hinweis (kein Klartext-Passwort!)</label>
-      <textarea id="f-hinweis" rows="3" placeholder="Zusätzliche Hinweise für den Ernstfall...">${e?.hinweis ?? ''}</textarea>
+      <label class="form-label">Hinweis <span style="color:var(--wash-grey);font-weight:400">(kein Klartext-Passwort!)</span></label>
+      <textarea id="f-hinweis" class="form-input" rows="3" placeholder="Zusätzliche Hinweise für den Ernstfall …">${e?.hinweis ?? ''}</textarea>
     </div>`;
   document.getElementById('modal-submit').onclick = saveNotfallEintrag;
   openModal();
