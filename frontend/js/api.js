@@ -100,8 +100,9 @@ export const api = {
   },
 
   networth: {
-    get:      ()  => request('GET',  '/networth/'),
-    snapshot: ()  => request('POST', '/networth/snapshot'),
+    get:            ()   => request('GET',    '/networth/'),
+    snapshot:       ()   => request('POST',   '/networth/snapshot'),
+    deleteSnapshot: (id) => request('DELETE', `/networth/snapshot/${id}`),
   },
 
   anhaenge: {

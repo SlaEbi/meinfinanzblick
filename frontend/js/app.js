@@ -1,4 +1,4 @@
-import { api } from './api.js?v=4';
+import { api } from './api.js?v=5';
 import { DEMO } from './demo.js?v=1';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
@@ -409,8 +409,36 @@ function renderSchuldenChart() {
   });
 }
 
+function renderSnapshotList() {
+  const el = document.getElementById('snapshot-list');
+  if (!el) return;
+  const verlauf = [...(state.networth?.verlauf ?? [])].reverse();
+  if (!verlauf.length) { el.innerHTML = ''; return; }
+  el.innerHTML = verlauf.map(s => `
+    <div class="snapshot-row">
+      <span class="snapshot-date mono">${new Date(s.datum).toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'numeric' })}</span>
+      <span class="snapshot-val mono">${fmt.eur(s.netto)}</span>
+      <button class="btn-icon danger snapshot-del" onclick="deleteSnapshot(${s.id})" title="Snapshot löschen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+window.deleteSnapshot = async function(id) {
+  const s = state.networth?.verlauf?.find(x => x.id === id);
+  const label = s ? new Date(s.datum).toLocaleDateString('de-DE') : `#${id}`;
+  if (!confirm(`Snapshot vom ${label} wirklich löschen?`)) return;
+  try {
+    await api.networth.deleteSnapshot(id);
+    toast('Snapshot gelöscht.');
+    await refresh();
+  } catch (e) { toast(e.message); }
+};
+
 function renderVerlaufChart() {
   const verlauf = state.networth?.verlauf ?? [];
+
+  renderSnapshotList();
 
   if (!chartEmptyState('chart-verlauf', verlauf.length === 0, 'Noch keine Verlaufsdaten. Erstelle den ersten Snapshot.')) {
     if (state.charts.verlauf) { state.charts.verlauf.destroy(); state.charts.verlauf = null; }

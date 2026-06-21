@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
@@ -47,6 +47,16 @@ def get_networth(db: Session = Depends(get_db)):
         .all()
     )
     return NetWorthData(aktuell=aktuell, verlauf=verlauf)
+
+
+@router.delete('/snapshot/{snapshot_id}', status_code=204)
+def delete_snapshot(snapshot_id: int, db: Session = Depends(get_db)):
+    s = db.query(NetWorthSnapshot).filter(NetWorthSnapshot.id == snapshot_id).first()
+    if not s:
+        raise HTTPException(404, 'Snapshot nicht gefunden')
+    db.delete(s)
+    db.commit()
+    return None
 
 
 @router.post('/snapshot', response_model=NetWorthSnapshotResponse, status_code=201)
