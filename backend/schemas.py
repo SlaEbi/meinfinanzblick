@@ -120,6 +120,7 @@ class DarlehenBase(BaseModel):
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: bool = False
     sondertilgung_betrag: Optional[float] = None
+    hat_ust_auf_zinsen: bool = False
     notiz: Optional[str] = None
 
 
@@ -141,6 +142,7 @@ class DarlehenUpdate(BaseModel):
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: Optional[bool] = None
     sondertilgung_betrag: Optional[float] = None
+    hat_ust_auf_zinsen: Optional[bool] = None
     notiz: Optional[str] = None
 
 

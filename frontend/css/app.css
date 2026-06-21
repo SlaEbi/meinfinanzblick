@@ -1767,34 +1767,74 @@ html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
 }
 .btn-anhang-upload:hover { border-color: var(--seal-red); color: var(--seal-red); }
 
-/* ── Snapshot-Liste ────────────────────────────────────────────────────────── */
+/* ── Snapshot-Popup ─────────────────────────────────────────────────────────── */
 
-.snapshot-list {
-  margin-top: var(--space-3);
-  max-height: 160px;
-  overflow-y: auto;
-  border-top: 1px solid var(--ink-wash);
+.snapshot-popup {
+  position: fixed;
+  z-index: 2000;
+  background: var(--surface);
+  border: 1px solid var(--ink-wash);
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: var(--space-3);
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  animation: fadeInUp 150ms ease-out;
 }
 
-.snapshot-row {
+.snapshot-popup-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  padding: 4px var(--space-1);
-  border-bottom: 1px solid var(--ink-wash);
-  font-size: 0.75rem;
 }
-.snapshot-row:last-child { border-bottom: none; }
 
-.snapshot-date { color: var(--text-muted); flex: 1; }
-.snapshot-val  { color: var(--ink-black); font-weight: 500; }
-
-.snapshot-del {
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 150ms;
+.snapshot-popup-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
 }
-.snapshot-row:hover .snapshot-del { opacity: 1; }
+
+.snapshot-popup-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: color 150ms, background 150ms;
+}
+.snapshot-popup-close:hover { color: var(--ink-black); background: var(--ink-wash); }
+
+.snapshot-popup-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-black);
+}
+
+.snapshot-popup-del {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: 1px solid var(--seal-red);
+  color: var(--seal-red);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-family: 'Noto Serif JP', serif;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.snapshot-popup-del:hover {
+  background: var(--seal-red);
+  color: #fff;
+}
 
 /* ── Demo-Modus ────────────────────────────────────────────────────────────── */
 

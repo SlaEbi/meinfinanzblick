@@ -421,25 +421,46 @@ function renderSchuldenChart() {
   });
 }
 
-function renderSnapshotList() {
-  const el = document.getElementById('snapshot-list');
-  if (!el) return;
-  const verlauf = [...(state.networth?.verlauf ?? [])].reverse();
-  if (!verlauf.length) { el.innerHTML = ''; return; }
-  el.innerHTML = verlauf.map(s => `
-    <div class="snapshot-row">
-      <span class="snapshot-date mono">${new Date(s.datum).toLocaleDateString('de-DE', { day:'2-digit', month:'short', year:'numeric' })}</span>
-      <span class="snapshot-val mono">${fmt.eur(s.netto)}</span>
-      <button class="btn-icon danger snapshot-del" onclick="deleteSnapshot(${s.id})" title="Snapshot löschen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+// ── Snapshot Popup ──────────────────────────────────────────────────────────
+
+function closeSnapshotPopup() {
+  document.getElementById('snapshot-popup')?.remove();
+}
+
+function showSnapshotPopup(snapshot, nativeEvent) {
+  closeSnapshotPopup();
+  const popup = document.createElement('div');
+  popup.id = 'snapshot-popup';
+  popup.className = 'snapshot-popup';
+  const datum = new Date(snapshot.datum).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+  popup.innerHTML = `
+    <div class="snapshot-popup-header">
+      <span class="snapshot-popup-date">${datum}</span>
+      <button class="snapshot-popup-close" onclick="closeSnapshotPopup()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
-    </div>`).join('');
+    </div>
+    <div class="snapshot-popup-val mono">${fmt.eur(snapshot.netto)}</div>
+    <button class="snapshot-popup-del" onclick="deleteSnapshot(${snapshot.id})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      Löschen
+    </button>`;
+
+  // Popup an Klickposition setzen, innerhalb des Viewports halten
+  document.body.appendChild(popup);
+  const pw = popup.offsetWidth || 160;
+  const ph = popup.offsetHeight || 90;
+  let x = nativeEvent.clientX + 12;
+  let y = nativeEvent.clientY - ph / 2;
+  if (x + pw > window.innerWidth  - 8) x = nativeEvent.clientX - pw - 12;
+  if (y < 8)                           y = 8;
+  if (y + ph > window.innerHeight - 8) y = window.innerHeight - ph - 8;
+  popup.style.left = x + 'px';
+  popup.style.top  = y + 'px';
 }
 
 window.deleteSnapshot = async function(id) {
-  const s = state.networth?.verlauf?.find(x => x.id === id);
-  const label = s ? new Date(s.datum).toLocaleDateString('de-DE') : `#${id}`;
-  if (!confirm(`Snapshot vom ${label} wirklich löschen?`)) return;
+  closeSnapshotPopup();
   try {
     await api.networth.deleteSnapshot(id);
     toast('Snapshot gelöscht.');
@@ -449,8 +470,6 @@ window.deleteSnapshot = async function(id) {
 
 function renderVerlaufChart() {
   const verlauf = state.networth?.verlauf ?? [];
-
-  renderSnapshotList();
 
   if (!chartEmptyState('chart-verlauf', verlauf.length === 0, 'Noch keine Verlaufsdaten. Erstelle den ersten Snapshot.')) {
     if (state.charts.verlauf) { state.charts.verlauf.destroy(); state.charts.verlauf = null; }
@@ -473,11 +492,18 @@ function renderVerlaufChart() {
         borderWidth: 2,
         fill: true,
         tension: 0.4,
-        pointRadius: 3,
+        pointRadius: 5,
+        pointHoverRadius: 8,
         pointBackgroundColor: theme.accent,
+        pointHoverBackgroundColor: theme.accent,
       }],
     },
     options: {
+      cursor: 'pointer',
+      onClick: (event, elements) => {
+        if (!elements.length) { closeSnapshotPopup(); return; }
+        showSnapshotPopup(verlauf[elements[0].index], event.native);
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -530,13 +556,20 @@ function renderDashboardDarlehen() {
     el.innerHTML = '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:2rem">Noch keine Darlehen erfasst</td></tr>';
     return;
   }
-  el.innerHTML = state.darlehen.slice(0, 5).map(d => `
+  el.innerHTML = state.darlehen.slice(0, 5).map(d => {
+    const anteil = d.anteil_pct != null ? Number(d.anteil_pct) : 100;
+    const restschuld = Number(d.restschuld);
+    const schuldenZelle = anteil < 100
+      ? `<strong>${fmt.eur(restschuld * anteil / 100)}</strong><br>
+         <span class="text-muted" style="font-size:0.7rem">Gesamt: ${fmt.eur(restschuld)}</span>`
+      : fmt.eur(restschuld);
+    return `
     <tr>
       <td>${d.bezeichnung}<br><span class="text-muted" style="font-size:0.75rem">${d.glaeubiger}</span></td>
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
-      <td class="right mono text-red">${fmt.eur(d.restschuld)}</td>
-    </tr>
-  `).join('');
+      <td class="right mono text-red">${schuldenZelle}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── Konten View ─────────────────────────────────────────────────────────────
@@ -708,24 +741,36 @@ function renderDarlehen() {
     const restschuld        = Number(d.restschuld);
     const zinssatz          = Number(d.zinssatz);
     const tilgungsrate      = Number(d.tilgungsrate_monatlich ?? 0);
+    const rateNetto         = Number(d.rate_monatlich);   // bei Annuität: Tilgung+Zinsen netto
     const zinsenAktuell     = restschuld * zinssatz / 12;
-    const rateAktuell       = isTilg ? tilgungsrate + zinsenAktuell : Number(d.rate_monatlich);
+    const ustAufZinsen      = d.hat_ust_auf_zinsen ? zinsenAktuell * 0.19 : 0;
+    const rateAktuell       = isTilg
+      ? tilgungsrate + zinsenAktuell + ustAufZinsen
+      : rateNetto + ustAufZinsen;
 
-    // Restlaufzeit
+    // Restlaufzeit — immer auf Basis der Nettorate (ohne USt, die den Schuldenabbau nicht beeinflusst)
     let rlText;
     if (isTilg) {
       const monate = tilgungsrate > 0 ? Math.ceil(restschuld / tilgungsrate) : null;
       rlText = monate ? `noch ${formatRestlaufzeit(monate)}` : '—';
     } else {
-      const rl = restlaufzeitMonate(restschuld, zinssatz, rateAktuell);
+      const rl = restlaufzeitMonate(restschuld, zinssatz, rateNetto);
       rlText = rl.monate ? `noch ${formatRestlaufzeit(rl.monate)}`
              : rl.fehler === 'rate_zu_niedrig' ? 'Rate deckt Zinsen nicht' : '—';
     }
 
-    // Rate-Zelle: bei Tilgungsdarlehen Aufschlüsselung zeigen
-    const rateHtml = isTilg
+    // Rate-Aufschlüsselung
+    let rateDetails;
+    if (isTilg) {
+      rateDetails = `Tilgung ${fmt.eur(tilgungsrate)} + Zinsen ${fmt.eur(zinsenAktuell)}`;
+      if (ustAufZinsen > 0) rateDetails += ` + USt ${fmt.eur(ustAufZinsen)}`;
+    } else if (ustAufZinsen > 0) {
+      const tilgungAkt = rateNetto - zinsenAktuell;
+      rateDetails = `Tilgung ${fmt.eur(tilgungAkt)} + Zinsen ${fmt.eur(zinsenAktuell)} + USt ${fmt.eur(ustAufZinsen)}`;
+    }
+    const rateHtml = (isTilg || ustAufZinsen > 0)
       ? `${fmt.eur(rateAktuell)} / Mon.
-         <br><span class="text-muted" style="font-size:0.7rem">Tilgung ${fmt.eur(tilgungsrate)} + Zinsen ${fmt.eur(zinsenAktuell)}</span>
+         <br><span class="text-muted" style="font-size:0.7rem">${rateDetails}</span>
          <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>`
       : `${fmt.eur(rateAktuell)} / Mon.
          <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>`;
@@ -737,8 +782,10 @@ function renderDarlehen() {
         <span class="text-muted" style="font-size:0.75rem">${d.glaeubiger}</span>
       </td>
       <td class="mono text-red">
-        ${fmt.eur(d.restschuld)}
-        ${(d.anteil_pct != null && Number(d.anteil_pct) < 100) ? `<br><span class="text-muted" style="font-size:0.7rem">Anteil ${Number(d.anteil_pct)} %: ${fmt.eur(d.restschuld * Number(d.anteil_pct) / 100)}</span>` : ''}
+        ${(d.anteil_pct != null && Number(d.anteil_pct) < 100)
+          ? `<strong>${fmt.eur(d.restschuld * Number(d.anteil_pct) / 100)}</strong>
+             <br><span class="text-muted" style="font-size:0.7rem">Gesamt: ${fmt.eur(d.restschuld)}</span>`
+          : fmt.eur(d.restschuld)}
       </td>
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
       <td class="mono">${rateHtml}</td>
@@ -790,7 +837,7 @@ window.openDarlehenForm = function(id = null) {
         <input id="f-urspr" class="form-input" type="number" step="0.01" value="${d?.urspr_betrag ?? 0}">
       </div>
       <div class="form-group">
-        <label class="form-label">Restschuld (€) <span class="required">*</span></label>
+        <label class="form-label">Restschuld (€) — Stand ${new Date().toLocaleDateString('de-DE')} <span class="required">*</span></label>
         <input id="f-restschuld" class="form-input" type="number" step="0.01" value="${d?.restschuld ?? 0}">
       </div>
     </div>
@@ -835,6 +882,12 @@ window.openDarlehenForm = function(id = null) {
       <div id="f-restlaufzeit-display" class="form-input" style="background:var(--input-bg,#f8f8f8);color:var(--wash-grey);cursor:default;min-height:42px;display:flex;align-items:center">
         — wird automatisch berechnet
       </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+        <input id="f-ust" type="checkbox" ${d?.hat_ust_auf_zinsen ? 'checked' : ''}>
+        19 % Umsatzsteuer auf Zinsen (gewerbliches Darlehen)
+      </label>
     </div>
     <div class="form-group">
       <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
@@ -917,6 +970,7 @@ async function submitDarlehenForm() {
     restlaufzeit:           parseInt(document.getElementById('f-restlaufzeit-display').dataset.monate) || null,
     sondertilgung_moeglich: document.getElementById('f-sonder').checked,
     sondertilgung_betrag:   parseFloat(document.getElementById('f-sonder-betrag')?.value) || null,
+    hat_ust_auf_zinsen:     document.getElementById('f-ust').checked,
     notiz:                  document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.bezeichnung || !data.glaeubiger) return toast('Bitte Bezeichnung und Gläubiger ausfüllen.');
@@ -1163,8 +1217,10 @@ function renderSachwerte() {
         ${wertEntwicklung !== null ? `<br><span class="${parseFloat(wertEntwicklung) >= 0 ? 'text-green' : 'text-red'}" style="font-size:0.7rem">${wertEntwicklung >= 0 ? '+' : ''}${wertEntwicklung} %</span>` : ''}
       </td>
       <td class="right mono">
-        ${fmt.eur(s.aktueller_wert)}
-        ${(s.anteil_pct != null && Number(s.anteil_pct) < 100) ? `<br><span class="text-muted" style="font-size:0.7rem">Anteil ${Number(s.anteil_pct)} %: ${fmt.eur(s.aktueller_wert * Number(s.anteil_pct) / 100)}</span>` : ''}
+        ${(s.anteil_pct != null && Number(s.anteil_pct) < 100)
+          ? `<strong>${fmt.eur(s.aktueller_wert * Number(s.anteil_pct) / 100)}</strong>
+             <br><span class="text-muted" style="font-size:0.7rem">Gesamt: ${fmt.eur(s.aktueller_wert)}</span>`
+          : fmt.eur(s.aktueller_wert)}
       </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openSachwertForm(${s.id})" title="Bearbeiten">
@@ -2823,6 +2879,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Resize, falls die Maus dabei über den Rand des Modals hinausgleitet.
   document.getElementById('modal-overlay')?.addEventListener('mousedown', e => {
     if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  // Snapshot-Popup bei Klick außerhalb oder Escape schließen
+  document.addEventListener('mousedown', e => {
+    const popup = document.getElementById('snapshot-popup');
+    if (popup && !popup.contains(e.target)) closeSnapshotPopup();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSnapshotPopup();
   });
 
   // Theme aus localStorage wiederherstellen

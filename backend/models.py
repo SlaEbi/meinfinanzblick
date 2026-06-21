@@ -76,6 +76,7 @@ class Darlehen(Base):
     restlaufzeit = Column(Integer)                      # Monate (berechnet)
     sondertilgung_moeglich = Column(Boolean, default=False)
     sondertilgung_betrag = Column(Numeric(14, 2))       # max. jährliche Sondertilgung in €
+    hat_ust_auf_zinsen = Column(Boolean, default=False) # 19 % USt auf Zinsen (gewerbliche Darlehen)
     notiz = Column(String)
 
 
