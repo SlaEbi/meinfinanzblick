@@ -1,7 +1,7 @@
 import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -30,7 +30,15 @@ def get_datei(anhang_id: int, db: Session = Depends(get_db)):
     path = os.path.join(UPLOADS_DIR, a.dateiname)
     if not os.path.exists(path):
         raise HTTPException(404, 'Datei nicht auf dem Server')
-    return FileResponse(path, filename=a.original_name, media_type=a.mime_type or 'application/octet-stream')
+    mime = a.mime_type or 'application/octet-stream'
+    # PDF und Bilder direkt im Browser anzeigen, alles andere herunterladen
+    can_inline = mime in ('application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp')
+    return FileResponse(
+        path,
+        media_type=mime,
+        filename=a.original_name,
+        content_disposition_type='inline' if can_inline else 'attachment',
+    )
 
 
 @router.get('/{entity_typ}/{entity_id}')
