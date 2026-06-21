@@ -1747,52 +1747,6 @@ async function renderSpendinPlan() {
       </div>
     </div>
 
-    <!-- Einkommens-Leiste -->
-    <div class="sp-income-bar">
-      <div class="sp-income-field">
-        <label>Brutto / Monat</label>
-        <input class="sp-income-input" type="number" step="50"
-          value="${spPlan.brutto_monatlich}"
-          onblur="spSavePlanField('brutto_monatlich', +this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()"> €
-      </div>
-      <div class="sp-income-field">
-        <label>Netto / Monat <span class="sp-income-hint">= Summe Einnahmen</span></label>
-        <div class="sp-income-computed mono" id="sp-netto-display">${fmt.eur(spNetto())}</div>
-      </div>
-      <div class="sp-puffer-label">
-        Sonstiges-Puffer:
-        <input id="sp-puffer-input" style="width:45px;font-family:var(--font-mono);border:none;border-bottom:1px solid var(--ink-wash);background:transparent;text-align:right"
-          type="number" step="1" min="0" max="30"
-          value="${Math.round((spPlan.sonstiges_puffer_pct ?? 0.05) * 100)}"
-          onblur="spSavePlanField('sonstiges_puffer_pct', this.value/100)"
-          oninput="spRecalc()"
-          onkeydown="if(event.key==='Enter')this.blur()"> %
-        auf Fixkosten
-      </div>
-    </div>
-
-    <!-- Einnahmen-Karte -->
-    <div class="sp-card sp-card-income">
-      <div class="sp-card-header">
-        <div class="sp-card-dot dot-income"></div>
-        <div class="sp-card-title">Einnahmen</div>
-        <div class="sp-card-target">Woraus sich das Netto-Einkommen zusammensetzt</div>
-        <div class="sp-card-pct mono" id="sp-income-total-head">${fmt.eur(spNetto())}</div>
-      </div>
-      <div class="sp-position-list" id="sp-einnahmen-list">
-        ${renderEinnahmen() || '<p class="sp-income-empty">Noch keine Einnahmen erfasst — füge deine Einkommensquellen hinzu.</p>'}
-      </div>
-      <button class="sp-add-btn" onclick="spAddPos('einnahmen')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
-        Einnahme hinzufügen
-      </button>
-      <div class="sp-total-row">
-        <span class="sp-total-label">Summe Einnahmen (Netto)</span>
-        <span class="sp-total-value" id="sp-income-total">${fmt.eur(spNetto())}</span>
-      </div>
-    </div>
-
     <!-- Allokations-Balken -->
     <div class="sp-alloc-bar">
       <div class="sp-alloc-segments" id="sp-alloc-segs">
@@ -1826,7 +1780,13 @@ async function renderSpendinPlan() {
           ${renderPositionen('fixkosten')}
         </div>
         <div class="sp-sonstiges-row">
-          <span>Sonstiges-Puffer (${Math.round((spPlan.sonstiges_puffer_pct??0.05)*100)} %)</span>
+          <span>Sonstiges-Puffer (<input id="sp-puffer-input"
+            style="width:42px;font-family:var(--font-mono);color:var(--ink-black);border:none;border-bottom:1px solid var(--ink-wash);background:transparent;text-align:right"
+            type="number" step="1" min="0" max="30"
+            value="${Math.round((spPlan.sonstiges_puffer_pct ?? 0.05) * 100)}"
+            onblur="spSavePlanField('sonstiges_puffer_pct', this.value/100)"
+            oninput="spRecalc()"
+            onkeydown="if(event.key==='Enter')this.blur()"> % auf Fixkosten)</span>
           <span id="sp-sonstiges-val" class="mono">${fmt.eur(sonstT)}</span>
         </div>
         <button class="sp-add-btn" onclick="spAddPos('fixkosten')">
@@ -1839,8 +1799,29 @@ async function renderSpendinPlan() {
         </div>
       </div>
 
-      <!-- Rechte Spalte: Investments, Spar-Ziele, Guilt-Free gestapelt -->
+      <!-- Rechte Spalte: Einnahmen, Investments, Spar-Ziele, Guilt-Free gestapelt -->
       <div class="sp-col-right">
+      <!-- Einnahmen-Karte -->
+      <div class="sp-card sp-card-income">
+        <div class="sp-card-header">
+          <div class="sp-card-dot dot-income"></div>
+          <div class="sp-card-title">Einnahmen</div>
+          <div class="sp-card-target">Woraus sich das Netto-Einkommen zusammensetzt</div>
+          <div class="sp-card-pct mono" id="sp-income-total-head">${fmt.eur(spNetto())}</div>
+        </div>
+        <div class="sp-position-list" id="sp-einnahmen-list">
+          ${renderEinnahmen() || '<p class="sp-income-empty">Noch keine Einnahmen erfasst — füge deine Einkommensquellen hinzu.</p>'}
+        </div>
+        <button class="sp-add-btn" onclick="spAddPos('einnahmen')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+          Einnahme hinzufügen
+        </button>
+        <div class="sp-total-row">
+          <span class="sp-total-label">Summe Einnahmen (Netto)</span>
+          <span class="sp-total-value" id="sp-income-total">${fmt.eur(spNetto())}</span>
+        </div>
+      </div>
+
       <!-- Investments -->
       <div class="sp-card">
         <div class="sp-card-header">
@@ -1952,8 +1933,15 @@ function spRecalc() {
   const puffInput = document.getElementById('sp-puffer-input');
   if (puffInput) spPlan.sonstiges_puffer_pct = parseFloat(puffInput.value) / 100 || 0.05;
 
-  // Netto live aus Einnahmen ableiten und anzeigen
-  const nettoLive = spNetto();
+  // Netto live DIREKT aus den sichtbaren Einnahme-Feldern summieren —
+  // garantiert, dass die angezeigte Summe immer mit den Zeilen übereinstimmt.
+  let nettoLive = 0, hatEinnahmen = false;
+  document.querySelectorAll('#sp-einnahmen-list .sp-income-pos').forEach(row => {
+    hatEinnahmen = true;
+    nettoLive += parseFloat(row.querySelector('.sp-pos-amount')?.value) || 0;
+  });
+  if (!hatEinnahmen) nettoLive = Number(spPlan.netto_monatlich) || 0;
+
   const setN = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   setN('sp-netto-display',     fmt.eur(nettoLive));
   setN('sp-income-total',      fmt.eur(nettoLive));
@@ -2076,7 +2064,7 @@ async function spSyncNetto() {
   if (!spPlan) return;
   const einnahmen = spGetPositionen('einnahmen');
   if (!einnahmen.length) return;
-  const netto = einnahmen.reduce((s, p) => s + (p.betrag || 0), 0);
+  const netto = einnahmen.reduce((s, p) => s + (Number(p.betrag) || 0), 0);
   if (Number(spPlan.netto_monatlich) === netto) return;
   spPlan.netto_monatlich = netto;
   try { await api.spending.update(spPlan.id, { netto_monatlich: netto }); } catch {}
@@ -2093,6 +2081,21 @@ window.spAddPos = async function(kat) {
       kategorie: kat, bezeichnung, betrag: 0, sort_order: maxOrder + 1,
     });
     spPlan.positionen.push(pos);
+
+    if (kat === 'einnahmen') {
+      // Zeile in-place anhängen — zerstört keine laufenden Eingaben in anderen Zeilen
+      const list = document.getElementById('sp-einnahmen-list');
+      if (list) {
+        const empty = list.querySelector('.sp-income-empty');
+        if (empty) empty.remove();
+        list.insertAdjacentHTML('beforeend', einnahmeRowHtml(pos));
+        const newRow = list.lastElementChild;
+        newRow?.querySelector('.sp-pos-name')?.focus();
+        spRecalc();
+        return;
+      }
+    }
+
     await renderSpendinPlan();
     // Fokus auf neue Zeile
     const rows = document.querySelectorAll(`#${SP_LIST_ID[kat] ?? 'sp-fix-list'} .sp-pos-name`);
@@ -2106,7 +2109,14 @@ window.spDeletePos = async function(posId) {
   try {
     await api.spending.deletePosition(spPlan.id, posId);
     spPlan.positionen = spPlan.positionen.filter(p => p.id !== posId);
-    if (wasEinnahme) await spSyncNetto();
+    if (wasEinnahme) {
+      // Zeile in-place entfernen, Totals neu rechnen — kein Voll-Neurender
+      const row = document.querySelector(`#sp-einnahmen-list .sp-income-pos[data-pos-id="${posId}"]`);
+      row?.remove();
+      await spSyncNetto();
+      spRecalc();
+      return;
+    }
     await renderSpendinPlan();
   } catch (e) { toast(e.message); }
 };
@@ -3398,6 +3408,8 @@ window.spSavePlanField  = spSavePlanField;
 window.spSavePosName    = spSavePosName;
 window.spSavePosAmount  = spSavePosAmount;
 window.spSavePosEmpf    = spSavePosEmpf;
+window.spQueueSaveName  = spQueueSaveName;
+window.spQueueSaveAmount = spQueueSaveAmount;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 
