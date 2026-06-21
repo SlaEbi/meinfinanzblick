@@ -119,25 +119,33 @@ function cssVar(name, fallback) {
 // Theme-abhängige Achsen-/Linienfarben
 function chartTheme() {
   return {
-    accent: cssVar('--seal-red', '#8A1C15'),
-    grey:   cssVar('--wash-grey', '#808080'),
-    grid:   isFintech() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    accent:  cssVar('--seal-red', '#8A1C15'),
+    grey:    cssVar('--wash-grey', '#808080'),
+    text:    cssVar('--ink-black', '#0D0D0D'),
+    grid:    isFintech() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
   };
 }
 
-// Theme-abhängige Farbpaletten für Donut-/Schulden-Charts
+// Theme-abhängige Farbpaletten für Donut-/Schulden-Charts.
+// Hue-divers statt monochrom — klare Unterscheidbarkeit in hell und dunkel.
 const CHART_PALETTES = {
+  // Sumi (hell): mittlere Sättigung, gut auf #F4F1E8
   default: {
-    donut:    ['#8A1C15', '#4A5568', '#6B7532'],
-    schulden: ['#8A1C15', '#A83428', '#C4523C', '#D97A60', '#E8A080', '#F0C0A0'],
+    donut:    ['#2D6A9F', '#4A7F35', '#C17A1E'],
+    schulden: ['#8A1C15', '#2D6A9F', '#4A7F35', '#C17A1E', '#7A5EA0', '#8A6040'],
   },
+  // Fintech (dunkel): hellere, gesättigtere Varianten für #242424
   fintech: {
-    donut:    ['#C9A84C', '#6E7681', '#8A8C5A'],
-    schulden: ['#C9A84C', '#B8943E', '#A88234', '#98702A', '#876020', '#6E5018'],
+    donut:    ['#4DA8E0', '#6DC44E', '#F0A030'],
+    schulden: ['#E04848', '#4DA8E0', '#6DC44E', '#F0A030', '#A880D8', '#C09060'],
   },
 };
 function palette() {
   return isFintech() ? CHART_PALETTES.fintech : CHART_PALETTES.default;
+}
+// Trenn-Farbe zwischen Segmenten (= Hintergrundsfarbe der Chart-Karte)
+function segmentBorder() {
+  return cssVar('--surface', '#FDFBF5');
 }
 
 // Blendet eine Leer-Meldung ein/aus, OHNE das Canvas zu zerstören.
@@ -331,7 +339,8 @@ function renderDonutChart() {
       datasets: [{
         data,
         backgroundColor: palette().donut,
-        borderWidth: 0,
+        borderColor: segmentBorder(),
+        borderWidth: 2,
         hoverOffset: 6,
       }],
     },
@@ -342,9 +351,10 @@ function renderDonutChart() {
           position: 'bottom',
           labels: {
             font: { family: "'JetBrains Mono', monospace", size: 11 },
-            color: theme.grey,
+            color: theme.text,
             padding: 16,
             usePointStyle: true,
+            pointStyleWidth: 10,
           },
         },
         tooltip: {
@@ -382,7 +392,8 @@ function renderSchuldenChart() {
       datasets: [{
         data,
         backgroundColor: colors,
-        borderWidth: 0,
+        borderColor: segmentBorder(),
+        borderWidth: 2,
         hoverOffset: 6,
       }],
     },
@@ -393,9 +404,10 @@ function renderSchuldenChart() {
           position: 'bottom',
           labels: {
             font: { family: "'JetBrains Mono', monospace", size: 11 },
-            color: theme.grey,
+            color: theme.text,
             padding: 12,
             usePointStyle: true,
+            pointStyleWidth: 10,
           },
         },
         tooltip: {
@@ -690,9 +702,34 @@ function renderDarlehen() {
 
   tbody.innerHTML = state.darlehen.map(d => {
     const zinsbindungWarning = zinsbindungBald(d.zinsbindung_bis);
-    const rl = restlaufzeitMonate(Number(d.restschuld), Number(d.zinssatz), Number(d.rate_monatlich));
-    const rlText = rl.monate ? `noch ${formatRestlaufzeit(rl.monate)}`
-                 : rl.fehler === 'rate_zu_niedrig' ? 'Rate deckt Zinsen nicht' : '—';
+    const isTilg = d.darlehen_typ === 'tilgungsdarlehen';
+
+    // Aktuelle Monatsrate berechnen
+    const restschuld        = Number(d.restschuld);
+    const zinssatz          = Number(d.zinssatz);
+    const tilgungsrate      = Number(d.tilgungsrate_monatlich ?? 0);
+    const zinsenAktuell     = restschuld * zinssatz / 12;
+    const rateAktuell       = isTilg ? tilgungsrate + zinsenAktuell : Number(d.rate_monatlich);
+
+    // Restlaufzeit
+    let rlText;
+    if (isTilg) {
+      const monate = tilgungsrate > 0 ? Math.ceil(restschuld / tilgungsrate) : null;
+      rlText = monate ? `noch ${formatRestlaufzeit(monate)}` : '—';
+    } else {
+      const rl = restlaufzeitMonate(restschuld, zinssatz, rateAktuell);
+      rlText = rl.monate ? `noch ${formatRestlaufzeit(rl.monate)}`
+             : rl.fehler === 'rate_zu_niedrig' ? 'Rate deckt Zinsen nicht' : '—';
+    }
+
+    // Rate-Zelle: bei Tilgungsdarlehen Aufschlüsselung zeigen
+    const rateHtml = isTilg
+      ? `${fmt.eur(rateAktuell)} / Mon.
+         <br><span class="text-muted" style="font-size:0.7rem">Tilgung ${fmt.eur(tilgungsrate)} + Zinsen ${fmt.eur(zinsenAktuell)}</span>
+         <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>`
+      : `${fmt.eur(rateAktuell)} / Mon.
+         <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>`;
+
     return `
     <tr>
       <td>
@@ -704,10 +741,7 @@ function renderDarlehen() {
         ${(d.anteil_pct != null && Number(d.anteil_pct) < 100) ? `<br><span class="text-muted" style="font-size:0.7rem">Anteil ${Number(d.anteil_pct)} %: ${fmt.eur(d.restschuld * Number(d.anteil_pct) / 100)}</span>` : ''}
       </td>
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
-      <td class="mono">
-        ${fmt.eur(d.rate_monatlich)} / Mon.
-        <br><span class="text-muted" style="font-size:0.7rem">${rlText}</span>
-      </td>
+      <td class="mono">${rateHtml}</td>
       <td>
         <span class="mono" style="font-size:0.75rem ${zinsbindungWarning ? ';color:var(--seal-red)' : ''}">
           ${d.zinsbindung_bis ? fmt.date(d.zinsbindung_bis) : '—'}
