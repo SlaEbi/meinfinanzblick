@@ -11,10 +11,20 @@ router = APIRouter(prefix='/networth', tags=['Net Worth'])
 
 
 def _berechne_aktuell(db: Session) -> NetWorthSummary:
-    summe_konten        = float(db.query(func.sum(Konto.saldo)).scalar() or 0)
-    summe_depots        = float(db.query(func.sum(Depot.wert_aktuell)).scalar() or 0)
-    summe_sachvermoegen = float(db.query(func.sum(Sachvermoegen.aktueller_wert)).scalar() or 0)
-    summe_schulden      = float(db.query(func.sum(Darlehen.restschuld)).scalar() or 0)
+    summe_konten  = float(db.query(func.sum(Konto.saldo)).scalar() or 0)
+    summe_depots  = float(db.query(func.sum(Depot.wert_aktuell)).scalar() or 0)
+
+    # Sachwerte und Darlehen mit Eigentumsanteil gewichten
+    sachwerte           = db.query(Sachvermoegen).all()
+    summe_sachvermoegen = sum(
+        float(s.aktueller_wert) * float(s.anteil_pct or 100) / 100
+        for s in sachwerte
+    )
+    darlehen       = db.query(Darlehen).all()
+    summe_schulden = sum(
+        float(d.restschuld) * float(d.anteil_pct or 100) / 100
+        for d in darlehen
+    )
     vermoegen_brutto    = summe_konten + summe_depots + summe_sachvermoegen
     netto               = vermoegen_brutto - summe_schulden
     return NetWorthSummary(

@@ -68,6 +68,7 @@ class Darlehen(Base):
     urspr_betrag = Column(Numeric(14, 2), nullable=False)
     restschuld = Column(Numeric(14, 2), nullable=False)
     zinssatz = Column(Numeric(6, 4), nullable=False)   # 0.0350 = 3.50 %
+    anteil_pct = Column(Numeric(5, 2), default=100)   # Eigentumsanteil in % (z. B. 50 bei GbR-Hälfte)
     darlehen_typ = Column(String, default='annuitaet')  # annuitaet | tilgungsdarlehen
     rate_monatlich = Column(Numeric(14, 2), nullable=False)
     tilgungsrate_monatlich = Column(Numeric(14, 2))     # feste monatl. Tilgung (Tilgungsdarlehen)
@@ -113,6 +114,7 @@ class Sachvermoegen(Base):
     kategorie = Column(String, nullable=False)  # immobilie, fahrzeug, kunst, schmuck, elektronik, sonstiges
     beschreibung = Column(String)
     aktueller_wert = Column(Numeric(14, 2), nullable=False, default=0)
+    anteil_pct = Column(Numeric(5, 2), default=100)  # Eigentumsanteil in % (z. B. 50 bei GbR-Hälfte)
     anschaffungswert = Column(Numeric(14, 2))
     anschaffungsjahr = Column(Integer)
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))

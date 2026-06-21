@@ -656,7 +656,10 @@ function renderDarlehen() {
         <strong>${d.bezeichnung}</strong><br>
         <span class="text-muted" style="font-size:0.75rem">${d.glaeubiger}</span>
       </td>
-      <td class="mono text-red">${fmt.eur(d.restschuld)}</td>
+      <td class="mono text-red">
+        ${fmt.eur(d.restschuld)}
+        ${(d.anteil_pct != null && Number(d.anteil_pct) < 100) ? `<br><span class="text-muted" style="font-size:0.7rem">Anteil ${Number(d.anteil_pct)} %: ${fmt.eur(d.restschuld * Number(d.anteil_pct) / 100)}</span>` : ''}
+      </td>
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
       <td class="mono">
         ${fmt.eur(d.rate_monatlich)} / Mon.
@@ -720,6 +723,13 @@ window.openDarlehenForm = function(id = null) {
         <input id="f-zinssatz" class="form-input" type="number" step="0.001" value="${d ? (d.zinssatz * 100).toFixed(3) : ''}">
         <p class="form-hint">z. B. 3.5 für 3,50 %</p>
       </div>
+      <div class="form-group">
+        <label class="form-label">Mein Anteil (%)</label>
+        <input id="f-anteil" class="form-input mono" type="number" step="0.01" min="0" max="100" value="${d?.anteil_pct ?? 100}">
+        <p class="form-hint">z. B. 50 bei GbR-Hälfte</p>
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label class="form-label">Darlehenstyp <span class="required">*</span></label>
         <select id="f-darlehen-typ" class="form-select"
@@ -822,6 +832,7 @@ async function submitDarlehenForm() {
     urspr_betrag:           parseFloat(document.getElementById('f-urspr').value) || 0,
     restschuld:             parseFloat(document.getElementById('f-restschuld').value) || 0,
     zinssatz:               zinssatzInput / 100,
+    anteil_pct:             parseFloat(document.getElementById('f-anteil').value) || 100,
     darlehen_typ:           typ,
     rate_monatlich:         isTilg ? 0 : (parseFloat(document.getElementById('f-rate').value) || 0),
     tilgungsrate_monatlich: isTilg ? (parseFloat(document.getElementById('f-tilgungsrate')?.value) || null) : null,
@@ -1074,7 +1085,10 @@ function renderSachwerte() {
         ${s.anschaffungswert ? `<br><span class="text-muted">${fmt.eur(s.anschaffungswert)}</span>` : ''}
         ${wertEntwicklung !== null ? `<br><span class="${parseFloat(wertEntwicklung) >= 0 ? 'text-green' : 'text-red'}" style="font-size:0.7rem">${wertEntwicklung >= 0 ? '+' : ''}${wertEntwicklung} %</span>` : ''}
       </td>
-      <td class="right mono">${fmt.eur(s.aktueller_wert)}</td>
+      <td class="right mono">
+        ${fmt.eur(s.aktueller_wert)}
+        ${(s.anteil_pct != null && Number(s.anteil_pct) < 100) ? `<br><span class="text-muted" style="font-size:0.7rem">Anteil ${Number(s.anteil_pct)} %: ${fmt.eur(s.aktueller_wert * Number(s.anteil_pct) / 100)}</span>` : ''}
+      </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openSachwertForm(${s.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1109,10 +1123,17 @@ window.openSachwertForm = function(id = null) {
       <label class="form-label">Beschreibung</label>
       <input id="f-desc" class="form-input" value="${escapeHtml(s?.beschreibung ?? '')}">
     </div>
-    <div class="form-group">
-      <label class="form-label">Aktueller Schätzwert (€) <span class="required">*</span></label>
-      <input id="f-wert" class="form-input" type="number" step="0.01" value="${s?.aktueller_wert ?? 0}">
-      <p class="form-hint">Aktueller Marktwert / Zeitwert</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Aktueller Schätzwert (€) <span class="required">*</span></label>
+        <input id="f-wert" class="form-input" type="number" step="0.01" value="${s?.aktueller_wert ?? 0}">
+        <p class="form-hint">Gesamtwert des Objekts</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mein Anteil (%)</label>
+        <input id="f-anteil" class="form-input mono" type="number" step="0.01" min="0" max="100" value="${s?.anteil_pct ?? 100}">
+        <p class="form-hint">z. B. 50 bei GbR-Hälfte</p>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1140,6 +1161,7 @@ async function submitSachwertForm() {
     kategorie:         document.getElementById('f-kat').value,
     beschreibung:      document.getElementById('f-desc').value.trim() || null,
     aktueller_wert:    parseFloat(document.getElementById('f-wert').value) || 0,
+    anteil_pct:        parseFloat(document.getElementById('f-anteil').value) || 100,
     anschaffungswert:  anschaffwert ? parseFloat(anschaffwert) : null,
     anschaffungsjahr:  jahr ? parseInt(jahr) : null,
   };

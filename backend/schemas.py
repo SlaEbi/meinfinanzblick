@@ -112,6 +112,7 @@ class DarlehenBase(BaseModel):
     urspr_betrag: float
     restschuld: float
     zinssatz: float
+    anteil_pct: float = 100.0
     darlehen_typ: str = 'annuitaet'
     rate_monatlich: float
     tilgungsrate_monatlich: Optional[float] = None
@@ -132,6 +133,7 @@ class DarlehenUpdate(BaseModel):
     urspr_betrag: Optional[float] = None
     restschuld: Optional[float] = None
     zinssatz: Optional[float] = None
+    anteil_pct: Optional[float] = None
     darlehen_typ: Optional[str] = None
     rate_monatlich: Optional[float] = None
     tilgungsrate_monatlich: Optional[float] = None
@@ -208,6 +210,7 @@ class SachvermoegenBase(BaseModel):
     kategorie: str
     beschreibung: Optional[str] = None
     aktueller_wert: float
+    anteil_pct: float = 100.0
     anschaffungswert: Optional[float] = None
     anschaffungsjahr: Optional[int] = None
 
@@ -221,6 +224,7 @@ class SachvermoegenUpdate(BaseModel):
     kategorie: Optional[str] = None
     beschreibung: Optional[str] = None
     aktueller_wert: Optional[float] = None
+    anteil_pct: Optional[float] = None
     anschaffungswert: Optional[float] = None
     anschaffungsjahr: Optional[int] = None
 

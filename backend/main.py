@@ -26,6 +26,8 @@ def _migrate():
         ("darlehen", "notiz",                   "TEXT"),
         ("darlehen", "darlehen_typ",             "TEXT DEFAULT 'annuitaet'"),
         ("darlehen", "tilgungsrate_monatlich",   "NUMERIC"),
+        ("darlehen", "anteil_pct",              "NUMERIC DEFAULT 100"),
+        ("sachvermoegen", "anteil_pct",         "NUMERIC DEFAULT 100"),
         ("depots",   "depot_bic",               "TEXT"),
         ("depots",   "verrechnungskonto_bic",   "TEXT"),
         ("depots",   "auszahlungskonto_name",   "TEXT"),
