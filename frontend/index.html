@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
   <link rel="stylesheet" href="/css/tokens.css?v=4">
-  <link rel="stylesheet" href="/css/app.css?v=12">
+  <link rel="stylesheet" href="/css/app.css?v=18">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -214,18 +214,14 @@
         </div>
       </div>
 
-      <!-- Chart Grid - Verlauf (full width) -->
-      <div class="chart-grid chart-grid-full">
+      <!-- Chart Grid - Verlauf, Aufteilung, Schulden nebeneinander -->
+      <div class="chart-grid chart-grid-triple">
         <div class="chart-card">
           <div class="chart-title">Nettovermögen — Verlauf</div>
           <div class="chart-canvas-wrap">
             <canvas id="chart-verlauf"></canvas>
           </div>
         </div>
-      </div>
-
-      <!-- Chart Grid - Aufteilung -->
-      <div class="chart-grid chart-grid-equal">
         <div class="chart-card">
           <div class="chart-title">Vermögensaufteilung</div>
           <div class="chart-subtitle">Konten · Depots · Sachwerte</div>
@@ -603,7 +599,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=22"></script>
+<script type="module" src="/js/app.js?v=26"></script>
 
 
 </body>

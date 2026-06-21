@@ -1054,12 +1054,35 @@ function spKatSumme(kat) {
   return spGetPositionen(kat).reduce((s, p) => s + (p.betrag || 0), 0);
 }
 
+// Automatisch aus anderen Modulen abgeleitete Fixkosten (monatlich).
+// Darlehen → Monatsrate · Versicherungen/Verträge → Jahresbeitrag / 12.
+function spAutoPositionen() {
+  const items = [];
+  for (const d of (state.darlehen ?? [])) {
+    const betrag = Number(d.rate_monatlich) || 0;
+    if (betrag > 0) items.push({ quelle: 'darlehen', view: 'darlehen', bezeichnung: d.bezeichnung, betrag });
+  }
+  for (const v of (state.versicherungen ?? [])) {
+    const betrag = vsJahresbeitrag(v, 'beitrag') / 12;
+    if (betrag > 0) items.push({ quelle: 'versicherung', view: 'versicherungen', bezeichnung: v.bezeichnung, betrag });
+  }
+  for (const v of (state.vertraege ?? [])) {
+    const betrag = vsJahresbeitrag(v, 'kosten') / 12;
+    if (betrag > 0) items.push({ quelle: 'vertrag', view: 'vertraege', bezeichnung: v.bezeichnung, betrag });
+  }
+  return items;
+}
+
+function spAutoTotal() {
+  return spAutoPositionen().reduce((s, p) => s + p.betrag, 0);
+}
+
 function spSonstiges() {
-  const sub = spKatSumme('fixkosten');
+  const sub = spKatSumme('fixkosten') + spAutoTotal();
   return sub * (spPlan?.sonstiges_puffer_pct ?? 0.05);
 }
 
-function spFixTotal()  { return spKatSumme('fixkosten') + spSonstiges(); }
+function spFixTotal()  { return spKatSumme('fixkosten') + spAutoTotal() + spSonstiges(); }
 function spInvTotal()  { return spKatSumme('investments'); }
 function spSparTotal() { return spKatSumme('sparziele'); }
 function spGFS()       {
@@ -1144,20 +1167,56 @@ async function renderSpendinPlan() {
       </button>
     </div>`).join('');
 
+  const QUELLE_LABEL = { darlehen: 'Darlehen', versicherung: 'Versicherung', vertrag: 'Vertrag' };
+  const hatAuto = spAutoPositionen().length > 0;
+
+  const renderAutoPositionen = () => {
+    const auto = spAutoPositionen();
+    if (!auto.length) return '';
+    return `
+      <div class="sp-group sp-group-auto">
+        <div class="sp-group-head" title="Diese Beträge stammen aus Darlehen, Versicherungen und Verträgen und aktualisieren sich automatisch.">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+          Automatisch übernommen
+        </div>
+        ${auto.map(p => `
+        <div class="sp-position sp-position-auto" onclick="navigate('${p.view}')" title="Aus ${QUELLE_LABEL[p.quelle]} — zum Bearbeiten klicken">
+          <span class="sp-pos-name-auto">
+            ${escapeHtml(p.bezeichnung)}
+            <span class="sp-pos-quelle">${QUELLE_LABEL[p.quelle]}</span>
+          </span>
+          <span class="sp-pos-amount-auto mono">${fmt.eur(p.betrag)}</span>
+        </div>`).join('')}
+      </div>`;
+  };
+
+  // Manuelle Fixkosten — nur mit Überschrift versehen, wenn auch Auto-Positionen existieren
+  const renderManuelleFixkosten = () => {
+    const rows = renderPositionen('fixkosten');
+    if (!hatAuto) return rows;
+    return `
+      <div class="sp-group sp-group-manual">
+        <div class="sp-group-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          Manuell eingetragen
+        </div>
+        ${rows}
+      </div>`;
+  };
+
   el.innerHTML = `
     <div class="page-header">
       <div style="flex:1">
         <input class="sp-plan-name" value="${escapeHtml(spPlan.name)}"
           onblur="spSavePlanField('name', this.value)"
           onkeydown="if(event.key==='Enter')this.blur()">
-        <p style="font-size:var(--text-sm);color:var(--wash-grey);margin-top:0.25rem">
-          Stand: ${spPlan.stand ? new Date(spPlan.stand).toLocaleDateString('de-DE') : '—'}
+        <p style="font-size:var(--text-sm);color:var(--wash-grey);margin-top:0.25rem;display:flex;align-items:center;gap:0.35rem">
+          <span>Stand:</span>
+          <input type="date" class="sp-stand-input mono" value="${fmt.dateISO(spPlan.stand)}"
+            onchange="spSavePlanField('stand', this.value || null)"
+            title="Datum anpassen — z. B. auf den aktuellen Monat">
         </p>
       </div>
-      <button class="btn btn-ghost" onclick="spCreateNew()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M12 5v14M5 12h14"/></svg>
-        Neuer Plan
-      </button>
     </div>
 
     <!-- Einkommens-Leiste -->
@@ -1218,6 +1277,7 @@ async function renderSpendinPlan() {
             style="color:${spPctColor(pctFix,0.50,0.60)}">${fmtPct(pctFix)}</div>
         </div>
         <div class="sp-position-list" id="sp-fix-list">
+          ${renderAutoPositionen()}
           ${renderPositionen('fixkosten')}
         </div>
         <div class="sp-sonstiges-row">
@@ -1234,6 +1294,8 @@ async function renderSpendinPlan() {
         </div>
       </div>
 
+      <!-- Rechte Spalte: Investments, Spar-Ziele, Guilt-Free gestapelt -->
+      <div class="sp-col-right">
       <!-- Investments -->
       <div class="sp-card">
         <div class="sp-card-header">
@@ -1299,6 +1361,7 @@ async function renderSpendinPlan() {
           </div>
         </div>
       </div>
+      </div><!-- /sp-col-right -->
 
     </div>
 
