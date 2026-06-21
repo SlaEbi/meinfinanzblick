@@ -101,6 +101,16 @@
       </div>
     </nav>
 
+    <!-- Demo-Modus Toggle -->
+    <button id="demo-toggle-btn" class="demo-toggle-btn" onclick="toggleDemoMode()" title="Demo-Modus ein-/ausschalten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="13" height="13">
+        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      Demo
+    </button>
+
     <!-- Theme + System Controls -->
     <div class="theme-switcher">
       <button class="theme-toggle" id="theme-toggle-btn" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='fintech'?'sumi':'fintech')" title="Design wechseln">
@@ -164,6 +174,17 @@
 
   <!-- ── Main ── -->
   <main class="main-content">
+
+    <!-- Demo-Banner -->
+    <div id="demo-banner" class="demo-banner" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Demo-Modus aktiv — alle angezeigten Daten sind fiktiv.
+      <button onclick="toggleDemoMode()" style="margin-left:auto;background:rgba(255,255,255,0.25);border:none;color:inherit;padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.8rem">Deaktivieren</button>
+    </div>
 
     <!-- ────────────────── Dashboard ────────────────── -->
     <section id="view-dashboard" class="view active">
@@ -599,7 +620,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=27"></script>
+<script type="module" src="/js/app.js?v=28"></script>
 
 
 </body>

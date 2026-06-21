@@ -1,4 +1,5 @@
 import { api } from './api.js?v=4';
+import { DEMO } from './demo.js?v=1';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,7 @@ function formatRestlaufzeit(monate) {
 
 const state = {
   view: 'dashboard',
+  demoMode: sessionStorage.getItem('mfb-demo') === '1',
   konten: [],
   darlehen: [],
   depots: [],
@@ -227,6 +229,19 @@ function navigate(view) {
 // ── Daten laden ─────────────────────────────────────────────────────────────
 
 async function loadAll() {
+  if (state.demoMode) {
+    state.konten         = DEMO.konten;
+    state.darlehen       = DEMO.darlehen;
+    state.depots         = DEMO.depots;
+    state.sachwerte      = DEMO.sachwerte;
+    state.versicherungen = DEMO.versicherungen;
+    state.vertraege      = DEMO.vertraege;
+    state.kontakte       = DEMO.kontakte;
+    state.dokumente      = DEMO.dokumente;
+    state.notfall        = DEMO.notfall;
+    state.networth       = DEMO.networth;
+    return;
+  }
   const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, dokumente, networth] = await Promise.all([
     api.konten.list(),
     api.darlehen.list(),
@@ -1763,6 +1778,11 @@ window.spCreateNew = async function() {
 };
 
 async function renderSpending() {
+  if (state.demoMode) {
+    spPlan = DEMO.spending;
+    await renderSpendinPlan();
+    return;
+  }
   try {
     spPlan = await api.spending.aktiv();
   } catch {
@@ -2703,6 +2723,25 @@ window.spSavePosAmount  = spSavePosAmount;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 
+// ── Demo-Modus ──────────────────────────────────────────────────────────────
+
+function applyDemoMode() {
+  document.body.classList.toggle('demo-mode', state.demoMode);
+  const btn  = document.getElementById('demo-toggle-btn');
+  const banner = document.getElementById('demo-banner');
+  if (btn) btn.classList.toggle('active', state.demoMode);
+  if (banner) banner.hidden = !state.demoMode;
+}
+
+window.toggleDemoMode = async function() {
+  state.demoMode = !state.demoMode;
+  sessionStorage.setItem('mfb-demo', state.demoMode ? '1' : '0');
+  applyDemoMode();
+  spPlan = null;
+  await refresh();
+  toast(state.demoMode ? 'Demo-Modus aktiv — es werden Musterdaten angezeigt.' : 'Demo-Modus deaktiviert — echte Daten werden geladen.');
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Navigation
   document.querySelectorAll('.nav-item[data-view]').forEach(el => {
@@ -2723,6 +2762,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Theme aus localStorage wiederherstellen
   applyTheme(localStorage.getItem('mfb-theme') ?? 'fintech');
+
+  // Demo-Modus aus sessionStorage wiederherstellen
+  applyDemoMode();
 
   try {
     await loadAll();
