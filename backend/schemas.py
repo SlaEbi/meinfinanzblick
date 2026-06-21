@@ -215,6 +215,7 @@ class SachvermoegenBase(BaseModel):
     anteil_pct: float = 100.0
     anschaffungswert: Optional[float] = None
     anschaffungsjahr: Optional[int] = None
+    naechster_tuev: Optional[date] = None
 
 
 class SachvermoegenCreate(SachvermoegenBase):
@@ -229,6 +230,7 @@ class SachvermoegenUpdate(BaseModel):
     anteil_pct: Optional[float] = None
     anschaffungswert: Optional[float] = None
     anschaffungsjahr: Optional[int] = None
+    naechster_tuev: Optional[date] = None
 
 
 class SachvermoegenResponse(SachvermoegenBase):

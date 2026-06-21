@@ -118,6 +118,7 @@ class Sachvermoegen(Base):
     anteil_pct = Column(Numeric(5, 2), default=100)  # Eigentumsanteil in % (z. B. 50 bei GbR-Hälfte)
     anschaffungswert = Column(Numeric(14, 2))
     anschaffungsjahr = Column(Integer)
+    naechster_tuev = Column(Date)   # nur für kategorie='fahrzeug'
     aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

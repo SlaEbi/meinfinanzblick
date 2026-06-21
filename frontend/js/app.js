@@ -123,6 +123,7 @@ function chartTheme() {
     grey:    cssVar('--wash-grey', '#808080'),
     text:    cssVar('--ink-black', '#0D0D0D'),
     grid:    isFintech() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    font:    cssVar('--font-serif', 'sans-serif'),
   };
 }
 
@@ -350,11 +351,12 @@ function renderDonutChart() {
         legend: {
           position: 'bottom',
           labels: {
-            font: { family: "'JetBrains Mono', monospace", size: 11 },
+            font: { family: theme.font, size: 12, weight: '400' },
             color: theme.text,
             padding: 16,
-            usePointStyle: true,
-            pointStyleWidth: 10,
+            boxWidth: 10,
+            boxHeight: 10,
+            borderRadius: 5,
           },
         },
         tooltip: {
@@ -403,11 +405,12 @@ function renderSchuldenChart() {
         legend: {
           position: 'bottom',
           labels: {
-            font: { family: "'JetBrains Mono', monospace", size: 11 },
+            font: { family: theme.font, size: 12, weight: '400' },
             color: theme.text,
             padding: 12,
-            usePointStyle: true,
-            pointStyleWidth: 10,
+            boxWidth: 10,
+            boxHeight: 10,
+            borderRadius: 5,
           },
         },
         tooltip: {
@@ -1206,9 +1209,25 @@ function renderSachwerte() {
     const wertEntwicklung = s.anschaffungswert
       ? ((s.aktueller_wert - s.anschaffungswert) / s.anschaffungswert * 100).toFixed(1)
       : null;
+
+    // TÜV-Warnung: Tage bis zum TÜV berechnen
+    let tuevHtml = '';
+    if (s.kategorie === 'fahrzeug' && s.naechster_tuev) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const tuev  = new Date(s.naechster_tuev); tuev.setHours(0,0,0,0);
+      const tage  = Math.ceil((tuev - today) / 86400000);
+      const warn  = tage <= 30;
+      const farbe = tage < 0 ? 'var(--seal-red)' : warn ? 'var(--seal-red)' : 'var(--wash-grey)';
+      const text  = tage < 0  ? `TÜV überfällig (${Math.abs(tage)} Tage)`
+                  : tage === 0 ? 'TÜV heute!'
+                  : warn       ? `TÜV in ${tage} Tagen`
+                  :              `TÜV ${fmt.date(s.naechster_tuev)}`;
+      tuevHtml = `<br><span class="mono" style="font-size:0.7rem;color:${farbe}">${text}</span>`;
+    }
+
     return `
     <tr>
-      <td><strong>${s.bezeichnung}</strong></td>
+      <td><strong>${s.bezeichnung}</strong>${tuevHtml}</td>
       <td><span class="badge badge-${s.kategorie}">${katLabel}</span></td>
       <td class="text-muted" style="font-size:0.8rem">${s.beschreibung ?? '—'}</td>
       <td class="mono" style="font-size:0.8rem">
@@ -1246,7 +1265,8 @@ window.openSachwertForm = function(id = null) {
     </div>
     <div class="form-group">
       <label class="form-label">Kategorie <span class="required">*</span></label>
-      <select id="f-kat" class="form-select">
+      <select id="f-kat" class="form-select"
+        onchange="document.getElementById('f-tuev-row').style.display=this.value==='fahrzeug'?'block':'none'">
         ${SACHWERT_KATEGORIEN.map(k =>
           `<option value="${k.value}" ${s?.kategorie === k.value ? 'selected' : ''}>${k.label}</option>`
         ).join('')}
@@ -1278,6 +1298,10 @@ window.openSachwertForm = function(id = null) {
         <input id="f-jahr" class="form-input" type="number" min="1900" max="2100" value="${s?.anschaffungsjahr ?? ''}">
       </div>
     </div>
+    <div id="f-tuev-row" class="form-group" style="display:${s?.kategorie === 'fahrzeug' ? 'block' : 'none'}">
+      <label class="form-label">Nächster TÜV</label>
+      <input id="f-tuev" class="form-input" type="date" value="${fmt.dateISO(s?.naechster_tuev)}">
+    </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('sachwert', id)}
   `;
@@ -1289,14 +1313,18 @@ window.openSachwertForm = function(id = null) {
 async function submitSachwertForm() {
   const anschaffwert = document.getElementById('f-anschaffwert').value;
   const jahr = document.getElementById('f-jahr').value;
+  const kategorie = document.getElementById('f-kat').value;
   const data = {
     bezeichnung:       document.getElementById('f-bez').value.trim(),
-    kategorie:         document.getElementById('f-kat').value,
+    kategorie:         kategorie,
     beschreibung:      document.getElementById('f-desc').value.trim() || null,
     aktueller_wert:    parseFloat(document.getElementById('f-wert').value) || 0,
     anteil_pct:        parseFloat(document.getElementById('f-anteil').value) || 100,
     anschaffungswert:  anschaffwert ? parseFloat(anschaffwert) : null,
     anschaffungsjahr:  jahr ? parseInt(jahr) : null,
+    naechster_tuev:    kategorie === 'fahrzeug'
+      ? (document.getElementById('f-tuev').value || null)
+      : null,
   };
   if (!data.bezeichnung) return toast('Bitte Bezeichnung ausfüllen.');
   try {

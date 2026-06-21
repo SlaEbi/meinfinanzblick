@@ -20,7 +20,7 @@
   --sidebar-muted:#8A8678;
 
   /* Typografie */
-  --font-serif:  'Noto Serif JP', 'Georgia', serif !important;
+  --font-serif:  'Noto Serif JP', 'Georgia', serif;
   --font-mono:   'JetBrains Mono', 'Courier New', monospace;
 
   /* Schriftgrößen (fluid) */
@@ -81,7 +81,7 @@ html[data-theme="fintech"] {
   --input-bg:      #2A2A2A;
   --input-border:  rgba(255,255,255,0.12);
 
-  --font-serif:  'Noto Serif JP', 'Georgia', serif;
+  --font-serif:  'Inter', 'Helvetica Neue', sans-serif;
 
   --shadow-card: 0 1px 1px rgba(0,0,0,0.6), 0 2px 12px rgba(0,0,0,0.4);
   --shadow-md:   0 0 0 1px rgba(201,168,76,0.12), 0 4px 20px rgba(0,0,0,0.5);
