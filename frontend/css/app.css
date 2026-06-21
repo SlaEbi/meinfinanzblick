@@ -1770,32 +1770,33 @@ html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
 /* ── Demo-Modus ────────────────────────────────────────────────────────────── */
 
 .demo-toggle-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: calc(100% - 2rem);
-  margin: 0.5rem 1rem 0;
-  padding: 0.45rem 0.75rem;
+  gap: 5px;
+  padding: 0.3rem 0.65rem;
   background: transparent;
   border: 1px dashed var(--wash-grey);
   border-radius: var(--radius-sm);
   color: var(--wash-grey);
   font-family: var(--font-serif);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
   cursor: pointer;
   transition: border-color 200ms, color 200ms, background 200ms;
+  opacity: 0.6;
 }
 .demo-toggle-btn:hover {
   border-color: var(--seal-red);
   color: var(--seal-red);
+  opacity: 1;
 }
 .demo-toggle-btn.active {
   border-style: solid;
   border-color: var(--seal-red);
-  background: rgba(138, 28, 21, 0.08);
+  background: rgba(138, 28, 21, 0.09);
   color: var(--seal-red);
   font-weight: 600;
+  opacity: 1;
 }
 
 .demo-banner {
@@ -1814,7 +1815,7 @@ html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
 }
 
 /* In Demo-Modus: Bearbeitungs- und Lösch-Buttons deaktivieren */
-body.demo-mode .view .btn-primary,
+body.demo-mode .view .btn-primary:not(#demo-toggle-btn),
 body.demo-mode .view .btn-icon,
 body.demo-mode #update-btn,
 body.demo-mode #publish-btn {

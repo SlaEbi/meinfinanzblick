@@ -2727,10 +2727,10 @@ window.spSavePosAmount  = spSavePosAmount;
 
 function applyDemoMode() {
   document.body.classList.toggle('demo-mode', state.demoMode);
-  const btn  = document.getElementById('demo-toggle-btn');
+  const btn    = document.getElementById('demo-toggle-btn');
   const banner = document.getElementById('demo-banner');
   if (btn) btn.classList.toggle('active', state.demoMode);
-  if (banner) banner.hidden = !state.demoMode;
+  if (banner) banner.style.display = state.demoMode ? 'flex' : 'none';
 }
 
 window.toggleDemoMode = async function() {

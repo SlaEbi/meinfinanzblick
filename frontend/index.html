@@ -101,16 +101,6 @@
       </div>
     </nav>
 
-    <!-- Demo-Modus Toggle -->
-    <button id="demo-toggle-btn" class="demo-toggle-btn" onclick="toggleDemoMode()" title="Demo-Modus ein-/ausschalten">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="13" height="13">
-        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
-        <polyline points="10 17 15 12 10 7"/>
-        <line x1="15" y1="12" x2="3" y2="12"/>
-      </svg>
-      Demo
-    </button>
-
     <!-- Theme + System Controls -->
     <div class="theme-switcher">
       <button class="theme-toggle" id="theme-toggle-btn" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='fintech'?'sumi':'fintech')" title="Design wechseln">
@@ -176,7 +166,7 @@
   <main class="main-content">
 
     <!-- Demo-Banner -->
-    <div id="demo-banner" class="demo-banner" hidden>
+    <div id="demo-banner" class="demo-banner" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="12"/>
@@ -193,14 +183,24 @@
           <h2>Finanzüberblick</h2>
           <p>Ihr aktuelles Gesamtvermögen auf einen Blick</p>
         </div>
-        <button class="btn btn-ghost" onclick="createSnapshot()" title="Heutigen Stand als Snapshot speichern">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          Snapshot speichern
-        </button>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <button id="demo-toggle-btn" class="demo-toggle-btn" onclick="toggleDemoMode()" title="Demo-Modus ein-/ausschalten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            Demo
+          </button>
+          <button class="btn btn-ghost" onclick="createSnapshot()" title="Heutigen Stand als Snapshot speichern">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Snapshot speichern
+          </button>
+        </div>
       </div>
 
       <!-- Net Worth Hero -->
@@ -620,7 +620,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=28"></script>
+<script type="module" src="/js/app.js?v=29"></script>
 
 
 </body>
