@@ -1,4 +1,4 @@
-/* API client — alle Aufrufe gehen an /api/v1/ */
+/* API client v4 — alle Aufrufe gehen an /api/v1/ */
 
 const BASE = '/api/v1';
 
@@ -102,5 +102,20 @@ export const api = {
   networth: {
     get:      ()  => request('GET',  '/networth/'),
     snapshot: ()  => request('POST', '/networth/snapshot'),
+  },
+
+  anhaenge: {
+    list:   (typ, id)      => request('GET',    `/anhaenge/${typ}/${id}`),
+    delete: (anhangId)     => request('DELETE', `/anhaenge/${anhangId}`),
+    upload: async (typ, id, file) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${BASE}/anhaenge/${typ}/${id}`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail || 'Upload fehlgeschlagen');
+      }
+      return res.json();
+    },
   },
 };

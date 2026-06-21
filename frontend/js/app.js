@@ -1,4 +1,4 @@
-import { api } from './api.js?v=3';
+import { api } from './api.js?v=4';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,81 @@ const fmt = {
     return v.substring(0, 10);
   },
 };
+
+// ── Konto-Typ Labels ─────────────────────────────────────────────────────────
+
+const KONTO_TYP_LABEL = {
+  giro:       'Girokonto',
+  tagesgeld:  'Tagesgeldkonto',
+  festgeld:   'Festgeld',
+  sparkonto:  'Sparkonto',
+  bargeld:    'Bargeld / Safe',
+  sonstige:   'Sonstige',
+};
+
+// ── Anhang-Helper ─────────────────────────────────────────────────────────────
+
+const ANHANG_ICON_PDF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 11h3"/></svg>`;
+const ANHANG_ICON_IMG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+
+async function loadAnhaenge(entityTyp, entityId) {
+  const container = document.getElementById(`anhang-container-${entityTyp}-${entityId}`);
+  if (!container) return;
+
+  let anhaenge = [];
+  try { anhaenge = await api.anhaenge.list(entityTyp, entityId); } catch {}
+
+  const listHtml = anhaenge.length
+    ? anhaenge.map(a => {
+        const icon = (a.mime_type || '').includes('pdf') ? ANHANG_ICON_PDF : ANHANG_ICON_IMG;
+        return `<div class="anhang-item">
+          ${icon}
+          <a href="/api/v1/anhaenge/datei/${a.id}" target="_blank" rel="noopener">${escapeHtml(a.original_name)}</a>
+          <button class="btn-icon danger" onclick="deleteAnhang(${a.id},'${entityTyp}',${entityId})" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>`;
+      }).join('')
+    : '<p class="form-hint" style="margin:0">Keine Anhänge vorhanden.</p>';
+
+  container.innerHTML = `
+    <div class="anhang-list">${listHtml}</div>
+    <div class="anhang-upload">
+      <label class="btn-anhang-upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Anhang hinzufügen
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
+          onchange="uploadAnhang('${entityTyp}',${entityId},this)">
+      </label>
+      <span class="form-hint" style="margin:0">PDF, JPG, PNG — max. 20 MB</span>
+    </div>`;
+}
+
+window.deleteAnhang = async function(anhangId, entityTyp, entityId) {
+  if (!confirm('Anhang wirklich löschen?')) return;
+  try {
+    await api.anhaenge.delete(anhangId);
+    toast('Anhang gelöscht.');
+    await loadAnhaenge(entityTyp, entityId);
+  } catch (e) { toast(e.message); }
+};
+
+window.uploadAnhang = async function(entityTyp, entityId, input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    await api.anhaenge.upload(entityTyp, entityId, file);
+    toast('Anhang hochgeladen.');
+    await loadAnhaenge(entityTyp, entityId);
+  } catch (e) { toast(e.message); }
+};
+
+function anhangPlaceholderHtml(entityTyp, entityId) {
+  if (!entityId) {
+    return `<p class="form-hint">Anhänge können nach dem ersten Speichern hinzugefügt werden.</p>`;
+  }
+  return `<div id="anhang-container-${entityTyp}-${entityId}"><p class="form-hint">Lädt…</p></div>`;
+}
 
 // ── Chart-Helfer ─────────────────────────────────────────────────────────────
 
@@ -438,7 +513,7 @@ function renderKonten() {
         ${k.kontoinhaber ? `<br><span class="text-muted" style="font-size:0.75rem">${escapeHtml(k.kontoinhaber)}</span>` : ''}
         ${k.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(k.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(k.bitwarden_name)}</a>` : ''}
       </td>
-      <td><span class="badge badge-${k.typ}">${k.typ}</span></td>
+      <td><span class="badge badge-${k.typ}">${KONTO_TYP_LABEL[k.typ] ?? k.typ}</span></td>
       <td class="mono">${k.iban ? maskIBAN(k.iban) : '—'}</td>
       <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">
         ${fmt.eur(k.saldo)}
@@ -476,8 +551,8 @@ window.openKontoForm = function(id = null) {
       <div class="form-group">
         <label class="form-label">Kontotyp <span class="required">*</span></label>
         <select id="f-typ" class="form-select">
-          ${['giro','tagesgeld','festgeld','sparkonto','sonstige'].map(t =>
-            `<option value="${t}" ${konto?.typ === t ? 'selected' : ''}>${t}</option>`
+          ${Object.entries(KONTO_TYP_LABEL).map(([val, label]) =>
+            `<option value="${val}" ${konto?.typ === val ? 'selected' : ''}>${label}</option>`
           ).join('')}
         </select>
       </div>
@@ -504,9 +579,12 @@ window.openKontoForm = function(id = null) {
       <label class="form-label">Notiz</label>
       <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(konto?.notiz ?? '')}</textarea>
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('konto', id)}
   `;
   document.getElementById('modal-submit').onclick = submitKontoForm;
   openModal();
+  if (id) loadAnhaenge('konto', id);
 };
 
 async function submitKontoForm() {
@@ -612,6 +690,8 @@ window.openDarlehenForm = function(id = null) {
   state.editingId = id;
   const d = id ? state.darlehen.find(x => x.id === id) : null;
 
+  const isTilgung = (d?.darlehen_typ ?? 'annuitaet') === 'tilgungsdarlehen';
+
   document.getElementById('modal-title').textContent = id ? 'Darlehen bearbeiten' : 'Darlehen hinzufügen';
   document.getElementById('modal-body').innerHTML = `
     <div class="form-row">
@@ -641,9 +721,23 @@ window.openDarlehenForm = function(id = null) {
         <p class="form-hint">z. B. 3.5 für 3,50 %</p>
       </div>
       <div class="form-group">
-        <label class="form-label">Monatliche Rate (€) <span class="required">*</span></label>
-        <input id="f-rate" class="form-input" type="number" step="0.01" value="${d?.rate_monatlich ?? 0}">
+        <label class="form-label">Darlehenstyp <span class="required">*</span></label>
+        <select id="f-darlehen-typ" class="form-select"
+          onchange="darlehenTypToggle(this.value)">
+          <option value="annuitaet" ${!isTilgung ? 'selected' : ''}>Annuitätendarlehen (konstante Rate)</option>
+          <option value="tilgungsdarlehen" ${isTilgung ? 'selected' : ''}>Tilgungsdarlehen (sinkende Rate)</option>
+        </select>
       </div>
+    </div>
+    <div id="f-rate-row" class="form-group" style="display:${isTilgung ? 'none' : 'block'}">
+      <label class="form-label">Monatliche Rate (€) <span class="required">*</span></label>
+      <input id="f-rate" class="form-input" type="number" step="0.01" value="${d?.rate_monatlich ?? 0}">
+    </div>
+    <div id="f-tilgung-row" class="form-group" style="display:${isTilgung ? 'block' : 'none'}">
+      <label class="form-label">Feste monatliche Tilgung (€) <span class="required">*</span></label>
+      <input id="f-tilgungsrate" class="form-input" type="number" step="0.01"
+        placeholder="z. B. 1000" value="${d?.tilgungsrate_monatlich ?? ''}">
+      <p class="form-hint">Der Zinsanteil sinkt mit der Restschuld — die Gesamtrate verringert sich monatlich.</p>
     </div>
     <div class="form-group">
       <label class="form-label">Zinsbindung bis</label>
@@ -667,17 +761,40 @@ window.openDarlehenForm = function(id = null) {
       <input id="f-sonder-betrag" class="form-input" type="number" step="0.01"
         placeholder="z. B. 5000" value="${d?.sondertilgung_betrag ?? ''}">
     </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(d?.notiz ?? '')}</textarea>
+    </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('darlehen', id)}
   `;
 
+  window.darlehenTypToggle = function(typ) {
+    const isTilg = typ === 'tilgungsdarlehen';
+    document.getElementById('f-rate-row').style.display    = isTilg ? 'none' : 'block';
+    document.getElementById('f-tilgung-row').style.display = isTilg ? 'block' : 'none';
+    updateRestlaufzeit();
+  };
+
   function updateRestlaufzeit() {
-    const restschuld   = parseFloat(document.getElementById('f-restschuld').value) || 0;
-    const zinssatz     = (parseFloat(document.getElementById('f-zinssatz').value) || 0) / 100;
-    const rate         = parseFloat(document.getElementById('f-rate').value) || 0;
-    const el           = document.getElementById('f-restlaufzeit-display');
+    const restschuld = parseFloat(document.getElementById('f-restschuld').value) || 0;
+    const zinssatz   = (parseFloat(document.getElementById('f-zinssatz').value) || 0) / 100;
+    const el         = document.getElementById('f-restlaufzeit-display');
     delete el.dataset.monate;
-    const res = restlaufzeitMonate(restschuld, zinssatz, rate);
-    if (res.fehler === 'unvollstaendig') { el.textContent = '— Restschuld und Rate eingeben'; return; }
-    if (res.fehler === 'rate_zu_niedrig') { el.textContent = 'Rate deckt nicht die Zinsen'; return; }
+    const typ = document.getElementById('f-darlehen-typ')?.value ?? 'annuitaet';
+
+    let res;
+    if (typ === 'tilgungsdarlehen') {
+      const tilgung = parseFloat(document.getElementById('f-tilgungsrate')?.value) || 0;
+      if (!restschuld || !tilgung) { el.textContent = '— Restschuld und Tilgungsrate eingeben'; return; }
+      res = { monate: Math.ceil(restschuld / tilgung) };
+    } else {
+      const rate = parseFloat(document.getElementById('f-rate').value) || 0;
+      res = restlaufzeitMonate(restschuld, zinssatz, rate);
+      if (res.fehler === 'unvollstaendig') { el.textContent = '— Restschuld und Rate eingeben'; return; }
+      if (res.fehler === 'rate_zu_niedrig') { el.textContent = 'Rate deckt nicht die Zinsen'; return; }
+    }
+
     const endDatum = new Date();
     endDatum.setMonth(endDatum.getMonth() + res.monate);
     const endLabel = endDatum.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
@@ -685,28 +802,34 @@ window.openDarlehenForm = function(id = null) {
     el.dataset.monate = res.monate;
   }
 
-  ['f-restschuld','f-zinssatz','f-rate'].forEach(id =>
-    document.getElementById(id)?.addEventListener('input', updateRestlaufzeit)
+  ['f-restschuld','f-zinssatz','f-rate','f-tilgungsrate'].forEach(fid =>
+    document.getElementById(fid)?.addEventListener('input', updateRestlaufzeit)
   );
   updateRestlaufzeit();
 
   document.getElementById('modal-submit').onclick = submitDarlehenForm;
   openModal();
+  if (id) loadAnhaenge('darlehen', id);
 };
 
 async function submitDarlehenForm() {
   const zinssatzInput = parseFloat(document.getElementById('f-zinssatz').value);
+  const typ = document.getElementById('f-darlehen-typ')?.value ?? 'annuitaet';
+  const isTilg = typ === 'tilgungsdarlehen';
   const data = {
     bezeichnung:            document.getElementById('f-bez').value.trim(),
     glaeubiger:             document.getElementById('f-glaeubiger').value.trim(),
     urspr_betrag:           parseFloat(document.getElementById('f-urspr').value) || 0,
     restschuld:             parseFloat(document.getElementById('f-restschuld').value) || 0,
     zinssatz:               zinssatzInput / 100,
-    rate_monatlich:         parseFloat(document.getElementById('f-rate').value) || 0,
+    darlehen_typ:           typ,
+    rate_monatlich:         isTilg ? 0 : (parseFloat(document.getElementById('f-rate').value) || 0),
+    tilgungsrate_monatlich: isTilg ? (parseFloat(document.getElementById('f-tilgungsrate')?.value) || null) : null,
     zinsbindung_bis:        document.getElementById('f-zinsbindung').value || null,
     restlaufzeit:           parseInt(document.getElementById('f-restlaufzeit-display').dataset.monate) || null,
     sondertilgung_moeglich: document.getElementById('f-sonder').checked,
     sondertilgung_betrag:   parseFloat(document.getElementById('f-sonder-betrag')?.value) || null,
+    notiz:                  document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.bezeichnung || !data.glaeubiger) return toast('Bitte Bezeichnung und Gläubiger ausfüllen.');
   try {
@@ -785,28 +908,63 @@ window.openDepotForm = function(id = null) {
 
   document.getElementById('modal-title').textContent = id ? 'Depot bearbeiten' : 'Depot hinzufügen';
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-group">
-      <label class="form-label">Name / Broker <span class="required">*</span></label>
-      <input id="f-name" class="form-input" placeholder="z. B. Scalable Capital, Trade Republic…" value="${escapeHtml(dep?.name ?? '')}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Depotinhaber</label>
-      <input id="f-depotinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.depotinhaber ?? '')}">
+    <div class="form-section-head">Depot</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Name / Broker <span class="required">*</span></label>
+        <input id="f-name" class="form-input" placeholder="z. B. Scalable Capital" value="${escapeHtml(dep?.name ?? '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Depotinhaber</label>
+        <input id="f-depotinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.depotinhaber ?? '')}">
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Wertpapierdepot-Nr.</label>
+        <label class="form-label">Depotnummer</label>
         <input id="f-depot-nr" class="form-input mono" placeholder="123456789" value="${escapeHtml(dep?.wertpapierdepot_nr ?? '')}">
       </div>
       <div class="form-group">
-        <label class="form-label">Verrechnungskonto</label>
-        <input id="f-verrechnungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.verrechnungskonto ?? '')}">
+        <label class="form-label">BIC</label>
+        <input id="f-depot-bic" class="form-input mono" placeholder="SSKMDEMMXXX" value="${escapeHtml(dep?.depot_bic ?? '')}">
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Auszahlungskonto</label>
-      <input id="f-auszahlungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.auszahlungskonto ?? '')}">
+
+    <div class="form-section-head">Verrechnungskonto</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">IBAN</label>
+        <input id="f-verrechnungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.verrechnungskonto ?? '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">BIC</label>
+        <input id="f-verrechnungskonto-bic" class="form-input mono" placeholder="COBADEFFXXX" value="${escapeHtml(dep?.verrechnungskonto_bic ?? '')}">
+      </div>
     </div>
+
+    <div class="form-section-head">Auszahlungskonto</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Name des Kontoinhabers</label>
+        <input id="f-auszahlungskonto-name" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.auszahlungskonto_name ?? '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bank</label>
+        <input id="f-auszahlungskonto-bank" class="form-input" placeholder="z. B. Sparkasse" value="${escapeHtml(dep?.auszahlungskonto_bank ?? '')}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">IBAN</label>
+        <input id="f-auszahlungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.auszahlungskonto ?? '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">BIC</label>
+        <input id="f-auszahlungskonto-bic" class="form-input mono" placeholder="SSKMDEMMXXX" value="${escapeHtml(dep?.auszahlungskonto_bic ?? '')}">
+      </div>
+    </div>
+
+    <div class="form-section-head">Bewertung & Sonstiges</div>
     <div class="form-group">
       <label class="form-label">Aktueller Gesamtwert (€) <span class="required">*</span></label>
       <input id="f-wert" class="form-input" type="number" step="0.01" value="${dep?.wert_aktuell ?? 0}">
@@ -821,21 +979,29 @@ window.openDepotForm = function(id = null) {
       <label class="form-label">Notiz</label>
       <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(dep?.notiz ?? '')}</textarea>
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('depot', id)}
   `;
   document.getElementById('modal-submit').onclick = submitDepotForm;
   openModal();
+  if (id) loadAnhaenge('depot', id);
 };
 
 async function submitDepotForm() {
   const data = {
-    name:               document.getElementById('f-name').value.trim(),
-    depotinhaber:       document.getElementById('f-depotinhaber').value.trim() || null,
-    wertpapierdepot_nr: document.getElementById('f-depot-nr').value.trim() || null,
-    verrechnungskonto:  document.getElementById('f-verrechnungskonto').value.trim() || null,
-    auszahlungskonto:   document.getElementById('f-auszahlungskonto').value.trim() || null,
-    wert_aktuell:       parseFloat(document.getElementById('f-wert').value) || 0,
-    bitwarden_name:     document.getElementById('f-bitwarden').value.trim() || null,
-    notiz:              document.getElementById('f-notiz').value.trim() || null,
+    name:                   document.getElementById('f-name').value.trim(),
+    depotinhaber:           document.getElementById('f-depotinhaber').value.trim() || null,
+    wertpapierdepot_nr:     document.getElementById('f-depot-nr').value.trim() || null,
+    depot_bic:              document.getElementById('f-depot-bic').value.trim() || null,
+    verrechnungskonto:      document.getElementById('f-verrechnungskonto').value.trim() || null,
+    verrechnungskonto_bic:  document.getElementById('f-verrechnungskonto-bic').value.trim() || null,
+    auszahlungskonto:       document.getElementById('f-auszahlungskonto').value.trim() || null,
+    auszahlungskonto_name:  document.getElementById('f-auszahlungskonto-name').value.trim() || null,
+    auszahlungskonto_bank:  document.getElementById('f-auszahlungskonto-bank').value.trim() || null,
+    auszahlungskonto_bic:   document.getElementById('f-auszahlungskonto-bic').value.trim() || null,
+    wert_aktuell:           parseFloat(document.getElementById('f-wert').value) || 0,
+    bitwarden_name:         document.getElementById('f-bitwarden').value.trim() || null,
+    notiz:                  document.getElementById('f-notiz').value.trim() || null,
   };
   if (!data.name) return toast('Bitte einen Namen eingeben.');
   try {
@@ -958,9 +1124,12 @@ window.openSachwertForm = function(id = null) {
         <input id="f-jahr" class="form-input" type="number" placeholder="2018" min="1900" max="2100" value="${s?.anschaffungsjahr ?? ''}">
       </div>
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('sachwert', id)}
   `;
   document.getElementById('modal-submit').onclick = submitSachwertForm;
   openModal();
+  if (id) loadAnhaenge('sachwert', id);
 };
 
 async function submitSachwertForm() {
@@ -1812,6 +1981,8 @@ window.openVersicherungForm = async function(id = null) {
       <label class="form-label">Notiz</label>
       <input id="f-notiz" class="form-input" placeholder="Freitext" value="${escapeHtml(v?.notiz??'')}">
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('versicherung', id)}
   `;
   document.getElementById('modal-submit').onclick = async () => {
     const data = {
@@ -1843,6 +2014,7 @@ window.openVersicherungForm = async function(id = null) {
     } catch (e) { toast(e.message); }
   };
   openModal();
+  if (id) loadAnhaenge('versicherung', id);
 };
 
 window.deleteVersicherung = async function(id) {
@@ -1914,6 +2086,8 @@ window.openVertragForm = async function(id = null) {
       <label class="form-label">Notiz</label>
       <input id="f-notiz" class="form-input" value="${escapeHtml(v?.notiz??'')}">
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('vertrag', id)}
   `;
   document.getElementById('modal-submit').onclick = async () => {
     const data = {
@@ -1943,6 +2117,7 @@ window.openVertragForm = async function(id = null) {
     } catch (e) { toast(e.message); }
   };
   openModal();
+  if (id) loadAnhaenge('vertrag', id);
 };
 
 window.deleteVertrag = async function(id) {
@@ -2051,6 +2226,8 @@ window.openDokumentForm = (id = null) => {
       <label class="form-label">Notiz</label>
       <textarea id="f-notiz" class="form-input" rows="2" placeholder="Zusätzliche Hinweise …">${d?.notiz ?? ''}</textarea>
     </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('dokument', id)}
   `;
   document.getElementById('modal-submit').onclick = async () => {
     const data = {
@@ -2078,6 +2255,7 @@ window.openDokumentForm = (id = null) => {
     } catch (e) { toast(e.message); }
   };
   openModal();
+  if (id) loadAnhaenge('dokument', id);
 };
 
 window.deleteDokument = async (id) => {
@@ -2376,9 +2554,13 @@ window.openNotfallForm = (id = null) => {
     <div class="form-group">
       <label class="form-label">Hinweis <span style="color:var(--wash-grey);font-weight:400">(kein Klartext-Passwort!)</span></label>
       <textarea id="f-hinweis" class="form-input" rows="3" placeholder="Zusätzliche Hinweise für den Ernstfall …">${e?.hinweis ?? ''}</textarea>
-    </div>`;
+    </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('notfall', id)}
+  `;
   document.getElementById('modal-submit').onclick = saveNotfallEintrag;
   openModal();
+  if (id) loadAnhaenge('notfall', id);
 };
 
 async function saveNotfallEintrag() {

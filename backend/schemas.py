@@ -64,8 +64,13 @@ class DepotBase(BaseModel):
     broker: Optional[str] = None
     depotinhaber: Optional[str] = None
     wertpapierdepot_nr: Optional[str] = None
+    depot_bic: Optional[str] = None
     verrechnungskonto: Optional[str] = None
+    verrechnungskonto_bic: Optional[str] = None
     auszahlungskonto: Optional[str] = None
+    auszahlungskonto_name: Optional[str] = None
+    auszahlungskonto_bank: Optional[str] = None
+    auszahlungskonto_bic: Optional[str] = None
     wert_aktuell: float
     bitwarden_name: Optional[str] = None
     notiz: Optional[str] = None
@@ -80,8 +85,13 @@ class DepotUpdate(BaseModel):
     broker: Optional[str] = None
     depotinhaber: Optional[str] = None
     wertpapierdepot_nr: Optional[str] = None
+    depot_bic: Optional[str] = None
     verrechnungskonto: Optional[str] = None
+    verrechnungskonto_bic: Optional[str] = None
     auszahlungskonto: Optional[str] = None
+    auszahlungskonto_name: Optional[str] = None
+    auszahlungskonto_bank: Optional[str] = None
+    auszahlungskonto_bic: Optional[str] = None
     wert_aktuell: Optional[float] = None
     bitwarden_name: Optional[str] = None
     notiz: Optional[str] = None
@@ -102,11 +112,14 @@ class DarlehenBase(BaseModel):
     urspr_betrag: float
     restschuld: float
     zinssatz: float
+    darlehen_typ: str = 'annuitaet'
     rate_monatlich: float
+    tilgungsrate_monatlich: Optional[float] = None
     zinsbindung_bis: Optional[date] = None
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: bool = False
     sondertilgung_betrag: Optional[float] = None
+    notiz: Optional[str] = None
 
 
 class DarlehenCreate(DarlehenBase):
@@ -119,11 +132,14 @@ class DarlehenUpdate(BaseModel):
     urspr_betrag: Optional[float] = None
     restschuld: Optional[float] = None
     zinssatz: Optional[float] = None
+    darlehen_typ: Optional[str] = None
     rate_monatlich: Optional[float] = None
+    tilgungsrate_monatlich: Optional[float] = None
     zinsbindung_bis: Optional[date] = None
     restlaufzeit: Optional[int] = None
     sondertilgung_moeglich: Optional[bool] = None
     sondertilgung_betrag: Optional[float] = None
+    notiz: Optional[str] = None
 
 
 class DarlehenResponse(DarlehenBase):
@@ -385,6 +401,19 @@ class DokumentResponse(DokumentBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     erstellt_am: datetime
+
+
+# ── Anhang ─────────────────────────────────────────────────────────────────────
+
+class AnhangResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    entity_typ: str
+    entity_id: int
+    dateiname: str
+    original_name: str
+    mime_type: Optional[str] = None
+    hochgeladen_am: datetime
 
 
 # ── Net Worth ──────────────────────────────────────────────────────────────────

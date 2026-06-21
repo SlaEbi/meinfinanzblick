@@ -30,8 +30,13 @@ class Depot(Base):
     broker = Column(String)
     depotinhaber = Column(String)
     wertpapierdepot_nr = Column(String)
-    verrechnungskonto = Column(String)
-    auszahlungskonto = Column(String)
+    depot_bic = Column(String)
+    verrechnungskonto = Column(String)          # IBAN Verrechnungskonto
+    verrechnungskonto_bic = Column(String)
+    auszahlungskonto = Column(String)           # IBAN Auszahlungskonto
+    auszahlungskonto_name = Column(String)
+    auszahlungskonto_bank = Column(String)
+    auszahlungskonto_bic = Column(String)
     wert_aktuell = Column(Numeric(14, 2), nullable=False, default=0)
     bitwarden_name = Column(String)
     notiz = Column(String)
@@ -63,11 +68,14 @@ class Darlehen(Base):
     urspr_betrag = Column(Numeric(14, 2), nullable=False)
     restschuld = Column(Numeric(14, 2), nullable=False)
     zinssatz = Column(Numeric(6, 4), nullable=False)   # 0.0350 = 3.50 %
+    darlehen_typ = Column(String, default='annuitaet')  # annuitaet | tilgungsdarlehen
     rate_monatlich = Column(Numeric(14, 2), nullable=False)
+    tilgungsrate_monatlich = Column(Numeric(14, 2))     # feste monatl. Tilgung (Tilgungsdarlehen)
     zinsbindung_bis = Column(Date)
     restlaufzeit = Column(Integer)                      # Monate (berechnet)
     sondertilgung_moeglich = Column(Boolean, default=False)
     sondertilgung_betrag = Column(Numeric(14, 2))       # max. jährliche Sondertilgung in €
+    notiz = Column(String)
 
 
 class SpendingPlan(Base):
@@ -184,6 +192,18 @@ class Dokument(Base):
     gueltig_bis = Column(Date)                   # Ablaufdatum (optional)
     notiz = Column(String)
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Anhang(Base):
+    __tablename__ = 'anhaenge'
+
+    id = Column(Integer, primary_key=True, index=True)
+    entity_typ = Column(String, nullable=False)   # konto, darlehen, depot, sachwert, versicherung, vertrag, dokument, notfall
+    entity_id = Column(Integer, nullable=False)
+    dateiname = Column(String, nullable=False)    # gespeicherter Dateiname (UUID-basiert)
+    original_name = Column(String, nullable=False)
+    mime_type = Column(String)
+    hochgeladen_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class NetWorthSnapshot(Base):

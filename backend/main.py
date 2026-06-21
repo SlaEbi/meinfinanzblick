@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 
 from sqlalchemy import text
 from .db import Base, engine
-from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system, dokumente
+from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system, dokumente, anhaenge
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,7 +22,15 @@ def _migrate():
         ("depots",   "auszahlungskonto",     "TEXT"),
         ("depots",   "bitwarden_name",       "TEXT"),
         ("depots",   "notiz",                "TEXT"),
-        ("darlehen", "sondertilgung_betrag", "NUMERIC"),
+        ("darlehen", "sondertilgung_betrag",    "NUMERIC"),
+        ("darlehen", "notiz",                   "TEXT"),
+        ("darlehen", "darlehen_typ",             "TEXT DEFAULT 'annuitaet'"),
+        ("darlehen", "tilgungsrate_monatlich",   "NUMERIC"),
+        ("depots",   "depot_bic",               "TEXT"),
+        ("depots",   "verrechnungskonto_bic",   "TEXT"),
+        ("depots",   "auszahlungskonto_name",   "TEXT"),
+        ("depots",   "auszahlungskonto_bank",   "TEXT"),
+        ("depots",   "auszahlungskonto_bic",    "TEXT"),
     ]
     with engine.connect() as conn:
         for table, col, typ in migrations:
@@ -49,6 +57,7 @@ app.include_router(notfall.router, prefix='/api/v1')
 app.include_router(networth.router, prefix='/api/v1')
 app.include_router(system.router, prefix='/api/v1')
 app.include_router(dokumente.router, prefix='/api/v1')
+app.include_router(anhaenge.router, prefix='/api/v1')
 
 FRONTEND = os.path.join(os.path.dirname(__file__), '..', 'frontend')
 DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')

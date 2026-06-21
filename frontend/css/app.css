@@ -520,6 +520,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .badge-tagesgeld   { background: #EBFBEE; color: #2F9E44; }
 .badge-festgeld    { background: #FFF3BF; color: #9C6C00; }
 .badge-sparkonto   { background: #F3F0FF; color: #6741D9; }
+.badge-bargeld     { background: #FFF7ED; color: #C2410C; }
 .badge-immobilie   { background: #FFF0E6; color: #C05621; }
 .badge-fahrzeug    { background: #E6F3FF; color: #2B6CB0; }
 .badge-kunst       { background: #FAF0FF; color: #6B21A8; }
@@ -1696,3 +1697,72 @@ html[data-theme="fintech"] .update-result-msg.success { color: #C9A84C; }
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* ── Formular-Abschnitt-Titel ─────────────────────────────────────────────── */
+
+.form-section-head {
+  font-family: var(--font-serif);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--wash-grey);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--ink-wash);
+  padding-bottom: var(--space-1);
+  margin: var(--space-5) 0 var(--space-3);
+}
+.form-section-head:first-child { margin-top: 0; }
+
+/* ── Anhänge ──────────────────────────────────────────────────────────────── */
+
+.anhang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+}
+
+.anhang-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+}
+
+.anhang-item a {
+  flex: 1;
+  color: var(--ink-black);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.anhang-item a:hover { text-decoration: underline; color: var(--seal-red); }
+
+.anhang-upload {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.btn-anhang-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 1px solid var(--wash-grey);
+  color: var(--ink-black);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color 150ms ease-out, color 150ms ease-out;
+}
+.btn-anhang-upload:hover { border-color: var(--seal-red); color: var(--seal-red); }
