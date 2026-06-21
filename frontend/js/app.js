@@ -546,7 +546,7 @@ window.openKontoForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Name <span class="required">*</span></label>
-        <input id="f-name" class="form-input" placeholder="z. B. Girokonto DKB" value="${escapeHtml(konto?.name ?? '')}" required>
+        <input id="f-name" class="form-input" value="${escapeHtml(konto?.name ?? '')}" required>
       </div>
       <div class="form-group">
         <label class="form-label">Kontotyp <span class="required">*</span></label>
@@ -559,7 +559,7 @@ window.openKontoForm = function(id = null) {
     </div>
     <div class="form-group">
       <label class="form-label">IBAN</label>
-      <input id="f-iban" class="form-input mono" placeholder="DE12 3456 7890 1234 5678 90" value="${escapeHtml(konto?.iban ?? '')}">
+      <input id="f-iban" class="form-input mono" value="${escapeHtml(konto?.iban ?? '')}">
       <p class="form-hint">Wird maskiert angezeigt (nur zur Identifikation)</p>
     </div>
     <div class="form-group">
@@ -568,16 +568,16 @@ window.openKontoForm = function(id = null) {
     </div>
     <div class="form-group">
       <label class="form-label">Kontoinhaber</label>
-      <input id="f-kontoinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(konto?.kontoinhaber ?? '')}">
+      <input id="f-kontoinhaber" class="form-input" value="${escapeHtml(konto?.kontoinhaber ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label">Passwortsafe-Eintrag</label>
-      <input id="f-bitwarden" class="form-input" placeholder="z. B. Sparkasse Girokonto" value="${escapeHtml(konto?.bitwarden_name ?? '')}">
+      <input id="f-bitwarden" class="form-input" value="${escapeHtml(konto?.bitwarden_name ?? '')}">
       <p class="form-hint">Klick in der Tabelle öffnet vault.bitwarden.com</p>
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(konto?.notiz ?? '')}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="3">${escapeHtml(konto?.notiz ?? '')}</textarea>
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('konto', id)}
@@ -697,11 +697,11 @@ window.openDarlehenForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Bezeichnung <span class="required">*</span></label>
-        <input id="f-bez" class="form-input" placeholder="Immobiliendarlehen" value="${escapeHtml(d?.bezeichnung ?? '')}">
+        <input id="f-bez" class="form-input" value="${escapeHtml(d?.bezeichnung ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">Gläubiger <span class="required">*</span></label>
-        <input id="f-glaeubiger" class="form-input" placeholder="Deutsche Bank" value="${escapeHtml(d?.glaeubiger ?? '')}">
+        <input id="f-glaeubiger" class="form-input" value="${escapeHtml(d?.glaeubiger ?? '')}">
       </div>
     </div>
     <div class="form-row">
@@ -717,7 +717,7 @@ window.openDarlehenForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Zinssatz (%) <span class="required">*</span></label>
-        <input id="f-zinssatz" class="form-input" type="number" step="0.001" placeholder="3.50" value="${d ? (d.zinssatz * 100).toFixed(3) : ''}">
+        <input id="f-zinssatz" class="form-input" type="number" step="0.001" value="${d ? (d.zinssatz * 100).toFixed(3) : ''}">
         <p class="form-hint">z. B. 3.5 für 3,50 %</p>
       </div>
       <div class="form-group">
@@ -736,7 +736,7 @@ window.openDarlehenForm = function(id = null) {
     <div id="f-tilgung-row" class="form-group" style="display:${isTilgung ? 'block' : 'none'}">
       <label class="form-label">Feste monatliche Tilgung (€) <span class="required">*</span></label>
       <input id="f-tilgungsrate" class="form-input" type="number" step="0.01"
-        placeholder="z. B. 1000" value="${d?.tilgungsrate_monatlich ?? ''}">
+        value="${d?.tilgungsrate_monatlich ?? ''}">
       <p class="form-hint">Der Zinsanteil sinkt mit der Restschuld — die Gesamtrate verringert sich monatlich.</p>
     </div>
     <div class="form-group">
@@ -759,11 +759,11 @@ window.openDarlehenForm = function(id = null) {
     <div id="f-sonder-betrag-row" class="form-group" style="display:${d?.sondertilgung_moeglich ? 'block' : 'none'}">
       <label class="form-label">Max. jährliche Sondertilgung (€)</label>
       <input id="f-sonder-betrag" class="form-input" type="number" step="0.01"
-        placeholder="z. B. 5000" value="${d?.sondertilgung_betrag ?? ''}">
+        value="${d?.sondertilgung_betrag ?? ''}">
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(d?.notiz ?? '')}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="3">${escapeHtml(d?.notiz ?? '')}</textarea>
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('darlehen', id)}
@@ -912,21 +912,21 @@ window.openDepotForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Name / Broker <span class="required">*</span></label>
-        <input id="f-name" class="form-input" placeholder="z. B. Scalable Capital" value="${escapeHtml(dep?.name ?? '')}">
+        <input id="f-name" class="form-input" value="${escapeHtml(dep?.name ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">Depotinhaber</label>
-        <input id="f-depotinhaber" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.depotinhaber ?? '')}">
+        <input id="f-depotinhaber" class="form-input" value="${escapeHtml(dep?.depotinhaber ?? '')}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Depotnummer</label>
-        <input id="f-depot-nr" class="form-input mono" placeholder="123456789" value="${escapeHtml(dep?.wertpapierdepot_nr ?? '')}">
+        <input id="f-depot-nr" class="form-input mono" value="${escapeHtml(dep?.wertpapierdepot_nr ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">BIC</label>
-        <input id="f-depot-bic" class="form-input mono" placeholder="SSKMDEMMXXX" value="${escapeHtml(dep?.depot_bic ?? '')}">
+        <input id="f-depot-bic" class="form-input mono" value="${escapeHtml(dep?.depot_bic ?? '')}">
       </div>
     </div>
 
@@ -934,11 +934,11 @@ window.openDepotForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">IBAN</label>
-        <input id="f-verrechnungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.verrechnungskonto ?? '')}">
+        <input id="f-verrechnungskonto" class="form-input mono" value="${escapeHtml(dep?.verrechnungskonto ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">BIC</label>
-        <input id="f-verrechnungskonto-bic" class="form-input mono" placeholder="COBADEFFXXX" value="${escapeHtml(dep?.verrechnungskonto_bic ?? '')}">
+        <input id="f-verrechnungskonto-bic" class="form-input mono" value="${escapeHtml(dep?.verrechnungskonto_bic ?? '')}">
       </div>
     </div>
 
@@ -946,21 +946,21 @@ window.openDepotForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Name des Kontoinhabers</label>
-        <input id="f-auszahlungskonto-name" class="form-input" placeholder="z. B. Max Mustermann" value="${escapeHtml(dep?.auszahlungskonto_name ?? '')}">
+        <input id="f-auszahlungskonto-name" class="form-input" value="${escapeHtml(dep?.auszahlungskonto_name ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">Bank</label>
-        <input id="f-auszahlungskonto-bank" class="form-input" placeholder="z. B. Sparkasse" value="${escapeHtml(dep?.auszahlungskonto_bank ?? '')}">
+        <input id="f-auszahlungskonto-bank" class="form-input" value="${escapeHtml(dep?.auszahlungskonto_bank ?? '')}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">IBAN</label>
-        <input id="f-auszahlungskonto" class="form-input mono" placeholder="DE12 3456 …" value="${escapeHtml(dep?.auszahlungskonto ?? '')}">
+        <input id="f-auszahlungskonto" class="form-input mono" value="${escapeHtml(dep?.auszahlungskonto ?? '')}">
       </div>
       <div class="form-group">
         <label class="form-label">BIC</label>
-        <input id="f-auszahlungskonto-bic" class="form-input mono" placeholder="SSKMDEMMXXX" value="${escapeHtml(dep?.auszahlungskonto_bic ?? '')}">
+        <input id="f-auszahlungskonto-bic" class="form-input mono" value="${escapeHtml(dep?.auszahlungskonto_bic ?? '')}">
       </div>
     </div>
 
@@ -972,12 +972,12 @@ window.openDepotForm = function(id = null) {
     </div>
     <div class="form-group">
       <label class="form-label">Passwortsafe-Eintrag</label>
-      <input id="f-bitwarden" class="form-input" placeholder="z. B. comdirect Depot" value="${escapeHtml(dep?.bitwarden_name ?? '')}">
+      <input id="f-bitwarden" class="form-input" value="${escapeHtml(dep?.bitwarden_name ?? '')}">
       <p class="form-hint">Klick in der Tabelle öffnet vault.bitwarden.com</p>
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="3" placeholder="Freitext…">${escapeHtml(dep?.notiz ?? '')}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="3">${escapeHtml(dep?.notiz ?? '')}</textarea>
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('depot', id)}
@@ -1095,7 +1095,7 @@ window.openSachwertForm = function(id = null) {
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group">
       <label class="form-label">Bezeichnung <span class="required">*</span></label>
-      <input id="f-bez" class="form-input" placeholder="z. B. Eigenheim München, VW Golf" value="${escapeHtml(s?.bezeichnung ?? '')}">
+      <input id="f-bez" class="form-input" value="${escapeHtml(s?.bezeichnung ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label">Kategorie <span class="required">*</span></label>
@@ -1107,7 +1107,7 @@ window.openSachwertForm = function(id = null) {
     </div>
     <div class="form-group">
       <label class="form-label">Beschreibung</label>
-      <input id="f-desc" class="form-input" placeholder="Kurze Beschreibung (optional)" value="${escapeHtml(s?.beschreibung ?? '')}">
+      <input id="f-desc" class="form-input" value="${escapeHtml(s?.beschreibung ?? '')}">
     </div>
     <div class="form-group">
       <label class="form-label">Aktueller Schätzwert (€) <span class="required">*</span></label>
@@ -1117,11 +1117,11 @@ window.openSachwertForm = function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Anschaffungswert (€)</label>
-        <input id="f-anschaffwert" class="form-input" type="number" step="0.01" placeholder="0" value="${s?.anschaffungswert ?? ''}">
+        <input id="f-anschaffwert" class="form-input" type="number" step="0.01" value="${s?.anschaffungswert ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Anschaffungsjahr</label>
-        <input id="f-jahr" class="form-input" type="number" placeholder="2018" min="1900" max="2100" value="${s?.anschaffungsjahr ?? ''}">
+        <input id="f-jahr" class="form-input" type="number" min="1900" max="2100" value="${s?.anschaffungsjahr ?? ''}">
       </div>
     </div>
     <div class="form-section-head">Anhänge</div>
@@ -1702,11 +1702,11 @@ window.spCreateNew = async function() {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Brutto / Monat (€) <span class="required">*</span></label>
-        <input id="f-brutto" class="form-input" type="number" step="50" placeholder="10000">
+        <input id="f-brutto" class="form-input" type="number" step="50">
       </div>
       <div class="form-group">
         <label class="form-label">Netto / Monat (€) <span class="required">*</span></label>
-        <input id="f-netto" class="form-input" type="number" step="50" placeholder="7500">
+        <input id="f-netto" class="form-input" type="number" step="50">
       </div>
     </div>
     <div class="form-row">
@@ -1930,23 +1930,23 @@ window.openVersicherungForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Bezeichnung <span class="required">*</span></label>
-        <input id="f-bez" class="form-input" placeholder="z. B. Private Haftpflicht" value="${escapeHtml(v?.bezeichnung??'')}">
+        <input id="f-bez" class="form-input" value="${escapeHtml(v?.bezeichnung??'')}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Anbieter <span class="required">*</span></label>
-        <input id="f-anbieter" class="form-input" placeholder="z. B. Allianz" value="${escapeHtml(v?.anbieter??'')}">
+        <input id="f-anbieter" class="form-input" value="${escapeHtml(v?.anbieter??'')}">
       </div>
       <div class="form-group">
         <label class="form-label">Vertragsnummer</label>
-        <input id="f-vnr" class="form-input mono" placeholder="123456789" value="${escapeHtml(v?.vertragsnummer??'')}">
+        <input id="f-vnr" class="form-input mono" value="${escapeHtml(v?.vertragsnummer??'')}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Beitrag (€) <span class="required">*</span></label>
-        <input id="f-beitrag" class="form-input" type="number" step="1" placeholder="0" value="${v?.beitrag??''}">
+        <input id="f-beitrag" class="form-input" type="number" step="1" value="${v?.beitrag??''}">
       </div>
       <div class="form-group">
         <label class="form-label">Zahlweise</label>
@@ -1964,22 +1964,22 @@ window.openVersicherungForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Kündigungsfrist (Tage)</label>
-        <input id="f-frist" class="form-input" type="number" step="1" placeholder="0" value="${v?.kuendigungsfrist_tage??0}">
+        <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Kontakt Telefon</label>
-        <input id="f-tel" class="form-input" placeholder="+49 800 …" value="${escapeHtml(v?.kontakt_telefon??'')}">
+        <input id="f-tel" class="form-input" value="${escapeHtml(v?.kontakt_telefon??'')}">
       </div>
       <div class="form-group">
         <label class="form-label">Kontakt E-Mail</label>
-        <input id="f-email" class="form-input" placeholder="service@…" value="${escapeHtml(v?.kontakt_email??'')}">
+        <input id="f-email" class="form-input" value="${escapeHtml(v?.kontakt_email??'')}">
       </div>
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <input id="f-notiz" class="form-input" placeholder="Freitext" value="${escapeHtml(v?.notiz??'')}">
+      <input id="f-notiz" class="form-input" value="${escapeHtml(v?.notiz??'')}">
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('versicherung', id)}
@@ -2045,13 +2045,13 @@ window.openVertragForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Bezeichnung <span class="required">*</span></label>
-        <input id="f-bez" class="form-input" placeholder="z. B. Strom Wohnung" value="${escapeHtml(v?.bezeichnung??'')}">
+        <input id="f-bez" class="form-input" value="${escapeHtml(v?.bezeichnung??'')}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Anbieter <span class="required">*</span></label>
-        <input id="f-anbieter" class="form-input" placeholder="z. B. E.ON" value="${escapeHtml(v?.anbieter??'')}">
+        <input id="f-anbieter" class="form-input" value="${escapeHtml(v?.anbieter??'')}">
       </div>
       <div class="form-group">
         <label class="form-label">Vertragsnummer</label>
@@ -2061,7 +2061,7 @@ window.openVertragForm = async function(id = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Kosten (€) <span class="required">*</span></label>
-        <input id="f-kosten" class="form-input" type="number" step="1" placeholder="0" value="${v?.kosten??''}">
+        <input id="f-kosten" class="form-input" type="number" step="1" value="${v?.kosten??''}">
       </div>
       <div class="form-group">
         <label class="form-label">Zahlweise</label>
@@ -2079,7 +2079,7 @@ window.openVertragForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Kündigungsfrist (Tage)</label>
-        <input id="f-frist" class="form-input" type="number" step="1" placeholder="0" value="${v?.kuendigungsfrist_tage??0}">
+        <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
       </div>
     </div>
     <div class="form-group">
@@ -2199,17 +2199,17 @@ window.openDokumentForm = (id = null) => {
       </div>
       <div class="form-group">
         <label class="form-label">Titel <span class="required">*</span></label>
-        <input id="f-titel" class="form-input" type="text" value="${d?.titel ?? ''}" placeholder="z. B. Testament 2024">
+        <input id="f-titel" class="form-input" type="text" value="${d?.titel ?? ''}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Aufbewahrungsort</label>
-        <input id="f-aufbew" class="form-input" type="text" value="${d?.aufbewahrungsort ?? ''}" placeholder="z. B. Safe im Arbeitszimmer, Notar Müller">
+        <input id="f-aufbew" class="form-input" type="text" value="${d?.aufbewahrungsort ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Aussteller</label>
-        <input id="f-aussteller" class="form-input" type="text" value="${d?.aussteller ?? ''}" placeholder="z. B. Notar Dr. Mayer, Finanzamt">
+        <input id="f-aussteller" class="form-input" type="text" value="${d?.aussteller ?? ''}">
       </div>
     </div>
     <div class="form-row">
@@ -2224,7 +2224,7 @@ window.openDokumentForm = (id = null) => {
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="2" placeholder="Zusätzliche Hinweise …">${d?.notiz ?? ''}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="2">${d?.notiz ?? ''}</textarea>
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('dokument', id)}
@@ -2447,7 +2447,7 @@ window.openKontaktForm = (id = null) => {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Name <span class="required">*</span></label>
-        <input id="f-name" class="form-input" type="text" value="${k?.name ?? ''}" placeholder="Max Mustermann">
+        <input id="f-name" class="form-input" type="text" value="${k?.name ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">Rolle <span class="required">*</span></label>
@@ -2460,25 +2460,25 @@ window.openKontaktForm = (id = null) => {
     </div>
     <div class="form-group">
       <label class="form-label">Firma / Institut</label>
-      <input id="f-firma" class="form-input" type="text" value="${k?.firma ?? ''}" placeholder="z. B. Kanzlei Müller">
+      <input id="f-firma" class="form-input" type="text" value="${k?.firma ?? ''}">
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Telefon</label>
-        <input id="f-telefon" class="form-input" type="text" value="${k?.telefon ?? ''}" placeholder="+49 …">
+        <input id="f-telefon" class="form-input" type="text" value="${k?.telefon ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label">E-Mail</label>
-        <input id="f-email" class="form-input" type="email" value="${k?.email ?? ''}" placeholder="name@example.de">
+        <input id="f-email" class="form-input" type="email" value="${k?.email ?? ''}">
       </div>
     </div>
     <div class="form-group">
       <label class="form-label">Adresse</label>
-      <input id="f-adresse" class="form-input" type="text" value="${k?.adresse ?? ''}" placeholder="Musterstraße 1, 12345 Stadt">
+      <input id="f-adresse" class="form-input" type="text" value="${k?.adresse ?? ''}">
     </div>
     <div class="form-group">
       <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="2" placeholder="Zusätzliche Infos…">${k?.notiz ?? ''}</textarea>
+      <textarea id="f-notiz" class="form-input" rows="2">${k?.notiz ?? ''}</textarea>
     </div>`;
   document.getElementById('modal-submit').onclick = saveKontakt;
   openModal();
@@ -2527,7 +2527,7 @@ window.openNotfallForm = (id = null) => {
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group">
       <label class="form-label">Titel <span class="required">*</span></label>
-      <input id="f-titel" class="form-input" type="text" value="${e?.titel ?? ''}" placeholder="z. B. Passwort-Manager, Testament …">
+      <input id="f-titel" class="form-input" type="text" value="${e?.titel ?? ''}">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -2549,11 +2549,11 @@ window.openNotfallForm = (id = null) => {
     </div>
     <div class="form-group">
       <label class="form-label">Wo liegt es / Verweis</label>
-      <input id="f-verweis" class="form-input" type="text" value="${e?.verweis ?? ''}" placeholder="z. B. Bitwarden › Finanzen / Safe im Arbeitszimmer">
+      <input id="f-verweis" class="form-input" type="text" value="${e?.verweis ?? ''}">
     </div>
     <div class="form-group">
       <label class="form-label">Hinweis <span style="color:var(--wash-grey);font-weight:400">(kein Klartext-Passwort!)</span></label>
-      <textarea id="f-hinweis" class="form-input" rows="3" placeholder="Zusätzliche Hinweise für den Ernstfall …">${e?.hinweis ?? ''}</textarea>
+      <textarea id="f-hinweis" class="form-input" rows="3">${e?.hinweis ?? ''}</textarea>
     </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('notfall', id)}
