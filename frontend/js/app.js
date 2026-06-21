@@ -2756,7 +2756,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape') closeModal();
   });
 
-  document.getElementById('modal-overlay')?.addEventListener('click', e => {
+  // mousedown statt click: schließt das Modal nur wenn der Klick auf dem
+  // Overlay *beginnt* — verhindert unbeabsichtigtes Schließen beim Textarea-
+  // Resize, falls die Maus dabei über den Rand des Modals hinausgleitet.
+  document.getElementById('modal-overlay')?.addEventListener('mousedown', e => {
     if (e.target === document.getElementById('modal-overlay')) closeModal();
   });
 
