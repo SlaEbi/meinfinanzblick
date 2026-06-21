@@ -207,6 +207,8 @@ const state = {
   kontakte: [],
   notfall: [],
   dokumente: [],
+  todos: [],
+  bugIdeen: [],
   networth: null,
   charts: {},
   editingId: null,
@@ -251,7 +253,7 @@ async function loadAll() {
     state.networth       = DEMO.networth;
     return;
   }
-  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, dokumente, networth] = await Promise.all([
+  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, dokumente, networth, todos, bugIdeen] = await Promise.all([
     api.konten.list(),
     api.darlehen.list(),
     api.depots.list(),
@@ -262,6 +264,8 @@ async function loadAll() {
     api.notfall.list(),
     api.dokumente.list(),
     api.networth.get(),
+    api.todos.list(),
+    api.bugIdeen.list(),
   ]);
   state.konten         = konten;
   state.darlehen       = darlehen;
@@ -273,6 +277,8 @@ async function loadAll() {
   state.dokumente      = dokumente;
   state.notfall        = notfall;
   state.networth       = networth;
+  state.todos          = todos;
+  state.bugIdeen       = bugIdeen;
 }
 
 function renderCurrentView() {
@@ -286,6 +292,8 @@ function renderCurrentView() {
   if (state.view === 'vertraege')      renderVertraege();
   if (state.view === 'dokumente')      renderDokumente();
   if (state.view === 'notfall')        renderNotfall();
+  if (state.view === 'todos')          renderTodos();
+  if (state.view === 'bug-ideen')      renderBugIdeen();
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
@@ -305,6 +313,9 @@ function renderDashboard() {
   const heroEl = document.getElementById('nw-netto');
   heroEl.className = 'card-value hero mono ' + (netto >= 0 ? '' : 'negative');
 
+  // Fristen & Warnungen
+  renderDashboardWarnings();
+
   // Charts zeichnen
   renderDonutChart();
   renderSchuldenChart();
@@ -313,6 +324,113 @@ function renderDashboard() {
   // Quick-Listen
   renderDashboardKonten();
   renderDashboardDarlehen();
+}
+
+// ── Fristen & Warnungen ───────────────────────────────────────────────────────
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.floor((d - t) / 86400000);
+}
+
+function kuendigungDeadline(item) {
+  if (!item.laufzeit_bis || !item.kuendigungsfrist_tage) return null;
+  const d = new Date(item.laufzeit_bis);
+  d.setDate(d.getDate() - item.kuendigungsfrist_tage);
+  return d;
+}
+
+// Icons (Lucide, inline)
+const WARN_ICONS = {
+  car:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 002 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  file:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  percent:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+  bell:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>',
+};
+
+// Glocken-Toggle für Kündigungsfrist-Erinnerung im Formular
+function fristBellHtml(active) {
+  const on = active === true;
+  return `<button type="button" id="f-frist-bell" class="frist-bell${on ? ' active' : ''}"
+    data-active="${on}" onclick="toggleFristBell(this)"
+    title="Erinnerung an Kündigungsfrist im Dashboard anzeigen">${WARN_ICONS.bell}</button>`;
+}
+
+window.toggleFristBell = function(btn) {
+  const next = btn.dataset.active !== 'true';
+  btn.dataset.active = next;
+  btn.classList.toggle('active', next);
+};
+
+function collectWarnings() {
+  const out = [];
+
+  // TÜV (nur Fahrzeuge) — bis 60 Tage vorher; überfällig immer zeigen (Pflicht)
+  for (const s of state.sachwerte ?? []) {
+    if (s.kategorie !== 'fahrzeug' || !s.naechster_tuev) continue;
+    const days = daysUntil(s.naechster_tuev);
+    if (days === null || days > 60) continue;
+    out.push({ typ: 'TÜV fällig', icon: WARN_ICONS.car, name: s.bezeichnung, days, datum: s.naechster_tuev, view: 'sachwerte' });
+  }
+
+  // Kündigungsfristen Versicherungen — nur mit aktivierter Glocke; Fenster -30…60 Tage
+  for (const v of state.versicherungen ?? []) {
+    if (!v.frist_erinnerung) continue;
+    const days = vsDaysTillKuendigung(v);
+    if (days === null || days > 60 || days < -30) continue;
+    out.push({ typ: 'Kündigungsfrist', icon: WARN_ICONS.shield, name: v.bezeichnung, days, datum: kuendigungDeadline(v), view: 'versicherungen' });
+  }
+
+  // Kündigungsfristen Verträge — nur mit aktivierter Glocke
+  for (const v of state.vertraege ?? []) {
+    if (!v.frist_erinnerung) continue;
+    const days = vsDaysTillKuendigung(v);
+    if (days === null || days > 60 || days < -30) continue;
+    out.push({ typ: 'Kündigungsfrist', icon: WARN_ICONS.file, name: v.bezeichnung, days, datum: kuendigungDeadline(v), view: 'vertraege' });
+  }
+
+  // Zinsbindung Darlehen — bis 90 Tage vorher, nicht länger als 30 Tage überfällig
+  for (const d of state.darlehen ?? []) {
+    const days = daysUntil(d.zinsbindung_bis);
+    if (days === null || days > 90 || days < -30) continue;
+    out.push({ typ: 'Zinsbindung endet', icon: WARN_ICONS.percent, name: d.bezeichnung, days, datum: d.zinsbindung_bis, view: 'darlehen' });
+  }
+
+  return out.sort((a, b) => a.days - b.days);
+}
+
+function renderDashboardWarnings() {
+  const host = document.getElementById('dash-warnings');
+  if (!host) return;
+  const warnings = collectWarnings();
+  if (!warnings.length) { host.innerHTML = ''; return; }
+
+  const rows = warnings.map(w => {
+    const sev = (w.days <= 30 || w.days < 0) ? 'urgent' : 'soon';
+    const daysTxt =
+      w.days < 0  ? `überfällig seit ${Math.abs(w.days)} ${Math.abs(w.days) === 1 ? 'Tag' : 'Tagen'}` :
+      w.days === 0 ? 'heute fällig' :
+                     `noch ${w.days} ${w.days === 1 ? 'Tag' : 'Tage'}`;
+    return `
+      <button class="alert-item ${sev}" onclick="navigate('${w.view}')">
+        <span class="alert-icon">${w.icon}</span>
+        <span class="alert-text"><strong>${escapeHtml(w.typ)}</strong> · ${escapeHtml(w.name)}</span>
+        <span class="alert-days mono">${daysTxt} · ${fmt.date(w.datum)}</span>
+      </button>`;
+  }).join('');
+
+  host.innerHTML = `
+    <div class="alert-banner">
+      <div class="alert-banner-head">
+        <span class="alert-seal">${WARN_ICONS.bell}</span>
+        <span>Anstehende Fristen</span>
+        <span class="alert-count">${warnings.length}</span>
+      </div>
+      <div class="alert-list">${rows}</div>
+    </div>`;
 }
 
 function renderDonutChart() {
@@ -357,6 +475,7 @@ function renderDonutChart() {
             boxWidth: 10,
             boxHeight: 10,
             borderRadius: 5,
+            generateLabels: legendLabelsWithPercent,
           },
         },
         tooltip: {
@@ -367,6 +486,25 @@ function renderDonutChart() {
         },
       },
     },
+  });
+}
+
+// Legend labels with percentage suffix (for doughnut charts)
+function legendLabelsWithPercent(chart) {
+  const ds = chart.data.datasets[0];
+  const total = ds.data.reduce((sum, v) => sum + Number(v ?? 0), 0);
+  return chart.data.labels.map((label, i) => {
+    const value = Number(ds.data[i] ?? 0);
+    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+    return {
+      text: `${label}  ${pct} %`,
+      fillStyle: ds.backgroundColor[i],
+      strokeStyle: ds.backgroundColor[i],
+      lineWidth: 0,
+      borderRadius: 5,
+      fontColor: chartTheme().text,
+      index: i,
+    };
   });
 }
 
@@ -384,7 +522,8 @@ function renderSchuldenChart() {
 
   const SCHULDEN_COLORS = palette().schulden;
   const labels = darlehen.map(d => d.bezeichnung);
-  const data   = darlehen.map(d => Number(d.restschuld ?? 0));
+  // nur Eigenanteil berücksichtigen (z. B. 50 % bei GbR-Hälfte)
+  const data   = darlehen.map(d => Number(d.restschuld ?? 0) * (Number(d.anteil_pct ?? 100) / 100));
   const colors = darlehen.map((_, i) => SCHULDEN_COLORS[i % SCHULDEN_COLORS.length]);
 
   state.charts.schulden = new Chart(ctx, {
@@ -411,6 +550,7 @@ function renderSchuldenChart() {
             boxWidth: 10,
             boxHeight: 10,
             borderRadius: 5,
+            generateLabels: legendLabelsWithPercent,
           },
         },
         tooltip: {
@@ -1402,6 +1542,40 @@ function spGetPositionen(kat) {
   return (spPlan?.positionen ?? []).filter(p => p.kategorie === kat);
 }
 
+// Netto = Summe der Einnahme-Positionen. Solange keine erfasst sind,
+// Fallback auf den manuell gespeicherten Wert (Rückwärtskompatibilität / Demo).
+function spNetto() {
+  const einnahmen = spGetPositionen('einnahmen');
+  if (einnahmen.length) return einnahmen.reduce((s, p) => s + (Number(p.betrag) || 0), 0);
+  return spPlan?.netto_monatlich ?? 0;
+}
+
+const SP_EMPF_LABEL = { ich: 'Ich', ehefrau: 'Ehefrau', beide: 'Beide' };
+
+// Eine Einnahme-Zeile (modulweit, damit Voll-Render UND Append-in-place sie nutzen)
+function einnahmeRowHtml(p) {
+  return `
+    <div class="sp-position sp-income-pos" data-pos-id="${p.id}">
+      <input class="sp-pos-name" value="${escapeHtml(p.bezeichnung)}"
+        placeholder="z. B. Gehalt"
+        oninput="spQueueSaveName(${p.id}, this.value)"
+        onblur="spSavePosName(${p.id}, this.value)"
+        onkeydown="if(event.key==='Enter')this.blur()">
+      <select class="sp-pos-empf" onchange="spSavePosEmpf(${p.id}, this.value)" title="Empfänger">
+        ${['ich','ehefrau','beide'].map(e => `<option value="${e}"${(p.empfaenger??'ich')===e?' selected':''}>${SP_EMPF_LABEL[e]}</option>`).join('')}
+      </select>
+      <input class="sp-pos-amount" type="number" step="0.01" value="${p.betrag}"
+        oninput="spRecalc(); spQueueSaveAmount(${p.id}, this.value)"
+        onblur="spSavePosAmount(${p.id}, this.value)"
+        onkeydown="if(event.key==='Enter')this.blur()">
+      <button class="sp-pos-delete" onclick="spDeletePos(${p.id})" title="Löschen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>`;
+}
+
 function spKatSumme(kat) {
   return spGetPositionen(kat).reduce((s, p) => s + (p.betrag || 0), 0);
 }
@@ -1438,12 +1612,12 @@ function spFixTotal()  { return spKatSumme('fixkosten') + spAutoTotal() + spSons
 function spInvTotal()  { return spKatSumme('investments'); }
 function spSparTotal() { return spKatSumme('sparziele'); }
 function spGFS()       {
-  const n = spPlan?.netto_monatlich ?? 0;
+  const n = spNetto();
   return Math.max(0, n - spFixTotal() - spInvTotal() - spSparTotal());
 }
 
 function spPct(val) {
-  const n = spPlan?.netto_monatlich ?? 1;
+  const n = spNetto() || 1;
   return n ? val / n : 0;
 }
 
@@ -1481,7 +1655,7 @@ async function renderSpendinPlan() {
     return;
   }
 
-  const netto    = spPlan.netto_monatlich;
+  const netto    = spNetto();
   const fixT     = spFixTotal();
   const invT     = spInvTotal();
   const sparT    = spSparTotal();
@@ -1518,6 +1692,8 @@ async function renderSpendinPlan() {
         </svg>
       </button>
     </div>`).join('');
+
+  const renderEinnahmen = () => spGetPositionen('einnahmen').map(einnahmeRowHtml).join('');
 
   const QUELLE_LABEL = { darlehen: 'Darlehen', versicherung: 'Versicherung', vertrag: 'Vertrag' };
   const hatAuto = spAutoPositionen().length > 0;
@@ -1581,12 +1757,8 @@ async function renderSpendinPlan() {
           onkeydown="if(event.key==='Enter')this.blur()"> €
       </div>
       <div class="sp-income-field">
-        <label>Netto / Monat</label>
-        <input class="sp-income-input" id="sp-netto-input" type="number" step="50"
-          value="${spPlan.netto_monatlich}"
-          onblur="spSavePlanField('netto_monatlich', +this.value)"
-          oninput="spRecalc()"
-          onkeydown="if(event.key==='Enter')this.blur()"> €
+        <label>Netto / Monat <span class="sp-income-hint">= Summe Einnahmen</span></label>
+        <div class="sp-income-computed mono" id="sp-netto-display">${fmt.eur(spNetto())}</div>
       </div>
       <div class="sp-puffer-label">
         Sonstiges-Puffer:
@@ -1597,6 +1769,27 @@ async function renderSpendinPlan() {
           oninput="spRecalc()"
           onkeydown="if(event.key==='Enter')this.blur()"> %
         auf Fixkosten
+      </div>
+    </div>
+
+    <!-- Einnahmen-Karte -->
+    <div class="sp-card sp-card-income">
+      <div class="sp-card-header">
+        <div class="sp-card-dot dot-income"></div>
+        <div class="sp-card-title">Einnahmen</div>
+        <div class="sp-card-target">Woraus sich das Netto-Einkommen zusammensetzt</div>
+        <div class="sp-card-pct mono" id="sp-income-total-head">${fmt.eur(spNetto())}</div>
+      </div>
+      <div class="sp-position-list" id="sp-einnahmen-list">
+        ${renderEinnahmen() || '<p class="sp-income-empty">Noch keine Einnahmen erfasst — füge deine Einkommensquellen hinzu.</p>'}
+      </div>
+      <button class="sp-add-btn" onclick="spAddPos('einnahmen')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+        Einnahme hinzufügen
+      </button>
+      <div class="sp-total-row">
+        <span class="sp-total-label">Summe Einnahmen (Netto)</span>
+        <span class="sp-total-value" id="sp-income-total">${fmt.eur(spNetto())}</span>
       </div>
     </div>
 
@@ -1747,11 +1940,7 @@ async function renderSpendinPlan() {
 function spRecalc() {
   if (!spPlan) return;
 
-  // Werte aus dem DOM lesen (bei laufender Eingabe)
-  const nettoInput = document.getElementById('sp-netto-input');
-  if (nettoInput) spPlan.netto_monatlich = parseFloat(nettoInput.value) || spPlan.netto_monatlich;
-
-  // Beträge aus amount-Inputs in spPlan.positionen spiegeln
+  // Beträge aus amount-Inputs in spPlan.positionen spiegeln (auch Einnahmen)
   document.querySelectorAll('.sp-position[data-pos-id]').forEach(row => {
     const posId = parseInt(row.dataset.posId);
     const amtInput = row.querySelector('.sp-pos-amount');
@@ -1763,7 +1952,14 @@ function spRecalc() {
   const puffInput = document.getElementById('sp-puffer-input');
   if (puffInput) spPlan.sonstiges_puffer_pct = parseFloat(puffInput.value) / 100 || 0.05;
 
-  const n = spPlan.netto_monatlich || 1;
+  // Netto live aus Einnahmen ableiten und anzeigen
+  const nettoLive = spNetto();
+  const setN = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setN('sp-netto-display',     fmt.eur(nettoLive));
+  setN('sp-income-total',      fmt.eur(nettoLive));
+  setN('sp-income-total-head', fmt.eur(nettoLive));
+
+  const n = nettoLive || 1;
   const fixT  = spFixTotal();
   const invT  = spInvTotal();
   const sparT = spSparTotal();
@@ -1832,7 +2028,9 @@ async function spSavePlanField(field, value) {
 }
 
 async function spSavePosName(posId, value) {
-  if (!spPlan || !value.trim()) return;
+  if (!spPlan) return;
+  clearTimeout(spSaveTimers['n' + posId]);
+  if (!value.trim()) return;
   try {
     await api.spending.updatePosition(spPlan.id, posId, { bezeichnung: value.trim() });
     const pos = spPlan.positionen.find(p => p.id === posId);
@@ -1842,34 +2040,73 @@ async function spSavePosName(posId, value) {
 
 async function spSavePosAmount(posId, value) {
   if (!spPlan) return;
+  clearTimeout(spSaveTimers['a' + posId]);
   const betrag = parseFloat(value) || 0;
   try {
     await api.spending.updatePosition(spPlan.id, posId, { betrag });
     const pos = spPlan.positionen.find(p => p.id === posId);
     if (pos) pos.betrag = betrag;
+    if (pos?.kategorie === 'einnahmen') await spSyncNetto();
   } catch (e) { toast(e.message); }
 }
+
+// Debounced Persistierung beim Tippen — schützt vor Datenverlust, falls
+// kein sauberes blur erfolgt (z. B. schnelles Klicken auf „Hinzufügen").
+const spSaveTimers = {};
+function spQueueSaveAmount(posId, value) {
+  clearTimeout(spSaveTimers['a' + posId]);
+  spSaveTimers['a' + posId] = setTimeout(() => spSavePosAmount(posId, value), 600);
+}
+function spQueueSaveName(posId, value) {
+  clearTimeout(spSaveTimers['n' + posId]);
+  spSaveTimers['n' + posId] = setTimeout(() => spSavePosName(posId, value), 600);
+}
+
+async function spSavePosEmpf(posId, value) {
+  if (!spPlan) return;
+  try {
+    await api.spending.updatePosition(spPlan.id, posId, { empfaenger: value });
+    const pos = spPlan.positionen.find(p => p.id === posId);
+    if (pos) pos.empfaenger = value;
+  } catch (e) { toast(e.message); }
+}
+
+// Hält spPlan.netto_monatlich = Summe der Einnahmen (persistiert, falls erfasst)
+async function spSyncNetto() {
+  if (!spPlan) return;
+  const einnahmen = spGetPositionen('einnahmen');
+  if (!einnahmen.length) return;
+  const netto = einnahmen.reduce((s, p) => s + (p.betrag || 0), 0);
+  if (Number(spPlan.netto_monatlich) === netto) return;
+  spPlan.netto_monatlich = netto;
+  try { await api.spending.update(spPlan.id, { netto_monatlich: netto }); } catch {}
+}
+
+const SP_LIST_ID = { einnahmen: 'sp-einnahmen-list', fixkosten: 'sp-fix-list', investments: 'sp-inv-list', sparziele: 'sp-spar-list' };
 
 window.spAddPos = async function(kat) {
   if (!spPlan) return;
   const maxOrder = Math.max(0, ...spGetPositionen(kat).map(p => p.sort_order));
+  const bezeichnung = kat === 'einnahmen' ? '' : 'Neue Position';
   try {
     const pos = await api.spending.addPosition(spPlan.id, {
-      kategorie: kat, bezeichnung: 'Neue Position', betrag: 0, sort_order: maxOrder + 1,
+      kategorie: kat, bezeichnung, betrag: 0, sort_order: maxOrder + 1,
     });
     spPlan.positionen.push(pos);
     await renderSpendinPlan();
     // Fokus auf neue Zeile
-    const rows = document.querySelectorAll(`#sp-${kat==='fixkosten'?'fix':kat==='investments'?'inv':'spar'}-list .sp-pos-name`);
+    const rows = document.querySelectorAll(`#${SP_LIST_ID[kat] ?? 'sp-fix-list'} .sp-pos-name`);
     if (rows.length) rows[rows.length - 1].focus();
   } catch (e) { toast(e.message); }
 };
 
 window.spDeletePos = async function(posId) {
   if (!spPlan) return;
+  const wasEinnahme = spPlan.positionen.find(p => p.id === posId)?.kategorie === 'einnahmen';
   try {
     await api.spending.deletePosition(spPlan.id, posId);
     spPlan.positionen = spPlan.positionen.filter(p => p.id !== posId);
+    if (wasEinnahme) await spSyncNetto();
     await renderSpendinPlan();
   } catch (e) { toast(e.message); }
 };
@@ -2152,7 +2389,10 @@ window.openVersicherungForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Kündigungsfrist (Tage)</label>
-        <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
+        <div class="frist-input-row">
+          <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
+          ${fristBellHtml(v?.frist_erinnerung)}
+        </div>
       </div>
     </div>
     <div class="form-row">
@@ -2182,6 +2422,7 @@ window.openVersicherungForm = async function(id = null) {
       zahlweise:            document.getElementById('f-zahlweise').value,
       laufzeit_bis:         document.getElementById('f-laufzeit').value || null,
       kuendigungsfrist_tage: parseInt(document.getElementById('f-frist').value) || 0,
+      frist_erinnerung:     document.getElementById('f-frist-bell').dataset.active === 'true',
       kontakt_telefon:      document.getElementById('f-tel').value.trim() || null,
       kontakt_email:        document.getElementById('f-email').value.trim() || null,
       notiz:                document.getElementById('f-notiz').value.trim() || null,
@@ -2267,7 +2508,10 @@ window.openVertragForm = async function(id = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Kündigungsfrist (Tage)</label>
-        <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
+        <div class="frist-input-row">
+          <input id="f-frist" class="form-input" type="number" step="1" value="${v?.kuendigungsfrist_tage??0}">
+          ${fristBellHtml(v?.frist_erinnerung)}
+        </div>
       </div>
     </div>
     <div class="form-group">
@@ -2287,6 +2531,7 @@ window.openVertragForm = async function(id = null) {
       zahlweise:            document.getElementById('f-zahlweise').value,
       laufzeit_bis:         document.getElementById('f-laufzeit').value || null,
       kuendigungsfrist_tage: parseInt(document.getElementById('f-frist').value) || 0,
+      frist_erinnerung:     document.getElementById('f-frist-bell').dataset.active === 'true',
       notiz:                document.getElementById('f-notiz').value.trim() || null,
     };
     if (!data.bezeichnung || !data.anbieter) return toast('Bezeichnung und Anbieter erforderlich.');
@@ -2857,6 +3102,292 @@ window.closeUpdateModal = () => {
   setTimeout(() => { modal.style.display = 'none'; }, 300);
 };
 
+// ── ToDo-Liste ───────────────────────────────────────────────────────────────
+
+// Ampelfarben für Priorität / Dringlichkeit
+const AMPEL_COLOR = { hoch: '#C0392B', mittel: '#D9A40B', niedrig: '#3E9C5F' };
+const PRIO_LABEL  = { hoch: 'Hoch', mittel: 'Mittel', niedrig: 'Niedrig' };
+
+function ampelBadge(prio) {
+  const c = AMPEL_COLOR[prio] ?? 'var(--wash-grey)';
+  return `<span class="badge ampel-badge" style="color:${c};border-color:${c}">
+    <span class="ampel-dot" style="background:${c}"></span>${PRIO_LABEL[prio] ?? prio}</span>`;
+}
+
+const TODO_PRIO_LABEL = PRIO_LABEL;
+const TODO_ZUSTAEND_LABEL = { ich: 'Ich', ehefrau: 'Ehefrau', beide: 'Beide' };
+
+function renderTodos() {
+  const todos = state.todos ?? [];
+  const host = document.getElementById('todos-container');
+  if (!host) return;
+
+  if (!todos.length) {
+    host.innerHTML = '<p class="empty-state">Noch keine Aufgaben erfasst.</p>';
+    return;
+  }
+
+  const offen    = todos.filter(t => !t.erledigt);
+  const erledigt = todos.filter(t => t.erledigt);
+
+  const renderItem = (t) => {
+    const overdue = t.faelligkeit && !t.erledigt && new Date(t.faelligkeit) < new Date();
+    const fällig  = t.faelligkeit
+      ? `<span class="todo-date mono${overdue ? ' overdue' : ''}">${fmt.date(t.faelligkeit)}${overdue ? ' ⚠' : ''}</span>`
+      : '';
+    return `
+      <div class="todo-item${t.erledigt ? ' done' : ''}">
+        <button class="todo-check" onclick="toggleTodo(${t.id}, ${!t.erledigt})" title="${t.erledigt ? 'Als offen markieren' : 'Erledigt'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+            ${t.erledigt ? '<polyline points="20 6 9 17 4 12"/>' : '<rect x="3" y="3" width="18" height="18" rx="2"/>'}
+          </svg>
+        </button>
+        <div class="todo-body">
+          <span class="todo-titel">${escapeHtml(t.titel)}</span>
+          ${t.notiz ? `<span class="todo-notiz">${escapeHtml(t.notiz)}</span>` : ''}
+        </div>
+        <div class="todo-meta">
+          ${fällig}
+          ${ampelBadge(t.prioritaet)}
+          <span class="badge">${TODO_ZUSTAEND_LABEL[t.zustaendigkeit] ?? t.zustaendigkeit}</span>
+        </div>
+        <div class="todo-actions">
+          <button class="btn-icon" onclick="openTodoForm(${t.id})" title="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteTodo(${t.id})" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  };
+
+  host.innerHTML = `
+    <div class="card todo-card">
+      <div class="todo-section-head">Offen (${offen.length})</div>
+      ${offen.length ? offen.map(renderItem).join('') : '<p class="todo-empty">Alles erledigt!</p>'}
+    </div>
+    ${erledigt.length ? `
+    <div class="card todo-card" style="margin-top:var(--space-6)">
+      <div class="todo-section-head muted">Erledigt (${erledigt.length})</div>
+      ${erledigt.map(renderItem).join('')}
+    </div>` : ''}`;
+}
+
+window.toggleTodo = async function(id, erledigt) {
+  try {
+    const upd = await api.todos.update(id, { erledigt });
+    state.todos = state.todos.map(t => t.id === id ? upd : t);
+    renderTodos();
+  } catch (e) { toast(e.message); }
+};
+
+window.openTodoForm = function(id = null) {
+  state.editingId = id;
+  const t = id ? state.todos.find(x => x.id === id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Aufgabe bearbeiten' : 'Aufgabe hinzufügen';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Titel <span class="required">*</span></label>
+      <input id="f-titel" class="form-input" value="${escapeHtml(t?.titel ?? '')}">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Priorität</label>
+        <select id="f-prio" class="form-input">
+          ${['hoch','mittel','niedrig'].map(p => `<option value="${p}"${t?.prioritaet===p?' selected':''}>${TODO_PRIO_LABEL[p]}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zuständigkeit</label>
+        <select id="f-zustaend" class="form-input">
+          ${['ich','ehefrau','beide'].map(z => `<option value="${z}"${t?.zustaendigkeit===z?' selected':''}>${TODO_ZUSTAEND_LABEL[z]}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fälligkeitsdatum</label>
+      <input id="f-faellig" class="form-input" type="date" value="${fmt.dateISO(t?.faelligkeit)}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-notiz" class="form-input" rows="3" style="resize:vertical">${escapeHtml(t?.notiz ?? '')}</textarea>
+    </div>`;
+  document.getElementById('modal-submit').onclick = submitTodoForm;
+  openModal();
+};
+
+async function submitTodoForm() {
+  const data = {
+    titel:          document.getElementById('f-titel').value.trim(),
+    prioritaet:     document.getElementById('f-prio').value,
+    zustaendigkeit: document.getElementById('f-zustaend').value,
+    faelligkeit:    document.getElementById('f-faellig').value || null,
+    notiz:          document.getElementById('f-notiz').value.trim() || null,
+  };
+  if (!data.titel) return toast('Bitte Titel ausfüllen.');
+  try {
+    if (state.editingId) {
+      const upd = await api.todos.update(state.editingId, data);
+      state.todos = state.todos.map(t => t.id === state.editingId ? upd : t);
+      toast('Aufgabe aktualisiert.');
+    } else {
+      const neu = await api.todos.create(data);
+      state.todos.unshift(neu);
+      toast('Aufgabe gespeichert.');
+    }
+    closeModal();
+    renderTodos();
+  } catch (e) { toast(e.message); }
+}
+
+window.deleteTodo = async function(id) {
+  const name = state.todos.find(x => x.id === id)?.titel ?? '';
+  if (!confirm(`Aufgabe „${name}" wirklich löschen?`)) return;
+  try {
+    await api.todos.delete(id);
+    state.todos = state.todos.filter(x => x.id !== id);
+    renderTodos();
+    toast('Aufgabe gelöscht.');
+  } catch (e) { toast(e.message); }
+};
+
+
+// ── Bugs & Ideen ─────────────────────────────────────────────────────────────
+
+const BI_TYP_LABEL  = { bug: 'Bug', idee: 'Idee', verbesserung: 'Verbesserung' };
+const BI_TYP_COLOR  = { bug: 'var(--seal-red)', idee: '#4A90D9', verbesserung: '#5C9E6A' };
+const BI_STATUS_LABEL = { offen: 'Offen', in_arbeit: 'In Arbeit', erledigt: 'Erledigt' };
+const BI_PRIO_LABEL = { hoch: 'Hoch', mittel: 'Mittel', niedrig: 'Niedrig' };
+
+function renderBugIdeen() {
+  const items = state.bugIdeen ?? [];
+  const host = document.getElementById('bug-ideen-container');
+  if (!host) return;
+
+  if (!items.length) {
+    host.innerHTML = '<p class="empty-state">Noch keine Einträge vorhanden.</p>';
+    return;
+  }
+
+  const byStatus = { offen: [], in_arbeit: [], erledigt: [] };
+  for (const item of items) {
+    const s = item.status ?? 'offen';
+    (byStatus[s] ?? byStatus.offen).push(item);
+  }
+
+  const renderItem = (item) => `
+    <div class="bi-item status-${item.status}">
+      <div class="bi-badges">
+        <span class="badge" style="color:${BI_TYP_COLOR[item.typ]};border-color:currentColor;font-weight:600">${BI_TYP_LABEL[item.typ] ?? item.typ}</span>
+        ${ampelBadge(item.prioritaet)}
+      </div>
+      <div class="bi-body">
+        <span class="bi-titel">${escapeHtml(item.titel)}</span>
+        ${item.beschreibung ? `<span class="bi-desc">${escapeHtml(item.beschreibung)}</span>` : ''}
+      </div>
+      <div class="bi-status-select">
+        <select class="form-input form-input-sm" onchange="updateBiStatus(${item.id}, this.value)">
+          ${Object.entries(BI_STATUS_LABEL).map(([k,l]) => `<option value="${k}"${item.status===k?' selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="todo-actions">
+        <button class="btn-icon" onclick="openBugIdeeForm(${item.id})" title="Bearbeiten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn-icon danger" onclick="deleteBugIdee(${item.id})" title="Löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+
+  const section = (status, list) => list.length ? `
+    <div class="card bi-card">
+      <div class="todo-section-head${status === 'erledigt' ? ' muted' : ''}">${BI_STATUS_LABEL[status]} (${list.length})</div>
+      ${list.map(renderItem).join('')}
+    </div>` : '';
+
+  host.innerHTML = [
+    section('offen',    byStatus.offen),
+    section('in_arbeit', byStatus.in_arbeit),
+    section('erledigt', byStatus.erledigt),
+  ].join('<div style="margin-top:var(--space-6)"></div>');
+}
+
+window.updateBiStatus = async function(id, status) {
+  try {
+    const upd = await api.bugIdeen.update(id, { status });
+    state.bugIdeen = state.bugIdeen.map(x => x.id === id ? upd : x);
+    renderBugIdeen();
+  } catch (e) { toast(e.message); }
+};
+
+window.openBugIdeeForm = function(id = null) {
+  state.editingId = id;
+  const item = id ? state.bugIdeen.find(x => x.id === id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Eintrag bearbeiten' : 'Eintrag hinzufügen';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Typ <span class="required">*</span></label>
+        <select id="f-typ" class="form-input">
+          ${Object.entries(BI_TYP_LABEL).map(([k,l]) => `<option value="${k}"${item?.typ===k?' selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priorität</label>
+        <select id="f-prio" class="form-input">
+          ${Object.entries(BI_PRIO_LABEL).map(([k,l]) => `<option value="${k}"${item?.prioritaet===k?' selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Titel <span class="required">*</span></label>
+      <input id="f-titel" class="form-input" value="${escapeHtml(item?.titel ?? '')}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Beschreibung</label>
+      <textarea id="f-beschreibung" class="form-input" rows="4" style="resize:vertical">${escapeHtml(item?.beschreibung ?? '')}</textarea>
+    </div>`;
+  document.getElementById('modal-submit').onclick = submitBugIdeeForm;
+  openModal();
+};
+
+async function submitBugIdeeForm() {
+  const data = {
+    typ:          document.getElementById('f-typ').value,
+    prioritaet:   document.getElementById('f-prio').value,
+    titel:        document.getElementById('f-titel').value.trim(),
+    beschreibung: document.getElementById('f-beschreibung').value.trim() || null,
+  };
+  if (!data.titel) return toast('Bitte Titel ausfüllen.');
+  try {
+    if (state.editingId) {
+      const upd = await api.bugIdeen.update(state.editingId, data);
+      state.bugIdeen = state.bugIdeen.map(x => x.id === state.editingId ? upd : x);
+      toast('Eintrag aktualisiert.');
+    } else {
+      const neu = await api.bugIdeen.create(data);
+      state.bugIdeen.unshift(neu);
+      toast('Eintrag gespeichert.');
+    }
+    closeModal();
+    renderBugIdeen();
+  } catch (e) { toast(e.message); }
+}
+
+window.deleteBugIdee = async function(id) {
+  const name = state.bugIdeen.find(x => x.id === id)?.titel ?? '';
+  if (!confirm(`„${name}" wirklich löschen?`)) return;
+  try {
+    await api.bugIdeen.delete(id);
+    state.bugIdeen = state.bugIdeen.filter(x => x.id !== id);
+    renderBugIdeen();
+    toast('Eintrag gelöscht.');
+  } catch (e) { toast(e.message); }
+};
+
+
 // ── Globale Exports (für onclick-Handler in HTML) ───────────────────────────
 
 window.navigate         = navigate;
@@ -2866,6 +3397,7 @@ window.spRecalc         = spRecalc;
 window.spSavePlanField  = spSavePlanField;
 window.spSavePosName    = spSavePosName;
 window.spSavePosAmount  = spSavePosAmount;
+window.spSavePosEmpf    = spSavePosEmpf;
 
 // ── Init ────────────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
   <link rel="stylesheet" href="/css/tokens.css?v=8">
-  <link rel="stylesheet" href="/css/app.css?v=18">
+  <link rel="stylesheet" href="/css/app.css?v=23">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -98,6 +98,21 @@
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
         Notfall
+      </div>
+
+      <div class="nav-item" data-view="todos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <polyline points="9 11 12 14 22 4"/>
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+        </svg>
+        ToDo-Liste
+      </div>
+
+      <div class="nav-item" data-view="bug-ideen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
+        </svg>
+        Bugs &amp; Ideen
       </div>
     </nav>
 
@@ -202,6 +217,9 @@
           </button>
         </div>
       </div>
+
+      <!-- Fristen & Warnungen -->
+      <div id="dash-warnings"></div>
 
       <!-- Net Worth Hero -->
       <div class="card networth-hero">
@@ -595,6 +613,36 @@
 
     </section>
 
+    <!-- ────────────────── ToDo-Liste ────────────────── -->
+    <section id="view-todos" class="view">
+      <div class="page-header">
+        <div>
+          <h2>ToDo-Liste</h2>
+          <p>Offene Aufgaben und Erledigungen</p>
+        </div>
+        <button class="btn btn-primary" onclick="openTodoForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Aufgabe hinzufügen
+        </button>
+      </div>
+      <div id="todos-container"></div>
+    </section>
+
+    <!-- ────────────────── Bugs & Ideen ────────────────── -->
+    <section id="view-bug-ideen" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Bugs &amp; Ideen</h2>
+          <p>Feedback und Verbesserungsvorschläge für MeinFinanzblick</p>
+        </div>
+        <button class="btn btn-primary" onclick="openBugIdeeForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Eintrag hinzufügen
+        </button>
+      </div>
+      <div id="bug-ideen-container"></div>
+    </section>
+
   </main><!-- /main-content -->
 </div><!-- /app-shell -->
 
@@ -620,7 +668,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=44"></script>
+<script type="module" src="/js/app.js?v=52"></script>
 
 
 </body>

@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 
 from sqlalchemy import text
 from .db import Base, engine
-from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system, dokumente, anhaenge
+from .routers import konten, darlehen, depots, sachvermoegen, spending, versicherungen, notfall, networth, system, dokumente, anhaenge, todos
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,6 +28,9 @@ def _migrate():
         ("darlehen", "tilgungsrate_monatlich",   "NUMERIC"),
         ("darlehen", "anteil_pct",              "NUMERIC DEFAULT 100"),
         ("sachvermoegen", "anteil_pct",         "NUMERIC DEFAULT 100"),
+        ("versicherungen", "frist_erinnerung",  "BOOLEAN DEFAULT 0"),
+        ("vertraege",      "frist_erinnerung",  "BOOLEAN DEFAULT 0"),
+        ("spending_positionen", "empfaenger",   "TEXT DEFAULT 'ich'"),
         ("depots",   "depot_bic",               "TEXT"),
         ("depots",   "verrechnungskonto_bic",   "TEXT"),
         ("depots",   "auszahlungskonto_name",   "TEXT"),
@@ -60,6 +63,7 @@ app.include_router(networth.router, prefix='/api/v1')
 app.include_router(system.router, prefix='/api/v1')
 app.include_router(dokumente.router, prefix='/api/v1')
 app.include_router(anhaenge.router, prefix='/api/v1')
+app.include_router(todos.router, prefix='/api/v1')
 
 FRONTEND = os.path.join(os.path.dirname(__file__), '..', 'frontend')
 DOCS = os.path.join(os.path.dirname(__file__), '..', 'docs')

@@ -157,6 +157,7 @@ class SpendingPositionBase(BaseModel):
     kategorie: str
     bezeichnung: str
     betrag: float
+    empfaenger: str = 'ich'
     sort_order: int = 0
 
 
@@ -167,6 +168,7 @@ class SpendingPositionCreate(SpendingPositionBase):
 class SpendingPositionUpdate(BaseModel):
     bezeichnung: Optional[str] = None
     betrag: Optional[float] = None
+    empfaenger: Optional[str] = None
     sort_order: Optional[int] = None
 
 
@@ -250,6 +252,7 @@ class VersicherungBase(BaseModel):
     zahlweise: str = 'monatlich'
     laufzeit_bis: Optional[date] = None
     kuendigungsfrist_tage: int = 0
+    frist_erinnerung: bool = False
     kontakt_telefon: Optional[str] = None
     kontakt_email: Optional[str] = None
     notiz: Optional[str] = None
@@ -268,6 +271,7 @@ class VersicherungUpdate(BaseModel):
     zahlweise: Optional[str] = None
     laufzeit_bis: Optional[date] = None
     kuendigungsfrist_tage: Optional[int] = None
+    frist_erinnerung: Optional[bool] = None
     kontakt_telefon: Optional[str] = None
     kontakt_email: Optional[str] = None
     notiz: Optional[str] = None
@@ -290,6 +294,7 @@ class VertragBase(BaseModel):
     zahlweise: str = 'monatlich'
     laufzeit_bis: Optional[date] = None
     kuendigungsfrist_tage: int = 0
+    frist_erinnerung: bool = False
     notiz: Optional[str] = None
 
 
@@ -306,6 +311,7 @@ class VertragUpdate(BaseModel):
     zahlweise: Optional[str] = None
     laufzeit_bis: Optional[date] = None
     kuendigungsfrist_tage: Optional[int] = None
+    frist_erinnerung: Optional[bool] = None
     notiz: Optional[str] = None
 
 
@@ -406,6 +412,66 @@ class DokumentUpdate(BaseModel):
 
 
 class DokumentResponse(DokumentBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    erstellt_am: datetime
+
+
+# ── Todo ───────────────────────────────────────────────────────────────────────
+
+class TodoBase(BaseModel):
+    titel: str
+    notiz: Optional[str] = None
+    faelligkeit: Optional[date] = None
+    prioritaet: str = 'mittel'
+    zustaendigkeit: str = 'ich'
+    erledigt: bool = False
+    sort_order: int = 0
+
+
+class TodoCreate(TodoBase):
+    pass
+
+
+class TodoUpdate(BaseModel):
+    titel: Optional[str] = None
+    notiz: Optional[str] = None
+    faelligkeit: Optional[date] = None
+    prioritaet: Optional[str] = None
+    zustaendigkeit: Optional[str] = None
+    erledigt: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class TodoResponse(TodoBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    erstellt_am: datetime
+
+
+# ── BugIdee ────────────────────────────────────────────────────────────────────
+
+class BugIdeeBase(BaseModel):
+    titel: str
+    typ: str = 'idee'
+    beschreibung: Optional[str] = None
+    prioritaet: str = 'mittel'
+    status: str = 'offen'
+
+
+class BugIdeeCreate(BugIdeeBase):
+    pass
+
+
+class BugIdeeUpdate(BaseModel):
+    titel: Optional[str] = None
+    typ: Optional[str] = None
+    beschreibung: Optional[str] = None
+    prioritaet: Optional[str] = None
+    status: Optional[str] = None
+
+
+class BugIdeeResponse(BugIdeeBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     erstellt_am: datetime

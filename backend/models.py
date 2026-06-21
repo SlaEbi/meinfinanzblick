@@ -100,9 +100,10 @@ class SpendingPosition(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     plan_id = Column(Integer, ForeignKey('spending_plans.id'), nullable=False)
-    kategorie = Column(String, nullable=False)  # fixkosten | investments | sparziele
+    kategorie = Column(String, nullable=False)  # einnahmen | fixkosten | investments | sparziele
     bezeichnung = Column(String, nullable=False)
     betrag = Column(Numeric(14, 2), nullable=False, default=0)
+    empfaenger = Column(String, default='ich')  # ich | ehefrau | beide (nur Einnahmen)
     sort_order = Column(Integer, default=0)
     plan = relationship('SpendingPlan', back_populates='positionen')
 
@@ -134,6 +135,7 @@ class Versicherung(Base):
     zahlweise = Column(String, default='monatlich')  # monatlich, quartalsweise, halbjährlich, jährlich
     laufzeit_bis = Column(Date)
     kuendigungsfrist_tage = Column(Integer, default=0)
+    frist_erinnerung = Column(Boolean, default=False)  # Kündigungsfrist im Dashboard-Banner zeigen
     kontakt_telefon = Column(String)
     kontakt_email = Column(String)
     notiz = Column(String)
@@ -152,6 +154,7 @@ class Vertrag(Base):
     zahlweise = Column(String, default='monatlich')
     laufzeit_bis = Column(Date)
     kuendigungsfrist_tage = Column(Integer, default=0)
+    frist_erinnerung = Column(Boolean, default=False)  # Kündigungsfrist im Dashboard-Banner zeigen
     notiz = Column(String)
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -195,6 +198,32 @@ class Dokument(Base):
     datum = Column(Date)                         # Datum des Dokuments
     gueltig_bis = Column(Date)                   # Ablaufdatum (optional)
     notiz = Column(String)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Todo(Base):
+    __tablename__ = 'todos'
+
+    id = Column(Integer, primary_key=True, index=True)
+    titel = Column(String, nullable=False)
+    notiz = Column(String)
+    faelligkeit = Column(Date)
+    prioritaet = Column(String, default='mittel')   # hoch | mittel | niedrig
+    zustaendigkeit = Column(String, default='ich')  # ich | ehefrau | beide
+    erledigt = Column(Boolean, default=False)
+    sort_order = Column(Integer, default=0)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class BugIdee(Base):
+    __tablename__ = 'bug_ideen'
+
+    id = Column(Integer, primary_key=True, index=True)
+    titel = Column(String, nullable=False)
+    typ = Column(String, default='idee')     # bug | idee | verbesserung
+    beschreibung = Column(String)
+    prioritaet = Column(String, default='mittel')   # hoch | mittel | niedrig
+    status = Column(String, default='offen')        # offen | in_arbeit | erledigt
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

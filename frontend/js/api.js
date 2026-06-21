@@ -105,6 +105,20 @@ export const api = {
     deleteSnapshot: (id) => request('DELETE', `/networth/snapshot/${id}`),
   },
 
+  todos: {
+    list:   ()          => request('GET',    '/todos/'),
+    create: (data)      => request('POST',   '/todos/', data),
+    update: (id, data)  => request('PUT',    `/todos/${id}`, data),
+    delete: (id)        => request('DELETE', `/todos/${id}`),
+  },
+
+  bugIdeen: {
+    list:   ()          => request('GET',    '/bug-ideen/'),
+    create: (data)      => request('POST',   '/bug-ideen/', data),
+    update: (id, data)  => request('PUT',    `/bug-ideen/${id}`, data),
+    delete: (id)        => request('DELETE', `/bug-ideen/${id}`),
+  },
+
   anhaenge: {
     list:   (typ, id)      => request('GET',    `/anhaenge/${typ}/${id}`),
     delete: (anhangId)     => request('DELETE', `/anhaenge/${anhangId}`),

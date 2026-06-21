@@ -1891,3 +1891,315 @@ body.demo-mode #publish-btn {
   pointer-events: none;
   opacity: 0.3;
 }
+
+/* ── Fristen & Warnungen (Dashboard) ─────────────────────────────────────── */
+.alert-banner {
+  background: var(--surface);
+  border: 1px solid var(--ink-wash);
+  border-left: 3px solid var(--seal-red);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-6);
+  animation: alert-in var(--duration-mid) var(--ease-out);
+}
+@keyframes alert-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.alert-banner-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-black);
+  margin-bottom: var(--space-3);
+}
+.alert-banner-head .alert-seal { color: var(--seal-red); display: inline-flex; }
+.alert-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--seal-red);
+  color: #fff;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.alert-list { display: flex; flex-direction: column; gap: var(--space-1); }
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  color: var(--ink-black);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.alert-item:hover { background: var(--ink-wash); }
+.alert-icon { display: inline-flex; flex-shrink: 0; }
+.alert-item.urgent .alert-icon { color: var(--seal-red); }
+.alert-item.soon   .alert-icon { color: var(--wash-grey); }
+.alert-text {
+  flex: 1;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alert-text strong { font-weight: 600; }
+.alert-days {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+.alert-item.urgent .alert-days { color: var(--seal-red); background: var(--ink-wash); font-weight: 600; }
+.alert-item.soon   .alert-days { color: var(--wash-grey); }
+@media (max-width: 600px) {
+  .alert-item { flex-wrap: wrap; }
+  .alert-days { margin-left: auto; }
+}
+
+/* ── Kündigungsfrist-Glocke (Formular) ───────────────────────────────────── */
+.frist-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.frist-input-row .form-input { flex: 1; min-width: 0; }
+.frist-bell {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: 1px solid var(--input-border, var(--ink-wash-md));
+  border-radius: var(--radius-sm);
+  background: var(--input-bg, var(--surface));
+  color: var(--wash-grey);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.frist-bell:hover { color: var(--ink-black); border-color: var(--wash-grey); }
+.frist-bell.active {
+  background: var(--seal-red);
+  border-color: var(--seal-red);
+  color: #fff;
+}
+.frist-bell.active:hover { background: var(--seal-red-dark); color: #fff; }
+
+/* ── ToDo-Liste ───────────────────────────────────────────────────────────── */
+.todo-card { padding: 0; }
+.todo-section-head {
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-black);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--ink-wash);
+  letter-spacing: 0.02em;
+}
+.todo-section-head.muted { color: var(--wash-grey); }
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--ink-wash);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.todo-item:last-child { border-bottom: none; }
+.todo-item:hover { background: var(--ink-wash); }
+.todo-item.done .todo-titel { text-decoration: line-through; opacity: 0.45; }
+.todo-item.done .todo-notiz { opacity: 0.35; }
+.todo-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--wash-grey);
+  padding: 0.2rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.todo-check:hover { color: var(--seal-red); }
+.todo-item.done .todo-check { color: var(--seal-red); }
+.todo-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.todo-titel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-notiz {
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.todo-date {
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+}
+.todo-date.overdue { color: var(--seal-red); font-weight: 600; }
+.todo-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+.todo-item:hover .todo-actions,
+.bi-item:hover .todo-actions { opacity: 1; }
+.todo-empty {
+  padding: var(--space-4) var(--space-5);
+  color: var(--wash-grey);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* ── Bugs & Ideen ────────────────────────────────────────────────────────── */
+.bi-card { padding: 0; }
+.bi-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--ink-wash);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.bi-item:last-child { border-bottom: none; }
+.bi-item:hover { background: var(--ink-wash); }
+.bi-item.status-erledigt { opacity: 0.55; }
+.bi-badges { display: flex; flex-direction: column; gap: var(--space-1); flex-shrink: 0; }
+.bi-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.bi-titel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bi-desc {
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.bi-status-select { flex-shrink: 0; }
+.form-input-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: var(--text-xs);
+  height: auto;
+}
+
+/* Badge (shared) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  border: 1px solid var(--ink-wash-md);
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.4rem;
+  color: var(--wash-grey);
+  white-space: nowrap;
+}
+
+/* Ampel-Badge (Priorität / Dringlichkeit) */
+.ampel-badge { gap: 0.3rem; font-weight: 600; }
+.ampel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Spending Plan: Einnahmen ─────────────────────────────────────────────── */
+.dot-income { background: #5C9E6A; }
+
+/* Netto im Income-Bar: berechneter, nicht editierbarer Wert */
+.sp-income-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+.sp-income-computed {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink-black);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 2px solid transparent;
+  min-width: 130px;
+}
+
+/* Einnahmen-Karte */
+.sp-card-income { margin-bottom: var(--space-6); }
+.sp-card-income .dot-income { box-shadow: 0 0 0 3px rgba(92,158,106,0.15); }
+
+.sp-income-empty {
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--wash-grey);
+  margin: 0;
+}
+
+/* Einnahme-Zeile: Bezeichnung · Empfänger · Betrag · Löschen */
+.sp-income-pos {
+  grid-template-columns: 1fr auto auto auto;
+}
+.sp-pos-empf {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  background: var(--input-bg, transparent);
+  border: 1px solid var(--ink-wash-md);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: border-color var(--duration-fast), color var(--duration-fast);
+}
+.sp-pos-empf:hover { border-color: var(--wash-grey); color: var(--ink-black); }
+.sp-pos-empf:focus { outline: none; border-color: var(--seal-red); }
