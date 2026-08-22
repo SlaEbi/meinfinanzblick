@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
-  <link rel="stylesheet" href="/css/tokens.css?v=8">
-  <link rel="stylesheet" href="/css/app.css?v=27">
+  <link rel="stylesheet" href="/css/tokens.css?v=9">
+  <link rel="stylesheet" href="/css/app.css?v=29">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -116,13 +116,8 @@
       </div>
     </nav>
 
-    <!-- Theme + System Controls -->
+    <!-- System Controls -->
     <div class="theme-switcher">
-      <button class="theme-toggle" id="theme-toggle-btn" onclick="setTheme(document.documentElement.getAttribute('data-theme')==='fintech'?'sumi':'fintech')" title="Design wechseln">
-        <span class="theme-toggle-track">
-          <span class="theme-toggle-thumb"></span>
-        </span>
-      </button>
       <button class="icon-btn" onclick="triggerUpdate()" id="update-btn" title="Updates von GitHub holen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15">
           <polyline points="23 4 23 10 17 10"/>
@@ -364,12 +359,18 @@
           <h2>Darlehen</h2>
           <p>Hypotheken, Raten- und Konsum­kredite</p>
         </div>
-        <button class="btn btn-primary" onclick="openDarlehenForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-          Darlehen hinzufügen
-        </button>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <button class="btn btn-ghost" onclick="openDarlehensrechner()" title="Darlehensszenarien durchrechnen, unabhängig von gespeicherten Darlehen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="8.01" y2="11"/><line x1="12" y1="11" x2="12.01" y2="11"/><line x1="16" y1="11" x2="16.01" y2="11"/><line x1="8" y1="15" x2="8.01" y2="15"/><line x1="12" y1="15" x2="12.01" y2="15"/><line x1="16" y1="15" x2="16.01" y2="15"/></svg>
+            Rechner
+          </button>
+          <button class="btn btn-primary" onclick="openDarlehenForm()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Darlehen hinzufügen
+          </button>
+        </div>
       </div>
       <div class="stat-grid" style="grid-template-columns:1fr">
         <div class="stat-card">
@@ -703,7 +704,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=58"></script>
+<script type="module" src="/js/app.js?v=64"></script>
 
 
 </body>

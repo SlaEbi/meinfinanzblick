@@ -1,16 +1,6 @@
 import { api } from './api.js?v=6';
 import { DEMO } from './demo.js?v=1';
 
-// ── Theme ────────────────────────────────────────────────────────────────────
-
-function applyTheme(id) {
-  document.documentElement.setAttribute('data-theme', id === 'fintech' ? 'fintech' : '');
-  localStorage.setItem('mfb-theme', id);
-  if (state.view === 'dashboard') renderDashboard();
-}
-
-window.setTheme = applyTheme;
-
 // ── Formatierung ────────────────────────────────────────────────────────────
 
 const fmt = {
@@ -116,46 +106,31 @@ function anhangPlaceholderHtml(entityTyp, entityId) {
 
 // ── Chart-Helfer ─────────────────────────────────────────────────────────────
 
-function isFintech() {
-  return document.documentElement.getAttribute('data-theme') === 'fintech';
-}
-
-// Liest eine CSS-Variable aus dem aktiven Theme
+// Liest eine CSS-Variable aus dem Theme
 function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-// Theme-abhängige Achsen-/Linienfarben
 function chartTheme() {
   return {
-    accent:  cssVar('--seal-red', '#8A1C15'),
-    grey:    cssVar('--wash-grey', '#808080'),
-    text:    cssVar('--ink-black', '#0D0D0D'),
-    grid:    isFintech() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    accent:  cssVar('--seal-red', '#C9A84C'),
+    grey:    cssVar('--wash-grey', '#888888'),
+    text:    cssVar('--ink-black', '#F0F0EE'),
+    grid:    'rgba(255,255,255,0.06)',
     font:    cssVar('--font-serif', 'sans-serif'),
   };
 }
 
-// Theme-abhängige Farbpaletten für Donut-/Schulden-Charts.
-// Hue-divers statt monochrom — klare Unterscheidbarkeit in hell und dunkel.
-const CHART_PALETTES = {
-  // Sumi (hell): mittlere Sättigung, gut auf #F4F1E8
-  default: {
-    donut:    ['#2D6A9F', '#4A7F35', '#C17A1E'],
-    schulden: ['#8A1C15', '#2D6A9F', '#4A7F35', '#C17A1E', '#7A5EA0', '#8A6040'],
-  },
-  // Fintech (dunkel): hellere, gesättigtere Varianten für #242424
-  fintech: {
-    donut:    ['#4DA8E0', '#6DC44E', '#F0A030'],
-    schulden: ['#E04848', '#4DA8E0', '#6DC44E', '#F0A030', '#A880D8', '#C09060'],
-  },
+// Farbpalette für Donut-/Schulden-Charts — hellere, gesättigte Varianten,
+// abgestimmt auf den dunklen Kartenhintergrund (#242424).
+// Hue-divers statt monochrom — klare Unterscheidbarkeit.
+const PALETTE = {
+  donut:    ['#4DA8E0', '#6DC44E', '#F0A030'],
+  schulden: ['#E04848', '#4DA8E0', '#6DC44E', '#F0A030', '#A880D8', '#C09060'],
 };
-function palette() {
-  return isFintech() ? CHART_PALETTES.fintech : CHART_PALETTES.default;
-}
 // Trenn-Farbe zwischen Segmenten (= Hintergrundsfarbe der Chart-Karte)
 function segmentBorder() {
-  return cssVar('--surface', '#FDFBF5');
+  return cssVar('--surface', '#242424');
 }
 
 // Blendet eine Leer-Meldung ein/aus, OHNE das Canvas zu zerstören.
@@ -506,7 +481,7 @@ function renderDonutChart() {
       labels: ['Konten', 'Depots', 'Sachwerte'],
       datasets: [{
         data,
-        backgroundColor: palette().donut,
+        backgroundColor: PALETTE.donut,
         borderColor: segmentBorder(),
         borderWidth: 2,
         hoverOffset: 6,
@@ -569,7 +544,7 @@ function renderSchuldenChart() {
 
   if (state.charts.schulden) state.charts.schulden.destroy();
 
-  const SCHULDEN_COLORS = palette().schulden;
+  const SCHULDEN_COLORS = PALETTE.schulden;
   const labels = darlehen.map(d => d.bezeichnung);
   // nur Eigenanteil berücksichtigen (z. B. 50 % bei GbR-Hälfte)
   const data   = darlehen.map(d => Number(d.restschuld ?? 0) * (Number(d.anteil_pct ?? 100) / 100));
@@ -680,7 +655,7 @@ function renderVerlaufChart() {
         label: 'Nettovermögen',
         data: verlauf.map(s => s.netto),
         borderColor: theme.accent,
-        backgroundColor: isFintech() ? 'rgba(201,168,76,0.08)' : 'rgba(138,28,21,0.06)',
+        backgroundColor: 'rgba(201,168,76,0.08)',
         borderWidth: 2,
         fill: true,
         tension: 0.4,
@@ -1130,6 +1105,230 @@ async function tpLadeUndRender(id, sondertilgungJahr) {
         Gesamtlaufzeit: ${plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : 'läuft über 60 Jahre hinaus'}
         &middot; Gesamtzinsen: ${fmt.eur(plan.zinsen_gesamt)}
       </p>`;
+  } catch (e) {
+    container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+// ── Darlehensrechner ───────────────────────────────────────────────────────
+// Freier Szenario-Rechner: unabhängig von gespeicherten Darlehen, alle Werte
+// frei editierbar. Rate und Laufzeit sind verkoppelt — welches Feld gerade
+// "abgeleitet" wird (statt vom Nutzer eingegeben), merkt sich drAnchor.
+// Annuität: gibt der Nutzer die Rate ein, wird die Laufzeit draus berechnet
+// (und umgekehrt, klassische Annuitätenformel). Tilgungsdarlehen: linear,
+// daher reicht Dreisatz in beide Richtungen.
+
+let drAnchor = 'rate'; // 'rate' | 'laufzeit' — welches Feld der Nutzer zuletzt bewusst gesetzt hat
+const drTimers = {};
+
+// Nötige Monatsrate für eine gewünschte Laufzeit (Umkehrung der Annuitätenformel).
+function drRateAusLaufzeit(betrag, zinssatzDezimal, laufzeitJahre, typ) {
+  const n = Math.round(laufzeitJahre * 12);
+  if (n <= 0 || betrag <= 0) return 0;
+  if (typ === 'tilgungsdarlehen') return betrag / n;
+  const r = zinssatzDezimal / 12;
+  if (r <= 0) return betrag / n;
+  return betrag * r / (1 - Math.pow(1 + r, -n));
+}
+
+// Laufzeit (Monate) aus Rate — nutzt dieselbe Formel wie die Darlehen-Tabelle.
+function drLaufzeitAusRate(betrag, zinssatzDezimal, rate, typ) {
+  if (betrag <= 0 || rate <= 0) return null;
+  if (typ === 'tilgungsdarlehen') return Math.ceil(betrag / rate);
+  const res = restlaufzeitMonate(betrag, zinssatzDezimal, rate);
+  return res.monate ?? null;
+}
+
+function drLesenFelder() {
+  const betrag = parseFloat(document.getElementById('dr-betrag').value) || 0;
+  const zinssatzPct = parseFloat(document.getElementById('dr-zinssatz').value) || 0;
+  const typ = document.getElementById('dr-typ').value;
+  // Zahlenfeld ist die Quelle der Wahrheit, der Regler folgt ihm nur visuell.
+  const sondertilgung = Number(document.getElementById('dr-sonder-input').value) || 0;
+  return { betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung };
+}
+
+window.openDarlehensrechner = function() {
+  drAnchor = 'rate';
+  document.getElementById('modal-title').textContent = 'Darlehensrechner';
+  document.getElementById('modal-body').innerHTML = `
+    <p class="form-hint">Simuliere ein Darlehensszenario mit frei wählbaren Werten — unabhängig von deinen gespeicherten Darlehen.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Darlehenssumme (€)</label>
+        <input id="dr-betrag" class="form-input" type="number" step="1000" min="0" value="200000" oninput="drRecalc()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zinssatz (% p. a.)</label>
+        <input id="dr-zinssatz" class="form-input" type="number" step="0.01" min="0" value="3.50" oninput="drRecalc()">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Darlehenstyp</label>
+      <select id="dr-typ" class="form-select" onchange="drTypChanged()">
+        <option value="annuitaet">Annuitätendarlehen</option>
+        <option value="tilgungsdarlehen">Tilgungsdarlehen (feste Tilgung)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" id="dr-rate-label">Monatliche Rate (€)</label>
+        <input id="dr-rate" class="form-input" type="number" step="10" min="0" value="900" oninput="drAnchorChanged('rate')">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Laufzeit (Jahre)</label>
+        <input id="dr-laufzeit" class="form-input" type="number" step="0.5" min="0" value="" oninput="drAnchorChanged('laufzeit')">
+      </div>
+    </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem">
+        <label class="form-label" style="margin:0">Jährliche Sondertilgung (€)</label>
+        <input id="dr-sonder-input" class="form-input mono" type="number" step="250" min="0" value="0"
+          style="width:8rem;text-align:right" oninput="drSonderInputChanged(this.value)">
+      </div>
+      <input id="dr-slider" type="range" min="0" max="50000" step="250" value="0" oninput="drSliderInput(this.value)" style="width:100%;margin-top:0.6rem">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--wash-grey);margin-top:0.2rem">
+        <span>0 €</span>
+        <span id="dr-slider-max" class="mono">50.000 €</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:0.75rem;font-size:0.78rem;color:var(--wash-grey);margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--ink-wash)">
+        <span>Laufzeitverkürzung: <span id="dr-out-monate-diff" class="mono" style="color:var(--ink-black);font-weight:600">—</span></span>
+        <span>Zinsersparnis: <span id="dr-out-zinsen-diff" class="mono" style="color:var(--ink-black);font-weight:600">—</span></span>
+      </div>
+    </div>
+    <div class="stat-grid" style="margin:1rem 0">
+      <div class="stat-card"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
+      <div class="stat-card"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
+      <div class="stat-card"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
+    </div>
+    <div id="dr-tabelle-container"><p class="form-hint">—</p></div>
+  `;
+  openModal();
+  document.getElementById('modal-submit').style.display = 'none';
+
+  // Startwert: Laufzeit aus der Default-Rate ableiten, dann erste Berechnung.
+  drRecalc();
+};
+
+window.drTypChanged = function() {
+  const typ = document.getElementById('dr-typ').value;
+  document.getElementById('dr-rate-label').textContent =
+    typ === 'tilgungsdarlehen' ? 'Monatliche Tilgung (€)' : 'Monatliche Rate (€)';
+  drRecalc();
+};
+
+window.drAnchorChanged = function(feld) {
+  drAnchor = feld;
+  drRecalc();
+};
+
+window.drSliderInput = function(wert) {
+  document.getElementById('dr-sonder-input').value = wert;
+  clearTimeout(drTimers.slider);
+  drTimers.slider = setTimeout(() => drRecalc(true), 200);
+};
+
+window.drSonderInputChanged = function(wert) {
+  const slider = document.getElementById('dr-slider');
+  const v = Math.max(0, Number(wert) || 0);
+  // Regler bei Bedarf erweitern, statt einen getippten Wert stillschweigend zu kappen.
+  if (v > Number(slider.max)) slider.max = v;
+  slider.value = v;
+  clearTimeout(drTimers.slider);
+  drTimers.slider = setTimeout(() => drRecalc(true), 300);
+};
+
+// Berechnet sofort (clientseitig) das jeweils abgeleitete Feld (Rate ↔ Laufzeit),
+// damit die Eingabe nicht auf den Server wartet — und holt danach (debounced)
+// den vollständigen Tilgungsplan vom Server.
+window.drRecalc = function(nurTabelle = false) {
+  const { betrag, zinssatzDezimal, typ, sondertilgung } = drLesenFelder();
+
+  // Sondertilgungs-Slider-Obergrenze an die Darlehenssumme anpassen — aber
+  // einen bewusst höher getippten Wert im Zahlenfeld nicht stillschweigend
+  // kappen, nur die Regler-Obergrenze bei Bedarf mit hochziehen.
+  const sliderMax = Math.max(1000, Math.min(betrag, 100000), sondertilgung);
+  const slider = document.getElementById('dr-slider');
+  slider.max = Math.round(sliderMax);
+  document.getElementById('dr-slider-max').textContent = fmt.eur(sliderMax);
+
+  const rateInput = document.getElementById('dr-rate');
+  const laufzeitInput = document.getElementById('dr-laufzeit');
+
+  if (drAnchor === 'laufzeit') {
+    const laufzeitJahre = parseFloat(laufzeitInput.value) || 0;
+    const rate = drRateAusLaufzeit(betrag, zinssatzDezimal, laufzeitJahre, typ);
+    if (rate > 0) rateInput.value = rate.toFixed(0);
+  } else {
+    const rate = parseFloat(rateInput.value) || 0;
+    const monate = drLaufzeitAusRate(betrag, zinssatzDezimal, rate, typ);
+    if (monate) laufzeitInput.value = (monate / 12).toFixed(1);
+  }
+
+  clearTimeout(drTimers.recalc);
+  drTimers.recalc = setTimeout(() => drLadeUndRender(), nurTabelle ? 0 : 300);
+};
+
+async function drLadeUndRender() {
+  const container = document.getElementById('dr-tabelle-container');
+  if (!container) return;
+  const { betrag, zinssatzDezimal, typ, sondertilgung } = drLesenFelder();
+  const rate = parseFloat(document.getElementById('dr-rate').value) || 0;
+
+  if (betrag <= 0 || rate <= 0) {
+    container.innerHTML = '<p class="form-hint">Bitte Darlehenssumme und Rate eingeben.</p>';
+    return;
+  }
+
+  const params = {
+    betrag, zinssatz: zinssatzDezimal, darlehen_typ: typ, sondertilgung_jahr: sondertilgung,
+    ...(typ === 'tilgungsdarlehen' ? { tilgungsrate_monatlich: rate } : { rate_monatlich: rate }),
+  };
+
+  try {
+    const plan = await api.darlehen.simulation(params);
+
+    document.getElementById('dr-out-laufzeit').textContent =
+      plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
+    document.getElementById('dr-out-zinsen').textContent = fmt.eur(plan.zinsen_gesamt);
+    // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die Bank
+    // fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur schneller
+    // dieselbe Summe; sie wirkt hier ausschließlich über geringere Zinsen.
+    document.getElementById('dr-out-gesamtkosten').textContent = fmt.eur(betrag + plan.zinsen_gesamt);
+
+    const { monate_gesamt: monateMit, monate_ohne_sondertilgung: monateOhne,
+            zinsen_gesamt: zinsenMit, zinsen_ohne_sondertilgung: zinsenOhne } = plan;
+    const monateDiff = (sondertilgung > 0 && monateOhne != null && monateMit != null) ? monateOhne - monateMit : 0;
+    document.getElementById('dr-out-monate-diff').textContent = monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—';
+    document.getElementById('dr-out-zinsen-diff').textContent =
+      sondertilgung > 0 ? fmt.eur(Math.max(0, zinsenOhne - zinsenMit)) : '—';
+
+    if (!plan.jahre.length) {
+      container.innerHTML = '<p class="form-hint">Keine gültige Tilgungsrechnung möglich — die Rate deckt vermutlich nicht einmal die Zinsen.</p>';
+      return;
+    }
+
+    const zeigtSonder = sondertilgung > 0;
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Jahr</th><th class="right">Zinsen</th><th class="right">Tilgung</th>
+            ${zeigtSonder ? '<th class="right">Sondertilgung</th>' : ''}
+            <th class="right">Restschuld z. Jahresende</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${plan.jahre.map(j => `
+            <tr>
+              <td>${j.jahr}</td>
+              <td class="right mono">${fmt.eur(j.zins)}</td>
+              <td class="right mono">${fmt.eur(j.tilgung)}</td>
+              ${zeigtSonder ? `<td class="right mono">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
+              <td class="right mono">${fmt.eur(j.restschuld_ende)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
   } catch (e) {
     container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
   }
@@ -1813,12 +2012,6 @@ function spPct(val) {
   return n ? val / n : 0;
 }
 
-function spStatusClass(pct, min, max) {
-  if (pct <= max + 0.005) return 'status-ok';
-  if (pct <= max + 0.05)  return 'status-warn';
-  return 'status-over';
-}
-
 function spPctColor(pct, min, max) {
   if (pct >= min - 0.005 && pct <= max + 0.005) return 'var(--ink-black)';
   if (pct > max + 0.05 || pct < min - 0.05) return 'var(--seal-red)';
@@ -1864,7 +2057,7 @@ async function renderSpendinPlan() {
       <div class="al-name">${{fixkosten:'Fixkosten',investments:'Investments',sparziele:'Spar-Ziele',gfs:'Guilt-Free'}[key]}</div>
       <div id="sp-al-pct-${key}" class="al-pct" style="color:${spPctColor(pct, conf.min, conf.max)}">
         <span id="sp-al-pct-val-${key}">${fmtPct(pct)}</span>
-        <span id="sp-al-status-${key}" class="al-status ${spStatusClass(pct, conf.min, conf.max)}"></span>
+        <span id="sp-al-status-${key}" class="al-status ${conf.dot}"></span>
       </div>
       <div id="sp-al-target-${key}" class="al-target">${conf.label} · ${fmt.eur(total)}</div>
     </div>`;
@@ -2185,12 +2378,13 @@ function spRecalc() {
   const updateAlLabel = (key, pct, total, mn, mx) => {
     const pctEl = document.getElementById(`sp-al-pct-${key}`);
     const valEl = document.getElementById(`sp-al-pct-val-${key}`);
-    const statusEl = document.getElementById(`sp-al-status-${key}`);
     const targetEl = document.getElementById(`sp-al-target-${key}`);
     if (pctEl) pctEl.style.color = spPctColor(pct, mn, mx);
     if (valEl) valEl.textContent = fmtPct(pct);
-    if (statusEl) { statusEl.className = 'al-status ' + spStatusClass(pct, mn, mx); }
     if (targetEl) targetEl.textContent = IWT[key].label + ' · ' + fmt.eur(total);
+    // Der Status-Dot bleibt unverändert die Kategorie-Farbe (dot-fix/-inv/-spar/-gfs,
+    // gesetzt beim Erstrender) — sie soll dieselbe Legende sein wie der Balken direkt
+    // darüber, nicht den Ziel-Status doppeln (den zeigt schon die Prozent-Textfarbe).
   };
   updateAlLabel('fixkosten',   pctFix,  fixT,  0.50, 0.60);
   updateAlLabel('investments', pctInv,  invT,  0.10, 0.10);
@@ -3653,9 +3847,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeSnapshotPopup();
   });
-
-  // Theme aus localStorage wiederherstellen
-  applyTheme(localStorage.getItem('mfb-theme') ?? 'fintech');
 
   // Demo-Modus aus sessionStorage wiederherstellen
   applyDemoMode();

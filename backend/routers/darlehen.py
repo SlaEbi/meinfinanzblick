@@ -20,9 +20,46 @@ def _berechne_restlaufzeit(darlehen: Darlehen) -> None:
     darlehen.restlaufzeit = res.monate  # None bei unvollständig / Rate zu niedrig
 
 
+def _tilgungsplan_response(
+    betrag: float, zinssatz: float, rate_monatlich: float, sondertilgung_jahr: float,
+    darlehen_typ: str, tilgungsrate_monatlich: float,
+) -> TilgungsplanResponse:
+    """Baut den Tilgungsplan plus Baseline ohne Sondertilgung — gemeinsame
+    Grundlage für den Plan eines gespeicherten Darlehens UND den freien
+    Darlehensrechner (der keinen gespeicherten Datensatz braucht)."""
+    kwargs = dict(darlehen_typ=darlehen_typ, tilgungsrate_monatlich=tilgungsrate_monatlich)
+    plan = tilgungsplan(betrag, zinssatz, rate_monatlich, sondertilgung_jahr=sondertilgung_jahr, **kwargs)
+    baseline = plan if sondertilgung_jahr <= 0 else tilgungsplan(
+        betrag, zinssatz, rate_monatlich, sondertilgung_jahr=0, **kwargs,
+    )
+    return TilgungsplanResponse(
+        jahre=plan.jahre, monate_gesamt=plan.monate_gesamt, zinsen_gesamt=plan.zinsen_gesamt,
+        monate_ohne_sondertilgung=baseline.monate_gesamt, zinsen_ohne_sondertilgung=baseline.zinsen_gesamt,
+    )
+
+
 @router.get('/', response_model=list[DarlehenResponse])
 def list_darlehen(db: Session = Depends(get_db)):
     return db.query(Darlehen).order_by(Darlehen.bezeichnung).all()
+
+
+@router.get('/simulation', response_model=TilgungsplanResponse)
+def simulate_darlehen(
+    betrag: float,
+    zinssatz: float,
+    rate_monatlich: float = 0.0,
+    darlehen_typ: str = 'annuitaet',
+    tilgungsrate_monatlich: float = 0.0,
+    sondertilgung_jahr: float = 0.0,
+):
+    """Freier Darlehensrechner — simuliert einen Tilgungsplan aus frei
+    eingegebenen Werten, ohne dass dafür ein Darlehen gespeichert sein muss.
+    Gleiche Rechenbasis wie der Tilgungsplan eines gespeicherten Darlehens
+    (services/tilgung.py), nur ohne DB-Zugriff.
+    """
+    return _tilgungsplan_response(
+        betrag, zinssatz, rate_monatlich, sondertilgung_jahr, darlehen_typ, tilgungsrate_monatlich,
+    )
 
 
 @router.post('/', response_model=DarlehenResponse, status_code=201)
@@ -54,21 +91,10 @@ def get_tilgungsplan(darlehen_id: int, sondertilgung_jahr: float = 0.0, db: Sess
     if not darlehen:
         raise HTTPException(status_code=404, detail='Darlehen nicht gefunden')
 
-    kwargs = dict(
-        darlehen_typ=darlehen.darlehen_typ or 'annuitaet',
-        tilgungsrate_monatlich=float(darlehen.tilgungsrate_monatlich or 0),
-    )
-    plan = tilgungsplan(
+    return _tilgungsplan_response(
         float(darlehen.restschuld or 0), float(darlehen.zinssatz or 0),
-        float(darlehen.rate_monatlich or 0), sondertilgung_jahr=sondertilgung_jahr, **kwargs,
-    )
-    baseline = plan if sondertilgung_jahr <= 0 else tilgungsplan(
-        float(darlehen.restschuld or 0), float(darlehen.zinssatz or 0),
-        float(darlehen.rate_monatlich or 0), sondertilgung_jahr=0, **kwargs,
-    )
-    return TilgungsplanResponse(
-        jahre=plan.jahre, monate_gesamt=plan.monate_gesamt, zinsen_gesamt=plan.zinsen_gesamt,
-        monate_ohne_sondertilgung=baseline.monate_gesamt, zinsen_ohne_sondertilgung=baseline.zinsen_gesamt,
+        float(darlehen.rate_monatlich or 0), sondertilgung_jahr,
+        darlehen.darlehen_typ or 'annuitaet', float(darlehen.tilgungsrate_monatlich or 0),
     )
 
 

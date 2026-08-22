@@ -57,6 +57,7 @@ export const api = {
     delete: (id)        => request('DELETE', `/darlehen/${id}`),
     tilgungsplan: (id, sondertilgungJahr = 0) =>
       request('GET', `/darlehen/${id}/tilgungsplan?sondertilgung_jahr=${sondertilgungJahr}`),
+    simulation: (params) => request('GET', `/darlehen/simulation?${new URLSearchParams(params)}`),
   },
 
   spending: {
