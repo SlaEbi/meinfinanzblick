@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Darlehen
-from ..schemas import DarlehenCreate, DarlehenUpdate, DarlehenResponse
-from ..services.tilgung import restlaufzeit_monate
+from ..schemas import DarlehenCreate, DarlehenUpdate, DarlehenResponse, TilgungsplanResponse
+from ..services.tilgung import restlaufzeit_monate, tilgungsplan
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(prefix='/darlehen', tags=['Darlehen'])
 
@@ -42,6 +43,35 @@ def get_darlehen(darlehen_id: int, db: Session = Depends(get_db)):
     return darlehen
 
 
+@router.get('/{darlehen_id}/tilgungsplan', response_model=TilgungsplanResponse)
+def get_tilgungsplan(darlehen_id: int, sondertilgung_jahr: float = 0.0, db: Session = Depends(get_db)):
+    """Jahresweiser Tilgungsplan, optional mit jährlicher Sondertilgung.
+
+    Liefert immer auch die Baseline ohne Sondertilgung mit, damit das Frontend
+    Laufzeitverkürzung und Zinsersparnis ohne zweiten Request anzeigen kann.
+    """
+    darlehen = db.query(Darlehen).filter(Darlehen.id == darlehen_id).first()
+    if not darlehen:
+        raise HTTPException(status_code=404, detail='Darlehen nicht gefunden')
+
+    kwargs = dict(
+        darlehen_typ=darlehen.darlehen_typ or 'annuitaet',
+        tilgungsrate_monatlich=float(darlehen.tilgungsrate_monatlich or 0),
+    )
+    plan = tilgungsplan(
+        float(darlehen.restschuld or 0), float(darlehen.zinssatz or 0),
+        float(darlehen.rate_monatlich or 0), sondertilgung_jahr=sondertilgung_jahr, **kwargs,
+    )
+    baseline = plan if sondertilgung_jahr <= 0 else tilgungsplan(
+        float(darlehen.restschuld or 0), float(darlehen.zinssatz or 0),
+        float(darlehen.rate_monatlich or 0), sondertilgung_jahr=0, **kwargs,
+    )
+    return TilgungsplanResponse(
+        jahre=plan.jahre, monate_gesamt=plan.monate_gesamt, zinsen_gesamt=plan.zinsen_gesamt,
+        monate_ohne_sondertilgung=baseline.monate_gesamt, zinsen_ohne_sondertilgung=baseline.zinsen_gesamt,
+    )
+
+
 @router.put('/{darlehen_id}', response_model=DarlehenResponse)
 def update_darlehen(darlehen_id: int, data: DarlehenUpdate, db: Session = Depends(get_db)):
     darlehen = db.query(Darlehen).filter(Darlehen.id == darlehen_id).first()
@@ -60,5 +90,6 @@ def delete_darlehen(darlehen_id: int, db: Session = Depends(get_db)):
     darlehen = db.query(Darlehen).filter(Darlehen.id == darlehen_id).first()
     if not darlehen:
         raise HTTPException(status_code=404, detail='Darlehen nicht gefunden')
+    delete_anhaenge_fuer('darlehen', darlehen_id, db)
     db.delete(darlehen)
     db.commit()

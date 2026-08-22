@@ -137,6 +137,13 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
       </button>
+      <a href="/api/v1/backup.zip" class="icon-btn" title="Backup herunterladen (Datenbank + Anhänge als ZIP)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </a>
       <a href="/landing/" target="_blank" class="icon-btn" title="Über MeinFinanzblick">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15">
           <circle cx="12" cy="12" r="10"/>
@@ -577,6 +584,10 @@
           <p>Ernstfall-Übersicht — Wo liegt was, wen anrufen, was sofort tun</p>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center">
+          <a href="/api/v1/export/notfall-pdf" target="_blank" rel="noopener" class="btn btn-ghost" title="Notfall-Mappe als PDF öffnen — zum Ausdrucken für den Ernstfall">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 11h3"/></svg>
+            Notfall-Mappe (PDF)
+          </a>
           <a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="btn btn-ghost bitwarden-btn" title="Bitwarden Tresor öffnen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             Bitwarden
@@ -692,7 +703,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=57"></script>
+<script type="module" src="/js/app.js?v=58"></script>
 
 
 </body>

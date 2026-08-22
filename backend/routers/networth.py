@@ -40,12 +40,16 @@ def _berechne_aktuell(db: Session) -> NetWorthSummary:
 @router.get('/', response_model=NetWorthData)
 def get_networth(db: Session = Depends(get_db)):
     aktuell = _berechne_aktuell(db)
+    # Neueste 24 Snapshots holen (absteigend), dann für die Chart-Anzeige
+    # chronologisch umdrehen — sonst zeigt der Verlauf ab dem 25. Snapshot
+    # dauerhaft die ältesten statt der aktuellen Stände.
     verlauf = (
         db.query(NetWorthSnapshot)
-        .order_by(NetWorthSnapshot.datum)
+        .order_by(NetWorthSnapshot.datum.desc())
         .limit(24)
         .all()
     )
+    verlauf.reverse()
     return NetWorthData(aktuell=aktuell, verlauf=verlauf)
 
 

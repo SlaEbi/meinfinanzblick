@@ -1,8 +1,31 @@
-/* API client v4 — alle Aufrufe gehen an /api/v1/ */
+/* API client v5 — alle Aufrufe gehen an /api/v1/ */
 
 const BASE = '/api/v1';
 
+/* ── Schreibsperre im Demo-Modus ────────────────────────────────────────────
+   Im Demo-Modus zeigt die Oberfläche Musterdaten, die Datensätze dahinter sind
+   aber die echten. Weil sich die Demo-IDs mit den echten überschneiden, würde
+   jeder Schreibvorgang einen echten Datensatz treffen — sichtbar wäre davon
+   nichts, weil auf dem Schirm die Musterdaten stehen.
+
+   Die Sperre sitzt deshalb hier an der einzigen Stelle, durch die JEDER
+   Schreibvorgang läuft, und nicht in der Oberfläche: eine CSS-Regel oder ein
+   Guard pro Formular muss bei jedem neuen Bedienelement nachgezogen werden,
+   diese Prüfung nicht. */
+function istDemoModus() {
+  return sessionStorage.getItem('mfb-demo') === '1';
+}
+
+class DemoSchreibsperre extends Error {
+  constructor() {
+    super('Demo-Modus aktiv — Änderungen werden nicht gespeichert.');
+    this.name = 'DemoSchreibsperre';
+  }
+}
+
 async function request(method, path, body = null) {
+  if (method !== 'GET' && istDemoModus()) throw new DemoSchreibsperre();
+
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -32,6 +55,8 @@ export const api = {
     create: (data)      => request('POST',   '/darlehen/', data),
     update: (id, data)  => request('PUT',    `/darlehen/${id}`, data),
     delete: (id)        => request('DELETE', `/darlehen/${id}`),
+    tilgungsplan: (id, sondertilgungJahr = 0) =>
+      request('GET', `/darlehen/${id}/tilgungsplan?sondertilgung_jahr=${sondertilgungJahr}`),
   },
 
   spending: {
@@ -123,6 +148,7 @@ export const api = {
     list:   (typ, id)      => request('GET',    `/anhaenge/${typ}/${id}`),
     delete: (anhangId)     => request('DELETE', `/anhaenge/${anhangId}`),
     upload: async (typ, id, file) => {
+      if (istDemoModus()) throw new DemoSchreibsperre();
       const fd = new FormData();
       fd.append('file', file);
       const res = await fetch(`${BASE}/anhaenge/${typ}/${id}`, { method: 'POST', body: fd });

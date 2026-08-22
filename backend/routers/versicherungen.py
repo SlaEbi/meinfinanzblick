@@ -8,6 +8,7 @@ from ..schemas import (
     VersicherungCreate, VersicherungUpdate, VersicherungResponse,
     VertragCreate, VertragUpdate, VertragResponse,
 )
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(tags=['Versicherungen'])
 
@@ -45,6 +46,7 @@ def delete_versicherung(vid: int, db: Session = Depends(get_db)):
     v = db.query(Versicherung).filter(Versicherung.id == vid).first()
     if not v:
         raise HTTPException(status_code=404, detail='Versicherung nicht gefunden')
+    delete_anhaenge_fuer('versicherung', vid, db)
     db.delete(v)
     db.commit()
 
@@ -82,5 +84,6 @@ def delete_vertrag(vid: int, db: Session = Depends(get_db)):
     v = db.query(Vertrag).filter(Vertrag.id == vid).first()
     if not v:
         raise HTTPException(status_code=404, detail='Vertrag nicht gefunden')
+    delete_anhaenge_fuer('vertrag', vid, db)
     db.delete(v)
     db.commit()

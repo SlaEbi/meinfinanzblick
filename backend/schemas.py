@@ -153,6 +153,24 @@ class DarlehenResponse(DarlehenBase):
     id: int
 
 
+class JahresZeileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    jahr: int
+    zins: float
+    tilgung: float
+    sondertilgung: float
+    restschuld_ende: float
+
+
+class TilgungsplanResponse(BaseModel):
+    jahre: list[JahresZeileResponse]
+    monate_gesamt: Optional[int] = None
+    zinsen_gesamt: float
+    # Baseline ohne Sondertilgung, zum Vergleich immer mitgeliefert
+    monate_ohne_sondertilgung: Optional[int] = None
+    zinsen_ohne_sondertilgung: float
+
+
 # ── Spending Plan ──────────────────────────────────────────────────────────────
 
 class SpendingPositionBase(BaseModel):

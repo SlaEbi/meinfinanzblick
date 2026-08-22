@@ -22,6 +22,25 @@ ALLOWED_ENTITY_TYPEN = {
 router = APIRouter(prefix='/anhaenge', tags=['Anhänge'])
 
 
+def delete_anhaenge_fuer(entity_typ: str, entity_id: int, db: Session) -> None:
+    """Löscht alle Anhänge (Datei + DB-Zeile) eines Datensatzes.
+
+    Muss vor jedem db.delete() eines Datensatzes mit Anhängen aufgerufen werden.
+    Ohne FK/Cascade bleiben sonst verwaiste Anhang-Zeilen zurück, die bei einer
+    späteren, von SQLite wiederverwendeten ID plötzlich am falschen (neuen)
+    Datensatz auftauchen.
+    """
+    anhaenge = db.query(Anhang).filter(
+        Anhang.entity_typ == entity_typ,
+        Anhang.entity_id == entity_id,
+    ).all()
+    for a in anhaenge:
+        path = os.path.join(UPLOADS_DIR, a.dateiname)
+        if os.path.exists(path):
+            os.remove(path)
+        db.delete(a)
+
+
 @router.get('/datei/{anhang_id}')
 def get_datei(anhang_id: int, db: Session = Depends(get_db)):
     a = db.query(Anhang).filter(Anhang.id == anhang_id).first()

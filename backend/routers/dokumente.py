@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Dokument
 from ..schemas import DokumentCreate, DokumentUpdate, DokumentResponse
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(tags=['Dokumente'])
 
@@ -39,5 +40,6 @@ def delete_dokument(id: int, db: Session = Depends(get_db)):
     d = db.get(Dokument, id)
     if not d:
         raise HTTPException(404, 'Dokument nicht gefunden')
+    delete_anhaenge_fuer('dokument', id, db)
     db.delete(d)
     db.commit()

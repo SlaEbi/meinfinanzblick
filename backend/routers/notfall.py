@@ -7,6 +7,7 @@ from ..schemas import (
     KontaktCreate, KontaktUpdate, KontaktResponse,
     NotfallEintragCreate, NotfallEintragUpdate, NotfallEintragResponse,
 )
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(tags=['Notfall'])
 
@@ -83,5 +84,6 @@ def delete_eintrag(id: int, db: Session = Depends(get_db)):
     e = db.get(NotfallEintrag, id)
     if not e:
         raise HTTPException(404, 'Eintrag nicht gefunden')
+    delete_anhaenge_fuer('notfall', id, db)
     db.delete(e)
     db.commit()

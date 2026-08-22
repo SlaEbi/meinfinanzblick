@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from ..db import get_db
 from ..models import Konto
 from ..schemas import KontoCreate, KontoUpdate, KontoResponse
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(prefix='/konten', tags=['Konten'])
 
@@ -53,5 +54,6 @@ def delete_konto(konto_id: int, db: Session = Depends(get_db)):
     konto = db.query(Konto).filter(Konto.id == konto_id).first()
     if not konto:
         raise HTTPException(status_code=404, detail='Konto nicht gefunden')
+    delete_anhaenge_fuer('konto', konto_id, db)
     db.delete(konto)
     db.commit()

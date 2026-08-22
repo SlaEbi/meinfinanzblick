@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from ..db import get_db
 from ..models import Depot, DepotPosition
 from ..schemas import DepotCreate, DepotUpdate, DepotResponse, DepotPositionCreate, DepotPositionResponse
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(prefix='/depots', tags=['Depots'])
 
@@ -49,6 +50,7 @@ def delete_depot(depot_id: int, db: Session = Depends(get_db)):
     depot = db.query(Depot).filter(Depot.id == depot_id).first()
     if not depot:
         raise HTTPException(status_code=404, detail='Depot nicht gefunden')
+    delete_anhaenge_fuer('depot', depot_id, db)
     db.delete(depot)
     db.commit()
 

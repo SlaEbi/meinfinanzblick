@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from ..db import get_db
 from ..models import Sachvermoegen
 from ..schemas import SachvermoegenCreate, SachvermoegenUpdate, SachvermoegenResponse
+from .anhaenge import delete_anhaenge_fuer
 
 router = APIRouter(prefix='/sachvermoegen', tags=['Sachwerte'])
 
@@ -49,5 +50,6 @@ def delete_sachvermoegen(item_id: int, db: Session = Depends(get_db)):
     obj = db.query(Sachvermoegen).filter(Sachvermoegen.id == item_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail='Sachwert nicht gefunden')
+    delete_anhaenge_fuer('sachwert', item_id, db)
     db.delete(obj)
     db.commit()

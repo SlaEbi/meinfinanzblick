@@ -1,4 +1,4 @@
-import { api } from './api.js?v=5';
+import { api } from './api.js?v=6';
 import { DEMO } from './demo.js?v=1';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
@@ -14,7 +14,16 @@ window.setTheme = applyTheme;
 // ── Formatierung ────────────────────────────────────────────────────────────
 
 const fmt = {
+  // Zeigt Cent nur, wenn welche vorhanden sind ("43,49 €", aber "18.138 €" bleibt
+  // glatt) — rundet also nie echte Cent-Beträge unsichtbar weg. Für Tabellen,
+  // Summenzeilen und alles, wo ein Betrag exakt stimmen muss.
   eur: (v) => new Intl.NumberFormat('de-DE', {
+    style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2
+  }).format(v ?? 0),
+
+  // Rundet immer auf ganze Euro — bewusst ungenau, nur für die großen
+  // Dashboard-Kacheln, wo es um die Größenordnung geht, nicht um den Cent.
+  eurKurz: (v) => new Intl.NumberFormat('de-DE', {
     style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0
   }).format(v ?? 0),
 
@@ -303,11 +312,11 @@ function renderDashboard() {
   const netto = nw.netto ?? 0;
 
   // Hero
-  document.getElementById('nw-netto').textContent          = fmt.eur(netto);
-  document.getElementById('nw-konten').textContent         = fmt.eur(nw.summe_konten ?? 0);
-  document.getElementById('nw-depots').textContent         = fmt.eur(nw.summe_depots ?? 0);
-  document.getElementById('nw-sachvermoegen').textContent  = fmt.eur(nw.summe_sachvermoegen ?? 0);
-  document.getElementById('nw-schulden').textContent       = fmt.eur(nw.summe_schulden ?? 0);
+  document.getElementById('nw-netto').textContent          = fmt.eurKurz(netto);
+  document.getElementById('nw-konten').textContent         = fmt.eurKurz(nw.summe_konten ?? 0);
+  document.getElementById('nw-depots').textContent         = fmt.eurKurz(nw.summe_depots ?? 0);
+  document.getElementById('nw-sachvermoegen').textContent  = fmt.eurKurz(nw.summe_sachvermoegen ?? 0);
+  document.getElementById('nw-schulden').textContent       = fmt.eurKurz(nw.summe_schulden ?? 0);
 
   // Netto-Klasse
   const heroEl = document.getElementById('nw-netto');
@@ -349,7 +358,44 @@ const WARN_ICONS = {
   file:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
   percent:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
   bell:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>',
+  clock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
 };
+
+// ── Aktualität ──────────────────────────────────────────────────────────────
+// Das Leitprinzip der App ist "einmal im Monat pflegen" — ohne einen Hinweis
+// sieht ein acht Monate alter Depotwert genauso aktuell aus wie einer von
+// gestern. STALE_TAGE ist bewusst etwas über einem Monat, damit ein normaler
+// Pflege-Rhythmus nicht ständig als "veraltet" markiert wird.
+const STALE_TAGE = 45;
+
+function istVeraltet(dateStr) {
+  const days = daysUntil(dateStr);
+  return days !== null && days < -STALE_TAGE;
+}
+
+// Datum unter einem Wert (Konten-/Depot-Tabelle) — färbt sich, wenn der Wert
+// länger als STALE_TAGE nicht aktualisiert wurde.
+function aktualisiertHtml(dateStr) {
+  const veraltet = istVeraltet(dateStr);
+  const style = veraltet
+    ? `color:var(--seal-red);font-weight:500`
+    : `color:var(--wash-grey);font-weight:400`;
+  const titel = veraltet ? ' title="Seit über 45 Tagen nicht aktualisiert"' : '';
+  return `<br><span class="mono" style="font-size:0.72rem;${style}"${titel}>${fmt.date(dateStr)}</span>`;
+}
+
+function collectStaleWarnings() {
+  const out = [];
+  for (const k of state.konten ?? []) {
+    if (!istVeraltet(k.aktualisiert_am)) continue;
+    out.push({ typ: 'Wert veraltet', icon: WARN_ICONS.clock, name: k.name, days: daysUntil(k.aktualisiert_am), datum: k.aktualisiert_am, view: 'konten' });
+  }
+  for (const d of state.depots ?? []) {
+    if (!istVeraltet(d.aktualisiert_am)) continue;
+    out.push({ typ: 'Wert veraltet', icon: WARN_ICONS.clock, name: d.name, days: daysUntil(d.aktualisiert_am), datum: d.aktualisiert_am, view: 'depots' });
+  }
+  return out;
+}
 
 // Glocken-Toggle für Kündigungsfrist-Erinnerung im Formular
 function fristBellHtml(active) {
@@ -398,6 +444,9 @@ function collectWarnings() {
     if (days === null || days > 90 || days < -30) continue;
     out.push({ typ: 'Zinsbindung endet', icon: WARN_ICONS.percent, name: d.bezeichnung, days, datum: d.zinsbindung_bis, view: 'darlehen' });
   }
+
+  // Veraltete Konten-/Depotwerte
+  out.push(...collectStaleWarnings());
 
   return out.sort((a, b) => a.days - b.days);
 }
@@ -755,7 +804,7 @@ function renderKonten() {
       </td>
       <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">
         ${fmt.eur(k.saldo)}
-        <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(k.aktualisiert_am)}</span>
+        ${aktualisiertHtml(k.aktualisiert_am)}
       </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openKontoForm(${k.id})" title="Bearbeiten">
@@ -957,6 +1006,9 @@ function renderDarlehen() {
         </span>
       </td>
       <td class="right"><div class="action-cell">
+        <button class="btn-icon" onclick="openDarlehenTilgungsplan(${d.id})" title="Tilgungsplan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-4-4L3 15.5"/></svg>
+        </button>
         <button class="btn-icon" onclick="openDarlehenForm(${d.id})" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -972,6 +1024,115 @@ function zinsbindungBald(bis) {
   if (!bis) return false;
   const diff = (new Date(bis) - new Date()) / (1000 * 60 * 60 * 24 * 30);
   return diff < 12; // weniger als 12 Monate
+}
+
+// ── Tilgungsplan & Sondertilgungs-Szenario ────────────────────────────────
+// Rechnet in backend/services/tilgung.py (kanonische Quelle, getestet) —
+// das Frontend fragt bei jeder Slider-Bewegung neu ab statt lokal
+// nachzurechnen. Lokaler Server, daher spürt man die Latenz beim Ziehen
+// praktisch nicht; ein leichtes Debounce genügt.
+
+const tpTimers = {};
+
+window.openDarlehenTilgungsplan = async function(id) {
+  const d = state.darlehen.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById('modal-title').textContent = `Tilgungsplan · ${d.bezeichnung}`;
+
+  const hatSonder = !!d.sondertilgung_moeglich;
+  const restschuld = Number(d.restschuld) || 0;
+  const maxSonder = Math.max(1000, Math.min(Number(d.sondertilgung_betrag) || restschuld, restschuld));
+
+  document.getElementById('modal-body').innerHTML = `
+    ${hatSonder ? `
+      <div class="form-group">
+        <label class="form-label">Jährliche Sondertilgung</label>
+        <input id="tp-slider" type="range" min="0" max="${Math.round(maxSonder)}" step="250" value="0"
+          oninput="tpQueueUpdate(${id}, this.value)" style="width:100%">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--wash-grey);margin-top:0.2rem">
+          <span>0 €</span>
+          <span id="tp-slider-val" class="mono" style="font-weight:600;color:var(--ink-black)">0 €</span>
+          <span>${fmt.eur(maxSonder)}</span>
+        </div>
+        ${d.sondertilgung_betrag ? `<p class="form-hint">Vertraglich max. ${fmt.eur(d.sondertilgung_betrag)} / Jahr erlaubt.</p>` : ''}
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr 1fr;margin-bottom:1rem">
+        <div class="stat-card">
+          <div class="label">Laufzeitverkürzung</div>
+          <div class="value mono" id="tp-monate-diff">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Zinsersparnis</div>
+          <div class="value mono" id="tp-zinsen-diff">—</div>
+        </div>
+      </div>
+    ` : `<p class="form-hint">Laut Vertrag ist für dieses Darlehen keine Sondertilgung vorgesehen.</p>`}
+    <div id="tp-tabelle-container"><p class="form-hint">Lädt…</p></div>
+  `;
+
+  openModal();
+  document.getElementById('modal-submit').style.display = 'none';
+
+  await tpLadeUndRender(id, 0);
+};
+
+window.tpQueueUpdate = function(id, wert) {
+  const el = document.getElementById('tp-slider-val');
+  if (el) el.textContent = fmt.eur(wert);
+  clearTimeout(tpTimers.slider);
+  tpTimers.slider = setTimeout(() => tpLadeUndRender(id, wert), 200);
+};
+
+async function tpLadeUndRender(id, sondertilgungJahr) {
+  const container = document.getElementById('tp-tabelle-container');
+  if (!container) return;
+  try {
+    const plan = await api.darlehen.tilgungsplan(id, sondertilgungJahr);
+
+    const diffEl = document.getElementById('tp-monate-diff');
+    const zinsDiffEl = document.getElementById('tp-zinsen-diff');
+    if (diffEl && zinsDiffEl) {
+      const { monate_gesamt: monateMit, monate_ohne_sondertilgung: monateOhne,
+              zinsen_gesamt: zinsenMit, zinsen_ohne_sondertilgung: zinsenOhne } = plan;
+      const monateDiff = (monateOhne != null && monateMit != null) ? monateOhne - monateMit : 0;
+      diffEl.textContent = monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—';
+      zinsDiffEl.textContent = fmt.eur(Math.max(0, zinsenOhne - zinsenMit));
+    }
+
+    if (!plan.jahre.length) {
+      container.innerHTML = '<p class="form-hint">Keine gültige Tilgungsrechnung möglich — die Rate deckt vermutlich nicht einmal die Zinsen.</p>';
+      return;
+    }
+
+    const zeigtSonder = Number(sondertilgungJahr) > 0;
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Jahr</th><th class="right">Zinsen</th><th class="right">Tilgung</th>
+            ${zeigtSonder ? '<th class="right">Sondertilgung</th>' : ''}
+            <th class="right">Restschuld z. Jahresende</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${plan.jahre.map(j => `
+            <tr>
+              <td>${j.jahr}</td>
+              <td class="right mono">${fmt.eur(j.zins)}</td>
+              <td class="right mono">${fmt.eur(j.tilgung)}</td>
+              ${zeigtSonder ? `<td class="right mono">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
+              <td class="right mono">${fmt.eur(j.restschuld_ende)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <p class="form-hint" style="margin-top:0.6rem">
+        Gesamtlaufzeit: ${plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : 'läuft über 60 Jahre hinaus'}
+        &middot; Gesamtzinsen: ${fmt.eur(plan.zinsen_gesamt)}
+      </p>`;
+  } catch (e) {
+    container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
+  }
 }
 
 window.openDarlehenForm = function(id = null) {
@@ -1195,7 +1356,7 @@ function renderDepots() {
       <td class="mono text-muted" style="font-size:0.8rem">${dep.verrechnungskonto ?? '—'}</td>
       <td class="right mono">
         ${fmt.eur(dep.wert_aktuell)}
-        <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(dep.aktualisiert_am)}</span>
+        ${aktualisiertHtml(dep.aktualisiert_am)}
       </td>
       <td class="right"><div class="action-cell">
         <button class="btn-icon" onclick="openDepotForm(${dep.id})" title="Bearbeiten">
@@ -1529,6 +1690,11 @@ window.createSnapshot = async function() {
 // ── Modal ───────────────────────────────────────────────────────────────────
 
 function openModal() {
+  // Reset auf den Standard-Zustand — ein reiner Anzeige-Modal (z. B.
+  // Tilgungsplan) blendet den Submit-Button danach gezielt wieder aus.
+  const submitBtn = document.getElementById('modal-submit');
+  submitBtn.textContent = 'Speichern';
+  submitBtn.style.display = '';
   document.getElementById('modal-overlay').classList.add('open');
 }
 
@@ -3496,8 +3662,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     await loadAll();
+    await autoSnapshotWennNeuerMonat();
     navigate('dashboard');
   } catch (e) {
     console.error('Init-Fehler:', e);
   }
 });
+
+// Setzt beim ersten App-Start eines Kalendermonats automatisch einen
+// Nettovermögens-Snapshot — vorher entstand der Verlauf nur, wenn man aktiv
+// auf "Snapshot speichern" klickte, wodurch die Kurve über Monate lückenhaft
+// blieb. Läuft nur einmal pro Monat (nicht bei jedem Öffnen der App).
+async function autoSnapshotWennNeuerMonat() {
+  if (state.demoMode) return;
+  const verlauf = state.networth?.verlauf ?? [];
+  const letzter = verlauf[verlauf.length - 1];
+  const aktMonat = new Date().toISOString().substring(0, 7);
+  if (letzter && letzter.datum.substring(0, 7) === aktMonat) return;
+  try {
+    await api.networth.snapshot();
+    state.networth = await api.networth.get();
+  } catch (e) {
+    console.warn('Automatischer Monats-Snapshot fehlgeschlagen:', e.message);
+  }
+}
