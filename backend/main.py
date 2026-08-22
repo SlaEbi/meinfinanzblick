@@ -13,6 +13,7 @@ Base.metadata.create_all(bind=engine)
 def _migrate():
     migrations = [
         ("konten",   "kontoinhaber",         "TEXT"),
+        ("konten",   "bic",                  "TEXT"),
         ("konten",   "notiz",                "TEXT"),
         ("konten",   "bitwarden_name",       "TEXT"),
         ("depots",   "broker",               "TEXT"),

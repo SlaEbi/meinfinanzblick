@@ -13,6 +13,7 @@ class Konto(Base):
     bank = Column(String)
     typ = Column(String, nullable=False)  # giro, tagesgeld, festgeld, sparkonto
     iban = Column(String)
+    bic = Column(String)
     saldo = Column(Numeric(14, 2), nullable=False, default=0)
     waehrung = Column(String, default='EUR')
     kontoinhaber = Column(String)

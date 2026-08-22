@@ -718,6 +718,10 @@ function renderDashboardDarlehen() {
 // ── Konten View ─────────────────────────────────────────────────────────────
 
 function renderKonten() {
+  const sumKt = state.konten.reduce((s, k) => s + (Number(k.saldo) || 0), 0);
+  const elSum = document.getElementById('kt-sum-konten');
+  if (elSum) elSum.textContent = fmt.eur(sumKt);
+
   const tbody = document.getElementById('konten-tbody');
   if (!tbody) return;
 
@@ -745,7 +749,10 @@ function renderKonten() {
         ${k.bitwarden_name ? `<br><a href="https://vault.bitwarden.com" target="_blank" rel="noopener" class="bw-link" title="In Bitwarden öffnen: ${escapeHtml(k.bitwarden_name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> ${escapeHtml(k.bitwarden_name)}</a>` : ''}
       </td>
       <td><span class="badge badge-${k.typ}">${KONTO_TYP_LABEL[k.typ] ?? k.typ}</span></td>
-      <td class="mono">${k.iban ? maskIBAN(k.iban) : '—'}</td>
+      <td class="mono">
+        ${k.iban ? maskIBAN(k.iban) : '—'}
+        ${k.bic ? `<br><span class="text-muted" style="font-size:0.72rem">${escapeHtml(k.bic)}</span>` : ''}
+      </td>
       <td class="right mono ${k.saldo >= 0 ? '' : 'text-red'}">
         ${fmt.eur(k.saldo)}
         <br><span class="text-muted" style="font-size:0.72rem;font-weight:400">${fmt.date(k.aktualisiert_am)}</span>
@@ -788,10 +795,16 @@ window.openKontoForm = function(id = null) {
         </select>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">IBAN</label>
-      <input id="f-iban" class="form-input mono" value="${escapeHtml(konto?.iban ?? '')}">
-      <p class="form-hint">Wird maskiert angezeigt (nur zur Identifikation)</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">IBAN</label>
+        <input id="f-iban" class="form-input mono" value="${escapeHtml(konto?.iban ?? '')}">
+        <p class="form-hint">Wird maskiert angezeigt (nur zur Identifikation)</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">BIC</label>
+        <input id="f-bic" class="form-input mono" value="${escapeHtml(konto?.bic ?? '')}">
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Saldo (€) <span class="required">*</span></label>
@@ -823,6 +836,7 @@ async function submitKontoForm() {
     name:           document.getElementById('f-name').value.trim(),
     typ:            document.getElementById('f-typ').value,
     iban:           document.getElementById('f-iban').value.trim() || null,
+    bic:            document.getElementById('f-bic').value.trim() || null,
     saldo:          parseFloat(document.getElementById('f-saldo').value) || 0,
     waehrung:       'EUR',
     kontoinhaber:   document.getElementById('f-kontoinhaber').value.trim() || null,
@@ -856,6 +870,10 @@ window.deleteKonto = async function(id) {
 // ── Darlehen View ────────────────────────────────────────────────────────────
 
 function renderDarlehen() {
+  const sumDl = state.darlehen.reduce((s, d) => s + (Number(d.restschuld) || 0) * (Number(d.anteil_pct ?? 100) / 100), 0);
+  const elSum = document.getElementById('dl-sum-darlehen');
+  if (elSum) elSum.textContent = fmt.eur(sumDl);
+
   const tbody = document.getElementById('darlehen-tbody');
   if (!tbody) return;
 
@@ -1143,6 +1161,10 @@ window.deleteDarlehen = async function(id) {
 // ── Depots View ─────────────────────────────────────────────────────────────
 
 function renderDepots() {
+  const sumDep = state.depots.reduce((s, d) => s + (Number(d.wert_aktuell) || 0), 0);
+  const elSum = document.getElementById('dep-sum-depots');
+  if (elSum) elSum.textContent = fmt.eur(sumDep);
+
   const tbody = document.getElementById('depots-tbody');
   if (!tbody) return;
 
@@ -1324,6 +1346,10 @@ const SACHWERT_KATEGORIEN = [
 ];
 
 function renderSachwerte() {
+  const sumSw = state.sachwerte.reduce((s, w) => s + (Number(w.aktueller_wert) || 0) * (Number(w.anteil_pct ?? 100) / 100), 0);
+  const elSum = document.getElementById('sw-sum-sachwerte');
+  if (elSum) elSum.textContent = fmt.eur(sumSw);
+
   const tbody = document.getElementById('sachwerte-tbody');
   if (!tbody) return;
 
@@ -1585,7 +1611,7 @@ function spKatSumme(kat) {
 function spAutoPositionen() {
   const items = [];
   for (const d of (state.darlehen ?? [])) {
-    const betrag = Number(d.rate_monatlich) || 0;
+    const betrag = (Number(d.rate_monatlich) || 0) * (Number(d.anteil_pct ?? 100) / 100);
     if (betrag > 0) items.push({ quelle: 'darlehen', view: 'darlehen', bezeichnung: d.bezeichnung, betrag });
   }
   for (const v of (state.versicherungen ?? [])) {

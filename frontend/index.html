@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
   <link rel="stylesheet" href="/css/tokens.css?v=8">
-  <link rel="stylesheet" href="/css/app.css?v=24">
+  <link rel="stylesheet" href="/css/app.css?v=27">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -318,7 +318,7 @@
     <section id="view-konten" class="view">
       <div class="page-header">
         <div>
-          <h2>Konten</h2>
+          <h2>Konten und Bargeld</h2>
           <p>Giro-, Tagesgeld- und Sparkonten</p>
         </div>
         <button class="btn btn-primary" onclick="openKontoForm()">
@@ -327,6 +327,12 @@
           </svg>
           Konto hinzufügen
         </button>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr">
+        <div class="stat-card">
+          <div class="label">Konten und Bargeld gesamt</div>
+          <div id="kt-sum-konten" class="value mono">—</div>
+        </div>
       </div>
       <div class="card" style="padding:0">
         <table class="data-table">
@@ -357,6 +363,12 @@
           </svg>
           Darlehen hinzufügen
         </button>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr">
+        <div class="stat-card">
+          <div class="label">Restschuld gesamt</div>
+          <div id="dl-sum-darlehen" class="value mono">—</div>
+        </div>
       </div>
       <div class="card" style="padding:0">
         <table class="data-table">
@@ -468,6 +480,12 @@
           Sachwert hinzufügen
         </button>
       </div>
+      <div class="stat-grid" style="grid-template-columns:1fr">
+        <div class="stat-card">
+          <div class="label">Sachwerte gesamt (aktueller Wert)</div>
+          <div id="sw-sum-sachwerte" class="value mono">—</div>
+        </div>
+      </div>
       <div class="card" style="padding:0">
         <table class="data-table">
           <thead>
@@ -498,6 +516,12 @@
           </svg>
           Depot hinzufügen
         </button>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:1fr">
+        <div class="stat-card">
+          <div class="label">Depots gesamt (aktueller Wert)</div>
+          <div id="dep-sum-depots" class="value mono">—</div>
+        </div>
       </div>
       <div class="card" style="padding:0">
         <table class="data-table">

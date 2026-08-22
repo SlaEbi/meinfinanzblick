@@ -175,6 +175,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: var(--space-8);
@@ -368,6 +369,10 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 /* ── Data Tables ──────────────────────────────────────────────────────────── */
+
+.card:has(> .data-table) {
+  overflow-x: auto;
+}
 
 .data-table {
   width: 100%;
@@ -778,14 +783,14 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .sp-alloc-label .al-pct {
-  font-size: 1.1rem;
+  font-size: var(--text-body);
   font-weight: 700;
   color: var(--ink-black);
 }
 
 .sp-alloc-label .al-target {
   color: var(--wash-grey);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
 }
 
 .sp-alloc-label .al-status {
@@ -901,7 +906,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .sp-pos-quelle {
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--wash-grey);
@@ -992,7 +997,12 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: var(--text-xs);
   color: var(--wash-grey);
   font-family: var(--font-mono);
-  border-top: 1px dashed var(--ink-wash);
+}
+
+.sp-sonstiges-row .mono {
+  min-width: 90px;
+  text-align: right;
+  padding-right: 26px;
 }
 
 .sp-add-btn {
@@ -1004,7 +1014,6 @@ input[type="number"]::-webkit-outer-spin-button {
   color: var(--wash-grey);
   background: none;
   border: none;
-  border-top: 1px solid var(--ink-wash);
   cursor: pointer;
   width: 100%;
   text-align: left;
@@ -1036,7 +1045,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .sp-total-value {
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: var(--text-body);
   font-weight: 700;
   color: var(--ink-black);
 }
@@ -1054,7 +1063,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .sp-gfs-amount {
   font-family: var(--font-mono);
-  font-size: 2rem;
+  font-size: var(--text-h1);
   font-weight: 700;
   margin: var(--space-3) 0;
 }
@@ -1073,7 +1082,8 @@ input[type="number"]::-webkit-outer-spin-button {
   border-radius: var(--radius);
   padding: var(--space-4) var(--space-6);
   display: flex;
-  gap: var(--space-8);
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
   font-size: var(--text-xs);
   font-family: var(--font-mono);
   color: var(--wash-grey);

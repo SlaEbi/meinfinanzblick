@@ -10,6 +10,7 @@ class KontoBase(BaseModel):
     bank: Optional[str] = None
     typ: str
     iban: Optional[str] = None
+    bic: Optional[str] = None
     saldo: float
     waehrung: str = 'EUR'
     kontoinhaber: Optional[str] = None
@@ -26,6 +27,7 @@ class KontoUpdate(BaseModel):
     bank: Optional[str] = None
     typ: Optional[str] = None
     iban: Optional[str] = None
+    bic: Optional[str] = None
     saldo: Optional[float] = None
     waehrung: Optional[str] = None
     kontoinhaber: Optional[str] = None
