@@ -1192,14 +1192,14 @@ window.openDarlehensrechner = function() {
         <span id="dr-slider-max" class="mono">50.000 €</span>
       </div>
       <div style="display:flex;justify-content:space-between;gap:0.75rem;font-size:0.78rem;color:var(--wash-grey);margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--ink-wash)">
-        <span>Laufzeitverkürzung: <span id="dr-out-monate-diff" class="mono" style="color:var(--ink-black);font-weight:600">—</span></span>
-        <span>Zinsersparnis: <span id="dr-out-zinsen-diff" class="mono" style="color:var(--ink-black);font-weight:600">—</span></span>
+        <span>Laufzeitverkürzung: <span id="dr-out-monate-diff" class="mono" style="color:#4ADE80;font-weight:600">—</span></span>
+        <span>Zinsersparnis: <span id="dr-out-zinsen-diff" class="mono" style="color:#4ADE80;font-weight:600">—</span></span>
       </div>
     </div>
     <div class="stat-grid" style="margin:1rem 0">
-      <div class="stat-card"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
-      <div class="stat-card"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
-      <div class="stat-card"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
+      <div class="stat-card stat-card--gold"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
+      <div class="stat-card stat-card--amber"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
+      <div class="stat-card stat-card--red"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
     </div>
     <div id="dr-tabelle-container"><p class="form-hint">—</p></div>
   `;
@@ -1322,9 +1322,9 @@ async function drLadeUndRender() {
           ${plan.jahre.map(j => `
             <tr>
               <td>${j.jahr}</td>
-              <td class="right mono">${fmt.eur(j.zins)}</td>
+              <td class="right mono" style="color:#F0A030">${fmt.eur(j.zins)}</td>
               <td class="right mono">${fmt.eur(j.tilgung)}</td>
-              ${zeigtSonder ? `<td class="right mono">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
+              ${zeigtSonder ? `<td class="right mono" style="color:#4ADE80">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
               <td class="right mono">${fmt.eur(j.restschuld_ende)}</td>
             </tr>`).join('')}
         </tbody>

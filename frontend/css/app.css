@@ -309,6 +309,18 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .stat-card.schulden .value { color: var(--seal-red); }
 
+/* Farbakzent-Varianten — z. B. für den Darlehensrechner, wo mehrere Kennzahlen
+   unterschiedlicher Bedeutung (Fakt / Kosten / Ersparnis) nebeneinanderstehen
+   und sonst alle gleich grau-nüchtern aussehen würden. */
+.stat-card--gold  { border-left: 3px solid var(--seal-red); }
+.stat-card--gold  .value { color: var(--seal-red); }
+.stat-card--amber { border-left: 3px solid #F0A030; }
+.stat-card--amber .value { color: #F0A030; }
+.stat-card--red   { border-left: 3px solid #F87171; }
+.stat-card--red   .value { color: #F87171; }
+.stat-card--green { border-left: 3px solid #4ADE80; }
+.stat-card--green .value { color: #4ADE80; }
+
 /* ── Chart Grid ───────────────────────────────────────────────────────────── */
 
 .chart-grid {
