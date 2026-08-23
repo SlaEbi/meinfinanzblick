@@ -1,4 +1,4 @@
-/* API client v5 — alle Aufrufe gehen an /api/v1/ */
+/* API client v7 — alle Aufrufe gehen an /api/v1/ */
 
 const BASE = '/api/v1';
 
@@ -143,6 +143,16 @@ export const api = {
     create: (data)      => request('POST',   '/bug-ideen/', data),
     update: (id, data)  => request('PUT',    `/bug-ideen/${id}`, data),
     delete: (id)        => request('DELETE', `/bug-ideen/${id}`),
+  },
+
+  steuer: {
+    jahre:            ()          => request('GET',    '/steuer/jahre'),
+    get:              (jahr)      => request('GET',    `/steuer/${jahr}`),
+    create:           (data)      => request('POST',   '/steuer/', data),
+    update:           (jahr, data) => request('PUT',   `/steuer/${jahr}`, data),
+    delete:           (jahr)      => request('DELETE', `/steuer/${jahr}`),
+    berechnung:       (jahr)      => request('GET',    `/steuer/${jahr}/berechnung`),
+    hebesatzDefaults: (jahr)      => request('GET',    `/steuer/${jahr}/hebesatz-defaults`),
   },
 
   anhaenge: {

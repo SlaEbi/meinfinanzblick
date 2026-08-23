@@ -533,3 +533,149 @@ class NetWorthSnapshotResponse(BaseModel):
 class NetWorthData(BaseModel):
     aktuell: NetWorthSummary
     verlauf: list[NetWorthSnapshotResponse]
+
+
+# ── Steuerprognose ───────────────────────────────────────────────────────────
+
+class SteuerKindBase(BaseModel):
+    name: Optional[str] = None
+    geburtsdatum: date
+    in_ausbildung_18_25: bool = False
+
+
+class SteuerKindCreate(SteuerKindBase):
+    pass
+
+
+class SteuerKindResponse(SteuerKindBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class SteuerBetriebsstaetteBase(BaseModel):
+    gemeinde: str
+    hebesatz: float
+    arbeitsloehne: float = 0
+    taetigkeitsanteil_pct: float = 0
+    prozent_manuell: Optional[float] = None
+
+
+class SteuerBetriebsstaetteCreate(SteuerBetriebsstaetteBase):
+    pass
+
+
+class SteuerBetriebsstaetteResponse(SteuerBetriebsstaetteBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class SteuerPrognoseBase(BaseModel):
+    jahr: int
+    veranlagung: str = 'zusammen'
+    kirchensteuerpflicht: str = 'niemand'
+    zerlegungsmodus: str = 'arbeitsloehne'
+
+    gewinn_gewerbebetrieb: float = 0
+    sonstige_einkuenfte: float = 0
+    bruttolohn_ehefrau: float = 0
+    werbungskosten_ehefrau: float = 0
+    vermietung_einnahmen: float = 0
+    vermietung_werbungskosten: float = 0
+    vermietung_afa: float = 0
+
+    kv_pv_beitraege_gesamt: float = 0
+    basisrente_beitrag: float = 0
+    uebrige_vorsorge_ich: float = 0
+    uebrige_vorsorge_ehefrau: float = 0
+    spenden: float = 0
+    kinderbetreuungskosten: float = 0
+    handwerkerleistungen: float = 0
+
+    gewst_hinzurechnung_zinsen_mieten: float = 0
+    gewst_kuerzung_grundbesitz: float = 0
+
+    est_vz_q1: float = 0
+    est_vz_q2: float = 0
+    est_vz_q3: float = 0
+    est_vz_q4: float = 0
+
+    lohnsteuer_ehefrau: float = 0
+    soli_ehefrau: float = 0
+    kirchensteuer_ehefrau: float = 0
+
+    gewst_vz_standort1: float = 0
+    gewst_vz_standort2: float = 0
+
+    notiz: Optional[str] = None
+
+
+class SteuerPrognoseCreate(SteuerPrognoseBase):
+    kinder: list[SteuerKindCreate] = []
+    betriebsstaetten: list[SteuerBetriebsstaetteCreate] = []
+
+
+class SteuerPrognoseUpdate(SteuerPrognoseCreate):
+    pass
+
+
+class SteuerPrognoseResponse(SteuerPrognoseBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    kinder: list[SteuerKindResponse] = []
+    betriebsstaetten: list[SteuerBetriebsstaetteResponse] = []
+    erstellt_am: datetime
+    aktualisiert_am: datetime
+
+
+# ── Steuerberechnung (rein berechnet, nicht persistiert) ────────────────────
+
+class SteuerZerlegungAnteil(BaseModel):
+    gemeinde: str
+    hebesatz: float
+    anteil_pct: float
+    messbetrag_anteil: float
+    gewerbesteuer: float
+
+
+class SteuerKinderErgebnis(BaseModel):
+    anzahl_anspruchsberechtigt: int
+    kinderfreibetrag_gesamt: float
+    est_ohne_kfb: float
+    est_mit_kfb: float
+    steuerersparnis_kfb: float
+    kindergeld_gesamt: float
+    kinderfreibetrag_guenstiger: bool
+    hinzurechnung_kindergeld: float
+
+
+class SteuerErgebnis(BaseModel):
+    jahr: int
+    hinweis: str = 'Planungsrechnung zur eigenen Vorsorge — keine Steuerberatung und kein Ersatz für die Steuererklärung.'
+
+    # Einkommensteuer
+    summe_einkuenfte: float
+    zve_vor_kinderfreibetrag: float
+    kinder: SteuerKinderErgebnis
+    est_tariflich: float
+    soli: float
+    kirchensteuer: float
+
+    # Gewerbesteuer
+    gewerbeertrag: float
+    gewerbesteuermessbetrag: float
+    zerlegung: list[SteuerZerlegungAnteil]
+    gewerbesteuer_gesamt: float
+    anrechnung_35a: float
+
+    est_nach_anrechnung: float
+    gesamtbelastung: float  # ESt (nach § 35) + Soli + KiSt + GewSt
+
+    # Abgleich Vorauszahlungen
+    est_vorauszahlungen_gesamt: float
+    lohn_soli_kist_ehefrau_gesamt: float
+    gewst_vorauszahlungen_gesamt: float
+    nachzahlung_est: float          # positiv = Nachzahlung, negativ = Erstattung
+    nachzahlung_gewst: float
+    nachzahlung_gesamt: float
+
+    monatliche_ruecklage_empfehlung: float

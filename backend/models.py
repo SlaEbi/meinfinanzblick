@@ -248,3 +248,83 @@ class NetWorthSnapshot(Base):
     summe_vermoegen = Column(Numeric(14, 2), nullable=False)
     summe_schulden = Column(Numeric(14, 2), nullable=False)
     netto = Column(Numeric(14, 2), nullable=False)
+
+
+# ── Steuerprognose ───────────────────────────────────────────────────────────
+
+class SteuerPrognose(Base):
+    __tablename__ = 'steuer_prognosen'
+
+    id = Column(Integer, primary_key=True, index=True)
+    jahr = Column(Integer, nullable=False, unique=True, index=True)
+    veranlagung = Column(String, default='zusammen')       # zusammen | einzeln
+    kirchensteuerpflicht = Column(String, default='niemand')  # niemand | beide | ich | ehefrau
+    zerlegungsmodus = Column(String, default='arbeitsloehne')  # arbeitsloehne | prozent
+
+    # Einkünfte
+    gewinn_gewerbebetrieb = Column(Numeric(14, 2), default=0)
+    sonstige_einkuenfte = Column(Numeric(14, 2), default=0)
+    bruttolohn_ehefrau = Column(Numeric(14, 2), default=0)
+    werbungskosten_ehefrau = Column(Numeric(14, 2), default=0)
+    vermietung_einnahmen = Column(Numeric(14, 2), default=0)
+    vermietung_werbungskosten = Column(Numeric(14, 2), default=0)
+    vermietung_afa = Column(Numeric(14, 2), default=0)
+
+    # Abzüge / Sonderausgaben
+    kv_pv_beitraege_gesamt = Column(Numeric(14, 2), default=0)      # Basisabsicherung, unbegrenzt abzugsfähig
+    basisrente_beitrag = Column(Numeric(14, 2), default=0)          # Rürup, gedeckelt
+    uebrige_vorsorge_ich = Column(Numeric(14, 2), default=0)        # gedeckelt (selbstständig)
+    uebrige_vorsorge_ehefrau = Column(Numeric(14, 2), default=0)    # gedeckelt (angestellt)
+    spenden = Column(Numeric(14, 2), default=0)
+    kinderbetreuungskosten = Column(Numeric(14, 2), default=0)
+    handwerkerleistungen = Column(Numeric(14, 2), default=0)        # § 35a EStG, Abzug von der Steuer
+
+    # Gewerbesteuer — Hinzurechnung/Kürzung
+    gewst_hinzurechnung_zinsen_mieten = Column(Numeric(14, 2), default=0)
+    gewst_kuerzung_grundbesitz = Column(Numeric(14, 2), default=0)
+
+    # Vorauszahlungen — Einkommensteuer (4 Quartale, inkl. Soli/KiSt-Anteil)
+    est_vz_q1 = Column(Numeric(14, 2), default=0)
+    est_vz_q2 = Column(Numeric(14, 2), default=0)
+    est_vz_q3 = Column(Numeric(14, 2), default=0)
+    est_vz_q4 = Column(Numeric(14, 2), default=0)
+
+    # Bereits einbehalten — Lohnsteuer der Ehefrau
+    lohnsteuer_ehefrau = Column(Numeric(14, 2), default=0)
+    soli_ehefrau = Column(Numeric(14, 2), default=0)
+    kirchensteuer_ehefrau = Column(Numeric(14, 2), default=0)
+
+    # Gewerbesteuer-Vorauszahlungen je Gemeinde (max. 2 Standorte im Formular)
+    gewst_vz_standort1 = Column(Numeric(14, 2), default=0)
+    gewst_vz_standort2 = Column(Numeric(14, 2), default=0)
+
+    notiz = Column(String)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    kinder = relationship('SteuerKind', back_populates='prognose', cascade='all, delete-orphan')
+    betriebsstaetten = relationship('SteuerBetriebsstaette', back_populates='prognose', cascade='all, delete-orphan')
+
+
+class SteuerKind(Base):
+    __tablename__ = 'steuer_kinder'
+
+    id = Column(Integer, primary_key=True, index=True)
+    prognose_id = Column(Integer, ForeignKey('steuer_prognosen.id'), nullable=False)
+    name = Column(String)
+    geburtsdatum = Column(Date, nullable=False)
+    in_ausbildung_18_25 = Column(Boolean, default=False)
+    prognose = relationship('SteuerPrognose', back_populates='kinder')
+
+
+class SteuerBetriebsstaette(Base):
+    __tablename__ = 'steuer_betriebsstaetten'
+
+    id = Column(Integer, primary_key=True, index=True)
+    prognose_id = Column(Integer, ForeignKey('steuer_prognosen.id'), nullable=False)
+    gemeinde = Column(String, nullable=False)
+    hebesatz = Column(Numeric(6, 2), nullable=False)
+    arbeitsloehne = Column(Numeric(14, 2), default=0)          # je AN bereits auf 50.000 € gedeckelt
+    taetigkeitsanteil_pct = Column(Numeric(5, 2), default=0)   # Anteil des Inhabers hier tätig, für Unternehmerlohn-Verteilung
+    prozent_manuell = Column(Numeric(5, 2))                     # nur Modus "prozent"
+    prognose = relationship('SteuerPrognose', back_populates='betriebsstaetten')

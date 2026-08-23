@@ -1,4 +1,4 @@
-import { api } from './api.js?v=6';
+import { api } from './api.js?v=7';
 import { DEMO } from './demo.js?v=1';
 
 // ── Formatierung ────────────────────────────────────────────────────────────
@@ -1899,6 +1899,7 @@ function openModal() {
 
 window.closeModal = function() {
   document.getElementById('modal-overlay').classList.remove('open');
+  document.querySelector('#modal-overlay .modal')?.classList.remove('modal--wide');
   state.editingId = null;
 };
 
@@ -2130,6 +2131,10 @@ async function renderSpendinPlan() {
             title="Datum anpassen — z. B. auf den aktuellen Monat">
         </p>
       </div>
+      <button class="btn btn-ghost" onclick="openSteuerprognose()" title="Einkommen- und Gewerbesteuer für das laufende Jahr vorausberechnen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+        Steuerprognose
+      </button>
     </div>
 
     <!-- Allokations-Balken -->
@@ -2577,7 +2582,7 @@ const VS_ART_LABEL = {
   haus: 'Haus', unfall: 'Unfall', rechtsschutz: 'Rechtsschutz', sonstiges: 'Sonstiges',
 };
 const VT_ART_LABEL = {
-  strom: 'Strom', gas: 'Gas', internet: 'Internet', handy: 'Handy',
+  strom: 'Strom', gas: 'Wärme/Wasser', internet: 'Internet', handy: 'Handy',
   streaming: 'Streaming', gym: 'Fitness', sonstiges: 'Sonstiges',
 };
 const ZAHLWEISE_FAKTOR = { monatlich: 12, quartalsweise: 4, 'halbjährlich': 2, jährlich: 1 };
@@ -3876,4 +3881,466 @@ async function autoSnapshotWennNeuerMonat() {
   } catch (e) {
     console.warn('Automatischer Monats-Snapshot fehlgeschlagen:', e.message);
   }
+}
+
+// ── Steuerprognose ───────────────────────────────────────────────────────────
+// Reine Planungsrechnung (Einkommen-, Gewerbesteuer, Vorauszahlungs-Abgleich).
+// Die eigentliche Steuermathematik liegt ausschließlich im Backend
+// (backend/services/steuer.py) — hier wird nur der Eingabe-Zustand gehalten,
+// gespeichert und das fertige Ergebnis dargestellt. Keine Duplikation der
+// Rechenlogik in JS, um Drift zwischen Frontend und der getesteten
+// Backend-Quelle der Wahrheit zu vermeiden (vgl. tilgung.py-Konvention).
+
+let stState = null;
+let stErgebnis = null;
+let stExists = false;
+
+function stDefaultState(jahr) {
+  return {
+    jahr, veranlagung: 'zusammen', kirchensteuerpflicht: 'niemand', zerlegungsmodus: 'arbeitsloehne',
+    gewinn_gewerbebetrieb: 0, sonstige_einkuenfte: 0,
+    bruttolohn_ehefrau: 0, werbungskosten_ehefrau: 0,
+    vermietung_einnahmen: 0, vermietung_werbungskosten: 0, vermietung_afa: 0,
+    kv_pv_beitraege_gesamt: 0, basisrente_beitrag: 0,
+    uebrige_vorsorge_ich: 0, uebrige_vorsorge_ehefrau: 0,
+    spenden: 0, kinderbetreuungskosten: 0, handwerkerleistungen: 0,
+    gewst_hinzurechnung_zinsen_mieten: 0, gewst_kuerzung_grundbesitz: 0,
+    est_vz_q1: 0, est_vz_q2: 0, est_vz_q3: 0, est_vz_q4: 0,
+    lohnsteuer_ehefrau: 0, soli_ehefrau: 0, kirchensteuer_ehefrau: 0,
+    gewst_vz_standort1: 0, gewst_vz_standort2: 0,
+    notiz: '',
+    kinder: [],
+    betriebsstaetten: [
+      { gemeinde: 'Böblingen', hebesatz: 380, arbeitsloehne: 0, taetigkeitsanteil_pct: 0,   prozent_manuell: 33 },
+      { gemeinde: 'Nürtingen', hebesatz: 390, arbeitsloehne: 0, taetigkeitsanteil_pct: 100,  prozent_manuell: 67 },
+    ],
+  };
+}
+
+function stFromApi(obj) {
+  const felder = [
+    'jahr', 'veranlagung', 'kirchensteuerpflicht', 'zerlegungsmodus',
+    'gewinn_gewerbebetrieb', 'sonstige_einkuenfte', 'bruttolohn_ehefrau', 'werbungskosten_ehefrau',
+    'vermietung_einnahmen', 'vermietung_werbungskosten', 'vermietung_afa',
+    'kv_pv_beitraege_gesamt', 'basisrente_beitrag', 'uebrige_vorsorge_ich', 'uebrige_vorsorge_ehefrau',
+    'spenden', 'kinderbetreuungskosten', 'handwerkerleistungen',
+    'gewst_hinzurechnung_zinsen_mieten', 'gewst_kuerzung_grundbesitz',
+    'est_vz_q1', 'est_vz_q2', 'est_vz_q3', 'est_vz_q4',
+    'lohnsteuer_ehefrau', 'soli_ehefrau', 'kirchensteuer_ehefrau',
+    'gewst_vz_standort1', 'gewst_vz_standort2',
+  ];
+  const out = {};
+  felder.forEach(f => { out[f] = obj[f]; });
+  out.notiz = obj.notiz || '';
+  out.kinder = (obj.kinder || []).map(k => ({
+    name: k.name || '', geburtsdatum: fmt.dateISO(k.geburtsdatum), in_ausbildung_18_25: !!k.in_ausbildung_18_25,
+  }));
+  out.betriebsstaetten = (obj.betriebsstaetten || []).map(b => ({
+    gemeinde: b.gemeinde, hebesatz: b.hebesatz, arbeitsloehne: b.arbeitsloehne,
+    taetigkeitsanteil_pct: b.taetigkeitsanteil_pct, prozent_manuell: b.prozent_manuell ?? 0,
+  }));
+  return out;
+}
+
+function stNum(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+window.openSteuerprognose = async function() {
+  const jahr = new Date().getFullYear();
+  stErgebnis = null;
+
+  try {
+    const existing = await api.steuer.get(jahr);
+    stState = stFromApi(existing);
+    stExists = true;
+  } catch {
+    stState = stDefaultState(jahr);
+    stExists = false;
+    try {
+      const heb = await api.steuer.hebesatzDefaults(jahr);
+      stState.betriebsstaetten.forEach(b => { if (heb[b.gemeinde] != null) b.hebesatz = heb[b.gemeinde]; });
+    } catch { /* Defaults bleiben hart im Formular hinterlegt */ }
+  }
+
+  document.getElementById('modal-title').textContent = `Steuerprognose ${jahr}`;
+  openModal();
+  document.querySelector('#modal-overlay .modal')?.classList.add('modal--wide');
+  const submitBtn = document.getElementById('modal-submit');
+  submitBtn.textContent = 'Speichern & berechnen';
+  submitBtn.onclick = stSaveUndBerechnen;
+  stRender();
+
+  if (stExists) {
+    try { stErgebnis = await api.steuer.berechnung(jahr); } catch { /* Formular bleibt trotzdem nutzbar */ }
+    stRender();
+  }
+};
+
+window.stSetField = function(key, value, isNumber = true) {
+  stState[key] = isNumber ? stNum(value) : value;
+};
+
+window.stSetFieldRerender = function(key, value) {
+  stState[key] = value;
+  stRender();
+};
+
+// ── Kinder ───────────────────────────────────────────────────────────────────
+
+window.stAddKind = function() {
+  stState.kinder.push({ name: '', geburtsdatum: '', in_ausbildung_18_25: false });
+  stRenderKinderListe();
+};
+window.stRemoveKind = function(i) {
+  stState.kinder.splice(i, 1);
+  stRenderKinderListe();
+};
+window.stSetKindField = function(i, key, value) {
+  stState.kinder[i][key] = value;
+};
+window.stSetKindCheckbox = function(i, key, checked) {
+  stState.kinder[i][key] = checked;
+};
+
+function stKinderListeHtml() {
+  if (stState.kinder.length === 0) {
+    return `<p class="form-hint">Noch keine Kinder erfasst — Kindergeld/-freibetrag bleiben dann unberücksichtigt.</p>`;
+  }
+  return stState.kinder.map((k, i) => `
+    <div class="form-row" style="align-items:flex-end;gap:0.5rem;margin-bottom:0.5rem">
+      <div class="form-group" style="flex:1.2;margin-bottom:0">
+        <label class="form-label">Name (optional)</label>
+        <input class="form-input" value="${escapeHtml(k.name)}" onblur="stSetKindField(${i},'name',this.value)">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Geburtsdatum</label>
+        <input class="form-input" type="date" value="${k.geburtsdatum}" onchange="stSetKindField(${i},'geburtsdatum',this.value)">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" style="display:flex;align-items:center;gap:0.35rem;white-space:nowrap">
+          <input type="checkbox" ${k.in_ausbildung_18_25 ? 'checked' : ''} onchange="stSetKindCheckbox(${i},'in_ausbildung_18_25',this.checked)">
+          18–25, in Ausbildung
+        </label>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="stRemoveKind(${i})" title="Kind entfernen" style="margin-bottom:0.1rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+function stRenderKinderListe() {
+  const el = document.getElementById('st-kinder-liste');
+  if (el) el.innerHTML = stKinderListeHtml();
+}
+
+// ── Betriebsstätten ──────────────────────────────────────────────────────────
+
+window.stAddBetriebsstaette = function() {
+  stState.betriebsstaetten.push({ gemeinde: '', hebesatz: 400, arbeitsloehne: 0, taetigkeitsanteil_pct: 0, prozent_manuell: 0 });
+  stRenderBetriebsstaettenTabelle();
+};
+window.stRemoveBetriebsstaette = function(i) {
+  stState.betriebsstaetten.splice(i, 1);
+  stRenderBetriebsstaettenTabelle();
+};
+window.stSetBetriebsstaetteField = function(i, key, value, isNumber = true) {
+  stState.betriebsstaetten[i][key] = isNumber ? stNum(value) : value;
+};
+
+function stBetriebsstaettenTabelleHtml() {
+  const arbeitsloehneModus = stState.zerlegungsmodus === 'arbeitsloehne';
+  const rows = stState.betriebsstaetten.map((b, i) => `
+    <div class="form-row" style="align-items:flex-end;gap:0.5rem;margin-bottom:0.5rem">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">Gemeinde</label>
+        <input class="form-input" value="${escapeHtml(b.gemeinde)}" onblur="stSetBetriebsstaetteField(${i},'gemeinde',this.value,false)">
+      </div>
+      <div class="form-group" style="width:6rem;margin-bottom:0">
+        <label class="form-label">Hebesatz %</label>
+        <input class="form-input mono" type="number" step="1" value="${b.hebesatz}" onblur="stSetBetriebsstaetteField(${i},'hebesatz',this.value)">
+      </div>
+      ${arbeitsloehneModus ? `
+      <div class="form-group" style="width:8rem;margin-bottom:0">
+        <label class="form-label">Arbeitslöhne €</label>
+        <input class="form-input mono" type="number" step="500" value="${b.arbeitsloehne}" onblur="stSetBetriebsstaetteField(${i},'arbeitsloehne',this.value)"
+          title="Bereits je Arbeitnehmer auf 50.000 € gedeckelt eintragen (§ 31 Abs. 4 GewStG)">
+      </div>
+      <div class="form-group" style="width:7rem;margin-bottom:0">
+        <label class="form-label">Inhaber tätig %</label>
+        <input class="form-input mono" type="number" step="5" min="0" max="100" value="${b.taetigkeitsanteil_pct}" onblur="stSetBetriebsstaetteField(${i},'taetigkeitsanteil_pct',this.value)"
+          title="Anteil deiner Arbeitszeit an diesem Standort — verteilt den fiktiven Unternehmerlohn (25.000 €, § 31 Abs. 5 GewStG)">
+      </div>` : `
+      <div class="form-group" style="width:7rem;margin-bottom:0">
+        <label class="form-label">Anteil %</label>
+        <input class="form-input mono" type="number" step="1" min="0" max="100" value="${b.prozent_manuell}" onblur="stSetBetriebsstaetteField(${i},'prozent_manuell',this.value)">
+      </div>`}
+      <button class="btn btn-ghost btn-sm" onclick="stRemoveBetriebsstaette(${i})" title="Betriebsstätte entfernen" style="margin-bottom:0.1rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+  return rows || `<p class="form-hint">Mindestens eine Betriebsstätte wird für die Gewerbesteuer benötigt.</p>`;
+}
+
+function stRenderBetriebsstaettenTabelle() {
+  const el = document.getElementById('st-betriebsstaetten-tabelle');
+  if (el) el.innerHTML = stBetriebsstaettenTabelleHtml();
+}
+
+// ── Speichern & Berechnen ────────────────────────────────────────────────────
+
+async function stSaveUndBerechnen() {
+  const payload = { ...stState };
+  delete payload.jahr; // Jahr wird über den URL-Pfad adressiert, nicht im Body geändert
+  payload.jahr = stState.jahr;
+  try {
+    if (stExists) {
+      await api.steuer.update(stState.jahr, payload);
+    } else {
+      await api.steuer.create(payload);
+      stExists = true;
+    }
+    stErgebnis = await api.steuer.berechnung(stState.jahr);
+    toast('Steuerprognose gespeichert');
+    stRender();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+// ── Ergebnis-Darstellung ─────────────────────────────────────────────────────
+
+function stErgebnisHtml() {
+  if (!stErgebnis) return '';
+  const e = stErgebnis;
+  const nachzahlungFarbe = e.nachzahlung_gesamt > 0 ? 'stat-card--red' : 'stat-card--green';
+  const nachzahlungLabel = e.nachzahlung_gesamt > 0 ? 'Erwartete Nachzahlung' : 'Erwartete Erstattung';
+
+  return `
+    <div class="form-section-head" style="margin-top:1.5rem">Ergebnis</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="stat-card stat-card--gold">
+        <div class="label">Gesamtbelastung</div>
+        <div class="value mono">${fmt.eur(e.gesamtbelastung)}</div>
+      </div>
+      <div class="stat-card ${nachzahlungFarbe}">
+        <div class="label">${nachzahlungLabel}</div>
+        <div class="value mono">${fmt.eur(Math.abs(e.nachzahlung_gesamt))}</div>
+      </div>
+      <div class="stat-card stat-card--amber">
+        <div class="label">Monatliche Rücklage</div>
+        <div class="value mono">${fmt.eur(e.monatliche_ruecklage_empfehlung)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Gewerbesteuer gesamt</div>
+        <div class="value mono">${fmt.eur(e.gewerbesteuer_gesamt)}</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.25rem;margin-top:1rem">
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+        <span>Summe der Einkünfte</span><span class="mono">${fmt.eur(e.summe_einkuenfte)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+        <span>zu versteuerndes Einkommen (vor Kinderfreibetrag)</span><span class="mono">${fmt.eur(e.zve_vor_kinderfreibetrag)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0;border-top:1px dashed var(--ink-wash);margin-top:0.35rem;padding-top:0.6rem">
+        <span>Tarifliche Einkommensteuer</span><span class="mono">${fmt.eur(e.est_tariflich)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0;color:var(--wash-grey)">
+        <span>./. Anrechnung Gewerbesteuer (§ 35 EStG)</span><span class="mono">− ${fmt.eur(e.anrechnung_35a)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-weight:600">
+        <span>ESt nach Anrechnung</span><span class="mono">${fmt.eur(e.est_nach_anrechnung)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+        <span>+ Solidaritätszuschlag</span><span class="mono">${fmt.eur(e.soli)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+        <span>+ Kirchensteuer</span><span class="mono">${fmt.eur(e.kirchensteuer)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+        <span>+ Gewerbesteuer (nach Zerlegung)</span><span class="mono">${fmt.eur(e.gewerbesteuer_gesamt)}</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.25rem;margin-top:0.75rem">
+      <div class="form-section-head" style="margin:0 0 0.5rem">Günstigerprüfung Kinder</div>
+      <p style="font-size:var(--text-sm)">
+        ${e.kinder.anzahl_anspruchsberechtigt} anspruchsberechtigte(s) Kind(er) —
+        ${e.kinder.kinderfreibetrag_guenstiger
+          ? `Kinderfreibetrag ist günstiger. Ersparnis ${fmt.eur(e.kinder.steuerersparnis_kfb)}, davon wird das erhaltene Kindergeld (${fmt.eur(e.kinder.kindergeld_gesamt)}) der Steuer wieder hinzugerechnet.`
+          : `Kindergeld (${fmt.eur(e.kinder.kindergeld_gesamt)}) bleibt günstiger als der Kinderfreibetrag.`}
+      </p>
+    </div>
+
+    <div class="card" style="padding:0;margin-top:0.75rem">
+      <table class="data-table">
+        <thead><tr><th>Gemeinde</th><th>Hebesatz</th><th class="right">Anteil</th><th class="right">Messbetrag-Anteil</th><th class="right">Gewerbesteuer</th></tr></thead>
+        <tbody>
+          ${e.zerlegung.map(z => `
+            <tr>
+              <td>${escapeHtml(z.gemeinde)}</td>
+              <td class="mono">${z.hebesatz.toFixed(0)} %</td>
+              <td class="right mono">${z.anteil_pct.toFixed(1)} %</td>
+              <td class="right mono">${fmt.eur(z.messbetrag_anteil)}</td>
+              <td class="right mono">${fmt.eur(z.gewerbesteuer)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="form-hint" style="margin-top:0.75rem">${escapeHtml(e.hinweis)}</p>
+  `;
+}
+
+function stRender() {
+  const s = stState;
+  document.getElementById('modal-body').innerHTML = `
+    <p class="form-hint">Planungsrechnung zur eigenen Vorsorge — ersetzt keine Steuerberatung. Werte einmal im Monat nachpflegen, um die Prognose aktuell zu halten.</p>
+
+    <div class="form-section-head">Grunddaten</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Veranlagung</label>
+        <select class="form-select" onchange="stSetFieldRerender('veranlagung', this.value)">
+          <option value="zusammen" ${s.veranlagung === 'zusammen' ? 'selected' : ''}>Zusammenveranlagung (Splitting)</option>
+          <option value="einzeln" ${s.veranlagung === 'einzeln' ? 'selected' : ''}>Einzelveranlagung</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kirchensteuerpflicht</label>
+        <select class="form-select" onchange="stSetField('kirchensteuerpflicht', this.value, false)">
+          <option value="niemand" ${s.kirchensteuerpflicht === 'niemand' ? 'selected' : ''}>Niemand</option>
+          <option value="beide" ${s.kirchensteuerpflicht === 'beide' ? 'selected' : ''}>Beide</option>
+          <option value="ich" ${s.kirchensteuerpflicht === 'ich' ? 'selected' : ''}>Nur ich</option>
+          <option value="ehefrau" ${s.kirchensteuerpflicht === 'ehefrau' ? 'selected' : ''}>Nur meine Frau</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section-head">Einkünfte</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gewinn aus Gewerbebetrieb (€)</label>
+        <input class="form-input mono" type="number" step="500" value="${s.gewinn_gewerbebetrieb}" onblur="stSetField('gewinn_gewerbebetrieb', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sonstige Einkünfte (€)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.sonstige_einkuenfte}" onblur="stSetField('sonstige_einkuenfte', this.value)">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Bruttolohn Ehefrau (€)</label>
+        <input class="form-input mono" type="number" step="500" value="${s.bruttolohn_ehefrau}" onblur="stSetField('bruttolohn_ehefrau', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Werbungskosten Ehefrau (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.werbungskosten_ehefrau}" onblur="stSetField('werbungskosten_ehefrau', this.value)">
+        <p class="form-hint">Mindestens der Arbeitnehmer-Pauschbetrag wird automatisch angesetzt.</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Vermietung — Einnahmen (€)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.vermietung_einnahmen}" onblur="stSetField('vermietung_einnahmen', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vermietung — Werbungskosten (€)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.vermietung_werbungskosten}" onblur="stSetField('vermietung_werbungskosten', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vermietung — AfA (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.vermietung_afa}" onblur="stSetField('vermietung_afa', this.value)">
+      </div>
+    </div>
+
+    <div class="form-section-head">Abzüge / Sonderausgaben</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Kranken-/Pflegeversicherung gesamt (€)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.kv_pv_beitraege_gesamt}" onblur="stSetField('kv_pv_beitraege_gesamt', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Basisrente / Rürup (€)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.basisrente_beitrag}" onblur="stSetField('basisrente_beitrag', this.value)">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Übrige Vorsorge — ich (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.uebrige_vorsorge_ich}" onblur="stSetField('uebrige_vorsorge_ich', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Übrige Vorsorge — Ehefrau (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.uebrige_vorsorge_ehefrau}" onblur="stSetField('uebrige_vorsorge_ehefrau', this.value)">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Spenden (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.spenden}" onblur="stSetField('spenden', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kinderbetreuungskosten (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.kinderbetreuungskosten}" onblur="stSetField('kinderbetreuungskosten', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Handwerkerleistungen — Lohnanteil (€)</label>
+        <input class="form-input mono" type="number" step="50" value="${s.handwerkerleistungen}" onblur="stSetField('handwerkerleistungen', this.value)">
+      </div>
+    </div>
+
+    <div class="form-section-head">Kinder</div>
+    <div id="st-kinder-liste">${stKinderListeHtml()}</div>
+    <button class="sp-add-btn" onclick="stAddKind()" style="margin-bottom:0.5rem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+      Kind hinzufügen
+    </button>
+
+    <div class="form-section-head">Gewerbesteuer — Zerlegung</div>
+    <div class="form-group">
+      <label class="form-label">Zerlegungsmaßstab</label>
+      <select class="form-select" onchange="stSetFieldRerender('zerlegungsmodus', this.value)">
+        <option value="arbeitsloehne" ${s.zerlegungsmodus === 'arbeitsloehne' ? 'selected' : ''}>Arbeitslöhne (gesetzeskonform, § 29 GewStG)</option>
+        <option value="prozent" ${s.zerlegungsmodus === 'prozent' ? 'selected' : ''}>Fester Prozentsatz (eigene Schätzung)</option>
+      </select>
+    </div>
+    <div id="st-betriebsstaetten-tabelle">${stBetriebsstaettenTabelleHtml()}</div>
+    <button class="sp-add-btn" onclick="stAddBetriebsstaette()" style="margin-bottom:0.5rem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
+      Betriebsstätte hinzufügen
+    </button>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Hinzurechnung Zinsen/Mieten gesamt (§ 8 GewStG, €)</label>
+        <input class="form-input mono" type="number" step="1000" value="${s.gewst_hinzurechnung_zinsen_mieten}" onblur="stSetField('gewst_hinzurechnung_zinsen_mieten', this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kürzung Grundbesitz (§ 9 GewStG, €)</label>
+        <input class="form-input mono" type="number" step="100" value="${s.gewst_kuerzung_grundbesitz}" onblur="stSetField('gewst_kuerzung_grundbesitz', this.value)">
+      </div>
+    </div>
+
+    <div class="form-section-head">Vorauszahlungen &amp; Abgleich</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">ESt-VZ Q1 (€)</label><input class="form-input mono" type="number" step="100" value="${s.est_vz_q1}" onblur="stSetField('est_vz_q1', this.value)"></div>
+      <div class="form-group"><label class="form-label">ESt-VZ Q2 (€)</label><input class="form-input mono" type="number" step="100" value="${s.est_vz_q2}" onblur="stSetField('est_vz_q2', this.value)"></div>
+      <div class="form-group"><label class="form-label">ESt-VZ Q3 (€)</label><input class="form-input mono" type="number" step="100" value="${s.est_vz_q3}" onblur="stSetField('est_vz_q3', this.value)"></div>
+      <div class="form-group"><label class="form-label">ESt-VZ Q4 (€)</label><input class="form-input mono" type="number" step="100" value="${s.est_vz_q4}" onblur="stSetField('est_vz_q4', this.value)"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Lohnsteuer Ehefrau (€)</label><input class="form-input mono" type="number" step="100" value="${s.lohnsteuer_ehefrau}" onblur="stSetField('lohnsteuer_ehefrau', this.value)"></div>
+      <div class="form-group"><label class="form-label">Soli Ehefrau (€)</label><input class="form-input mono" type="number" step="10" value="${s.soli_ehefrau}" onblur="stSetField('soli_ehefrau', this.value)"></div>
+      <div class="form-group"><label class="form-label">Kirchensteuer Ehefrau (€)</label><input class="form-input mono" type="number" step="10" value="${s.kirchensteuer_ehefrau}" onblur="stSetField('kirchensteuer_ehefrau', this.value)"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">GewSt-VZ Standort 1 (€)</label><input class="form-input mono" type="number" step="100" value="${s.gewst_vz_standort1}" onblur="stSetField('gewst_vz_standort1', this.value)"></div>
+      <div class="form-group"><label class="form-label">GewSt-VZ Standort 2 (€)</label><input class="form-input mono" type="number" step="100" value="${s.gewst_vz_standort2}" onblur="stSetField('gewst_vz_standort2', this.value)"></div>
+    </div>
+
+    ${stErgebnisHtml()}
+  `;
 }
