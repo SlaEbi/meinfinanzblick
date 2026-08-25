@@ -22,6 +22,11 @@
   --input-bg:      #2A2A2A;
   --input-border:  rgba(255,255,255,0.12);
 
+  /* Notfall — bewusst der einzige rote Ton im sonst goldenen Schema, damit
+     der Menüpunkt im Ernstfall sofort ins Auge springt. */
+  --notfall:      #E2645A;
+  --notfall-dim:  #CD6157;
+
   /* Typografie */
   --font-serif:  'Inter', 'Helvetica Neue', sans-serif;
   --font-mono:   'JetBrains Mono', 'Courier New', monospace;

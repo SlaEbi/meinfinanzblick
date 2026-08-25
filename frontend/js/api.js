@@ -1,4 +1,4 @@
-/* API client v7 — alle Aufrufe gehen an /api/v1/ */
+/* API client v16 — alle Aufrufe gehen an /api/v1/ */
 
 const BASE = '/api/v1';
 
@@ -60,6 +60,23 @@ export const api = {
     simulation: (params) => request('GET', `/darlehen/simulation?${new URLSearchParams(params)}`),
   },
 
+  zinseszins: {
+    simulation: (params) => request('GET', `/zinseszins/simulation?${new URLSearchParams(params)}`),
+  },
+
+  kapitalentnahme: {
+    simulation: (params) => request('GET', `/kapitalentnahme/simulation?${new URLSearchParams(params)}`),
+  },
+
+  sparziele: {
+    list:   ()          => request('GET',    '/sparziele/'),
+    create: (data)      => request('POST',   '/sparziele/', data),
+    update: (id, data)  => request('PUT',    `/sparziele/${id}`, data),
+    delete: (id)        => request('DELETE', `/sparziele/${id}`),
+    fuettern: (id, data)      => request('POST',   `/sparziele/${id}/fuetterungen`, data),
+    fuetterungLoeschen: (id, fid) => request('DELETE', `/sparziele/${id}/fuetterungen/${fid}`),
+  },
+
   spending: {
     list:           ()              => request('GET',    '/spending/'),
     aktiv:          ()              => request('GET',    '/spending/aktiv'),
@@ -118,13 +135,6 @@ export const api = {
     delete: (id)        => request('DELETE', `/notfall/${id}`),
   },
 
-  dokumente: {
-    list:   ()          => request('GET',    '/dokumente/'),
-    create: (data)      => request('POST',   '/dokumente/', data),
-    update: (id, data)  => request('PUT',    `/dokumente/${id}`, data),
-    delete: (id)        => request('DELETE', `/dokumente/${id}`),
-  },
-
   networth: {
     get:            ()   => request('GET',    '/networth/'),
     snapshot:       ()   => request('POST',   '/networth/snapshot'),
@@ -138,12 +148,6 @@ export const api = {
     delete: (id)        => request('DELETE', `/todos/${id}`),
   },
 
-  bugIdeen: {
-    list:   ()          => request('GET',    '/bug-ideen/'),
-    create: (data)      => request('POST',   '/bug-ideen/', data),
-    update: (id, data)  => request('PUT',    `/bug-ideen/${id}`, data),
-    delete: (id)        => request('DELETE', `/bug-ideen/${id}`),
-  },
 
   steuer: {
     jahre:            ()          => request('GET',    '/steuer/jahre'),
@@ -153,6 +157,15 @@ export const api = {
     delete:           (jahr)      => request('DELETE', `/steuer/${jahr}`),
     berechnung:       (jahr)      => request('GET',    `/steuer/${jahr}/berechnung`),
     hebesatzDefaults: (jahr)      => request('GET',    `/steuer/${jahr}/hebesatz-defaults`),
+    meta:             (jahr)      => request('GET',    `/steuer/${jahr}/meta`),
+  },
+
+  steuerbescheide: {
+    list:   ()          => request('GET',    '/steuerbescheide/'),
+    get:    (jahr)      => request('GET',    `/steuerbescheide/${jahr}`),
+    create: (data)      => request('POST',   '/steuerbescheide/', data),
+    update: (jahr, data) => request('PUT',   `/steuerbescheide/${jahr}`, data),
+    delete: (jahr)      => request('DELETE', `/steuerbescheide/${jahr}`),
   },
 
   anhaenge: {

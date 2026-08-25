@@ -1,15 +1,20 @@
-import { api } from './api.js?v=7';
+import { api } from './api.js?v=16';
 import { DEMO } from './demo.js?v=1';
 
 // ── Formatierung ────────────────────────────────────────────────────────────
 
 const fmt = {
   // Zeigt Cent nur, wenn welche vorhanden sind ("43,49 €", aber "18.138 €" bleibt
-  // glatt) — rundet also nie echte Cent-Beträge unsichtbar weg. Für Tabellen,
+  // glatt) — rundet also nie echte Cent-Beträge unsichtbar weg. Zeigt bei Cent
+  // immer beide Nachkommastellen ("89,90 €", nie "89,9 €"). Für Tabellen,
   // Summenzeilen und alles, wo ein Betrag exakt stimmen muss.
-  eur: (v) => new Intl.NumberFormat('de-DE', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2
-  }).format(v ?? 0),
+  eur: (v) => {
+    const hatCent = Math.round((v ?? 0) * 100) % 100 !== 0;
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency', currency: 'EUR',
+      minimumFractionDigits: hatCent ? 2 : 0, maximumFractionDigits: 2
+    }).format(v ?? 0);
+  },
 
   // Rundet immer auf ganze Euro — bewusst ungenau, nur für die großen
   // Dashboard-Kacheln, wo es um die Größenordnung geht, nicht um den Cent.
@@ -111,6 +116,61 @@ function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
+// Setzt den Füllstand eines Reglers als CSS-Variable, damit die Strecke links
+// vom Griff im Akzentton liegt (nativ wäre sie browserblau). Muss auch nach
+// einer Änderung von min/max erneut laufen.
+function syncRangeFill(el) {
+  if (!el) return;
+  const min = Number(el.min) || 0;
+  const max = Number(el.max);
+  const span = max - min;
+  const pct = span > 0 ? ((Number(el.value) - min) / span) * 100 : 0;
+  el.style.setProperty('--range-pct', `${Math.max(0, Math.min(100, pct))}%`);
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.classList?.contains('range-slider')) syncRangeFill(e.target);
+});
+
+// Beide Rechner starten immer heute, Planjahr 1 endet also im nächsten
+// Kalenderjahr. Echte Jahreszahlen sind über 25–30 Jahre hinweg deutlich
+// greifbarer als "J. 1" — man sieht sofort, wann man wo steht.
+function planKalenderjahr(jahr) {
+  return new Date().getFullYear() + jahr;
+}
+
+// Achsenkonfiguration für die Jahres-Achse der Rechner-Charts: vierstellige
+// Jahreszahlen brauchen mehr Platz als "J. 1", darum nicht kippen, sondern
+// ausdünnen.
+// Legendentext der Rechner-Charts: war mit 10px in Wash-Grau auf dem dunklen
+// Kartenhintergrund kaum lesbar. Etwas größer, heller und mit dickerem
+// Linien-Swatch, damit Farbe und Beschriftung beide auf den ersten Blick
+// zuzuordnen sind.
+function legendLabels(theme) {
+  return {
+    font: { family: "'JetBrains Mono', monospace", size: 11, weight: '500' },
+    color: theme.text,
+    usePointStyle: true,
+    pointStyle: 'line',
+    boxWidth: 20,
+    boxHeight: 3,
+    padding: 16,
+  };
+}
+
+function jahresAchse(theme) {
+  return {
+    ticks: {
+      font: { family: "'JetBrains Mono', monospace", size: 10 },
+      color: theme.grey,
+      maxTicksLimit: 10,
+      maxRotation: 0,
+      autoSkip: true,
+    },
+    grid: { display: false },
+  };
+}
+
 function chartTheme() {
   return {
     accent:  cssVar('--seal-red', '#C9A84C'),
@@ -190,9 +250,9 @@ const state = {
   vertraege: [],
   kontakte: [],
   notfall: [],
-  dokumente: [],
   todos: [],
-  bugIdeen: [],
+  sparziele: [],
+  steuerbescheide: [],
   networth: null,
   charts: {},
   editingId: null,
@@ -213,7 +273,8 @@ function toast(msg) {
 function navigate(view) {
   state.view = view;
   document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.view === view);
+    const dv = el.dataset.view;
+    el.classList.toggle('active', dv === view || (dv === 'rechner' && view.startsWith('rechner-')));
   });
   document.querySelectorAll('.view').forEach(el => {
     el.classList.toggle('active', el.id === `view-${view}`);
@@ -232,12 +293,11 @@ async function loadAll() {
     state.versicherungen = DEMO.versicherungen;
     state.vertraege      = DEMO.vertraege;
     state.kontakte       = DEMO.kontakte;
-    state.dokumente      = DEMO.dokumente;
     state.notfall        = DEMO.notfall;
     state.networth       = DEMO.networth;
     return;
   }
-  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, dokumente, networth, todos, bugIdeen] = await Promise.all([
+  const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, networth, todos, steuerbescheide, sparziele] = await Promise.all([
     api.konten.list(),
     api.darlehen.list(),
     api.depots.list(),
@@ -246,10 +306,10 @@ async function loadAll() {
     api.vertraege.list(),
     api.kontakte.list(),
     api.notfall.list(),
-    api.dokumente.list(),
     api.networth.get(),
     api.todos.list(),
-    api.bugIdeen.list(),
+    api.steuerbescheide.list(),
+    api.sparziele.list(),
   ]);
   state.konten         = konten;
   state.darlehen       = darlehen;
@@ -258,11 +318,11 @@ async function loadAll() {
   state.versicherungen = versicherungen;
   state.vertraege      = vertraege;
   state.kontakte       = kontakte;
-  state.dokumente      = dokumente;
   state.notfall        = notfall;
   state.networth       = networth;
   state.todos          = todos;
-  state.bugIdeen       = bugIdeen;
+  state.steuerbescheide = steuerbescheide;
+  state.sparziele      = sparziele;
 }
 
 function renderCurrentView() {
@@ -272,12 +332,15 @@ function renderCurrentView() {
   if (state.view === 'depots')    renderDepots();
   if (state.view === 'sachwerte')      renderSachwerte();
   if (state.view === 'spending')       renderSpending();
+  if (state.view === 'sparziele')      renderSparziele();
   if (state.view === 'versicherungen') renderVersicherungen();
   if (state.view === 'vertraege')      renderVertraege();
-  if (state.view === 'dokumente')      renderDokumente();
+  if (state.view === 'steuern')        renderSteuern();
+  if (state.view === 'rechner-zinseszins')     renderRechnerZinseszins();
+  if (state.view === 'rechner-darlehen')       renderRechnerDarlehen();
+  if (state.view === 'rechner-kapitalentnahme') renderRechnerKapitalentnahme();
   if (state.view === 'notfall')        renderNotfall();
   if (state.view === 'todos')          renderTodos();
-  if (state.view === 'bug-ideen')      renderBugIdeen();
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
@@ -353,7 +416,7 @@ function istVeraltet(dateStr) {
 function aktualisiertHtml(dateStr) {
   const veraltet = istVeraltet(dateStr);
   const style = veraltet
-    ? `color:var(--seal-red);font-weight:500`
+    ? `color:#F87171;font-weight:500`
     : `color:var(--wash-grey);font-weight:400`;
   const titel = veraltet ? ' title="Seit über 45 Tagen nicht aktualisiert"' : '';
   return `<br><span class="mono" style="font-size:0.72rem;${style}"${titel}>${fmt.date(dateStr)}</span>`;
@@ -683,7 +746,7 @@ function renderVerlaufChart() {
           ticks: {
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             color: theme.grey,
-            callback: (v) => '€' + (v / 1000).toFixed(0) + 'k',
+            callback: (v) => (v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'),
           },
           grid: { color: theme.grid },
           border: { dash: [4, 4] },
@@ -975,9 +1038,9 @@ function renderDarlehen() {
       <td class="mono">${fmt.pct(d.zinssatz * 100)}</td>
       <td class="mono">${rateHtml}</td>
       <td>
-        <span class="mono" style="font-size:0.75rem ${zinsbindungWarning ? ';color:var(--seal-red)' : ''}">
+        <span class="mono" style="font-size:0.75rem ${zinsbindungWarning ? ';color:#F87171' : ''}">
           ${d.zinsbindung_bis ? fmt.date(d.zinsbindung_bis) : '—'}
-          ${zinsbindungWarning ? ' ⚠' : ''}
+          ${zinsbindungWarning ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11" style="vertical-align:-1px;margin-left:2px"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>' : ''}
         </span>
       </td>
       <td class="right"><div class="action-cell">
@@ -1148,68 +1211,6 @@ function drLesenFelder() {
   return { betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung };
 }
 
-window.openDarlehensrechner = function() {
-  drAnchor = 'rate';
-  document.getElementById('modal-title').textContent = 'Darlehensrechner';
-  document.getElementById('modal-body').innerHTML = `
-    <p class="form-hint">Simuliere ein Darlehensszenario mit frei wählbaren Werten — unabhängig von deinen gespeicherten Darlehen.</p>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Darlehenssumme (€)</label>
-        <input id="dr-betrag" class="form-input" type="number" step="1000" min="0" value="200000" oninput="drRecalc()">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Zinssatz (% p. a.)</label>
-        <input id="dr-zinssatz" class="form-input" type="number" step="0.01" min="0" value="3.50" oninput="drRecalc()">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Darlehenstyp</label>
-      <select id="dr-typ" class="form-select" onchange="drTypChanged()">
-        <option value="annuitaet">Annuitätendarlehen</option>
-        <option value="tilgungsdarlehen">Tilgungsdarlehen (feste Tilgung)</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" id="dr-rate-label">Monatliche Rate (€)</label>
-        <input id="dr-rate" class="form-input" type="number" step="10" min="0" value="900" oninput="drAnchorChanged('rate')">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Laufzeit (Jahre)</label>
-        <input id="dr-laufzeit" class="form-input" type="number" step="0.5" min="0" value="" oninput="drAnchorChanged('laufzeit')">
-      </div>
-    </div>
-    <div class="form-group">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem">
-        <label class="form-label" style="margin:0">Jährliche Sondertilgung (€)</label>
-        <input id="dr-sonder-input" class="form-input mono" type="number" step="250" min="0" value="0"
-          style="width:8rem;text-align:right" oninput="drSonderInputChanged(this.value)">
-      </div>
-      <input id="dr-slider" type="range" min="0" max="50000" step="250" value="0" oninput="drSliderInput(this.value)" style="width:100%;margin-top:0.6rem">
-      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--wash-grey);margin-top:0.2rem">
-        <span>0 €</span>
-        <span id="dr-slider-max" class="mono">50.000 €</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;gap:0.75rem;font-size:0.78rem;color:var(--wash-grey);margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--ink-wash)">
-        <span>Laufzeitverkürzung: <span id="dr-out-monate-diff" class="mono" style="color:#4ADE80;font-weight:600">—</span></span>
-        <span>Zinsersparnis: <span id="dr-out-zinsen-diff" class="mono" style="color:#4ADE80;font-weight:600">—</span></span>
-      </div>
-    </div>
-    <div class="stat-grid" style="margin:1rem 0">
-      <div class="stat-card stat-card--gold"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
-      <div class="stat-card stat-card--amber"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
-      <div class="stat-card stat-card--red"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
-    </div>
-    <div id="dr-tabelle-container"><p class="form-hint">—</p></div>
-  `;
-  openModal();
-  document.getElementById('modal-submit').style.display = 'none';
-
-  // Startwert: Laufzeit aus der Default-Rate ableiten, dann erste Berechnung.
-  drRecalc();
-};
-
 window.drTypChanged = function() {
   const typ = document.getElementById('dr-typ').value;
   document.getElementById('dr-rate-label').textContent =
@@ -1234,6 +1235,7 @@ window.drSonderInputChanged = function(wert) {
   // Regler bei Bedarf erweitern, statt einen getippten Wert stillschweigend zu kappen.
   if (v > Number(slider.max)) slider.max = v;
   slider.value = v;
+  syncRangeFill(slider);
   clearTimeout(drTimers.slider);
   drTimers.slider = setTimeout(() => drRecalc(true), 300);
 };
@@ -1250,6 +1252,7 @@ window.drRecalc = function(nurTabelle = false) {
   const sliderMax = Math.max(1000, Math.min(betrag, 100000), sondertilgung);
   const slider = document.getElementById('dr-slider');
   slider.max = Math.round(sliderMax);
+  syncRangeFill(slider);
   document.getElementById('dr-slider-max').textContent = fmt.eur(sliderMax);
 
   const rateInput = document.getElementById('dr-rate');
@@ -1269,6 +1272,90 @@ window.drRecalc = function(nurTabelle = false) {
   drTimers.recalc = setTimeout(() => drLadeUndRender(), nurTabelle ? 0 : 300);
 };
 
+// Kennzahl in der Ersparnis-Zeile setzen — ohne Wert bleibt sie grau statt
+// ein grünes "—" zu zeigen.
+function setKpi(id, hatWert, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-empty', !hatWert);
+}
+
+function renderDrRestschuldChart(jahre, baselineJahre, betrag) {
+  if (!chartEmptyState('chart-dr-restschuld', !jahre.length, 'Keine gültige Tilgungsrechnung möglich.')) {
+    if (state.charts.drRestschuld) { state.charts.drRestschuld.destroy(); state.charts.drRestschuld = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-dr-restschuld').getContext('2d');
+  const theme = chartTheme();
+
+  if (state.charts.drRestschuld) state.charts.drRestschuld.destroy();
+
+  const datasets = [{
+    label: 'Restschuld',
+    data: [betrag, ...jahre.map(j => j.restschuld_ende)],
+    borderColor: theme.accent,
+    backgroundColor: 'rgba(201,168,76,0.12)',
+    borderWidth: 2,
+    fill: true,
+    tension: 0.3,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+  }];
+  if (baselineJahre?.length) {
+    datasets.push({
+      label: 'Ohne Sondertilgung',
+      data: [betrag, ...baselineJahre.map(j => j.restschuld_ende)],
+      borderColor: theme.grey,
+      borderDash: [5, 4],
+      borderWidth: 2,
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+    });
+  }
+
+  // Mit Sondertilgung ist das Darlehen früher weg, die Vergleichsreihe läuft
+  // also länger. Die Achse muss der längeren Reihe folgen — sonst bricht die
+  // gestrichelte Linie mitten in der Luft ab.
+  // Startpunkt heute (volle Darlehenssumme) plus ein Label je Tilgungsjahr.
+  const achsenJahre = Math.max(jahre.length, baselineJahre?.length ?? 0);
+  const labels = Array.from({ length: achsenJahre + 1 }, (_, i) => String(planKalenderjahr(i)));
+
+  state.charts.drRestschuld = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      // s. Zinseszins-Chart: sonst füllt das Canvas die Karte nicht aus.
+      maintainAspectRatio: false,
+      layout: { padding: { top: 4 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: !!baselineJahre?.length,
+          align: 'start',
+          labels: legendLabels(theme),
+        },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmt.eur(ctx.raw)}` },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            color: theme.grey,
+            callback: (v) => (v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'),
+          },
+          grid: { color: theme.grid },
+        },
+        x: jahresAchse(theme),
+      },
+    },
+  });
+}
+
 async function drLadeUndRender() {
   const container = document.getElementById('dr-tabelle-container');
   if (!container) return;
@@ -1287,6 +1374,11 @@ async function drLadeUndRender() {
 
   try {
     const plan = await api.darlehen.simulation(params);
+    // Vergleichslinie im Chart: derselbe Endpunkt, aber ohne Sondertilgung —
+    // nur bei Bedarf ein zweiter Call, kein Backend-Ausbau nötig.
+    const baselinePlan = sondertilgung > 0
+      ? await api.darlehen.simulation({ ...params, sondertilgung_jahr: 0 })
+      : null;
 
     document.getElementById('dr-out-laufzeit').textContent =
       plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
@@ -1299,9 +1391,20 @@ async function drLadeUndRender() {
     const { monate_gesamt: monateMit, monate_ohne_sondertilgung: monateOhne,
             zinsen_gesamt: zinsenMit, zinsen_ohne_sondertilgung: zinsenOhne } = plan;
     const monateDiff = (sondertilgung > 0 && monateOhne != null && monateMit != null) ? monateOhne - monateMit : 0;
-    document.getElementById('dr-out-monate-diff').textContent = monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—';
-    document.getElementById('dr-out-zinsen-diff').textContent =
-      sondertilgung > 0 ? fmt.eur(Math.max(0, zinsenOhne - zinsenMit)) : '—';
+    const zinsenDiff = sondertilgung > 0 ? Math.max(0, zinsenOhne - zinsenMit) : 0;
+    setKpi('dr-out-monate-diff', monateDiff > 0, monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—');
+    setKpi('dr-out-zinsen-diff', zinsenDiff > 0, zinsenDiff > 0 ? fmt.eur(zinsenDiff) : '—');
+
+    // Der Untertitel darf keinen Vergleich versprechen, den es ohne
+    // Sondertilgung gar nicht gibt.
+    const subtitle = document.getElementById('dr-chart-subtitle');
+    if (subtitle) {
+      subtitle.textContent = baselinePlan
+        ? 'Mit und ohne Sondertilgung im Vergleich'
+        : 'Restschuld über die gesamte Laufzeit';
+    }
+
+    renderDrRestschuldChart(plan.jahre, baselinePlan?.jahre ?? null, betrag);
 
     if (!plan.jahre.length) {
       container.innerHTML = '<p class="form-hint">Keine gültige Tilgungsrechnung möglich — die Rate deckt vermutlich nicht einmal die Zinsen.</p>';
@@ -1321,7 +1424,7 @@ async function drLadeUndRender() {
         <tbody>
           ${plan.jahre.map(j => `
             <tr>
-              <td>${j.jahr}</td>
+              <td class="mono">${planKalenderjahr(j.jahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
               <td class="right mono" style="color:#F0A030">${fmt.eur(j.zins)}</td>
               <td class="right mono">${fmt.eur(j.tilgung)}</td>
               ${zeigtSonder ? `<td class="right mono" style="color:#4ADE80">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
@@ -1333,6 +1436,664 @@ async function drLadeUndRender() {
     container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
   }
 }
+
+// ── Zinseszins-Simulator ───────────────────────────────────────────────────
+// Freier Rechner, unabhängig von gespeicherten Daten — läuft serverseitig in
+// backend/services/zinseszins.py (kanonische, getestete Quelle), Debounce
+// analog zum Darlehensrechner.
+
+const zzTimers = {};
+
+function zzLesenFelder() {
+  return {
+    startkapital: parseFloat(document.getElementById('zz-startkapital').value) || 0,
+    sparrateMonatlich: parseFloat(document.getElementById('zz-sparrate').value) || 0,
+    zinssatzDezimal: (parseFloat(document.getElementById('zz-zinssatz').value) || 0) / 100,
+    laufzeitJahre: parseInt(document.getElementById('zz-laufzeit').value) || 0,
+    inflationDezimal: (parseFloat(document.getElementById('zz-inflation').value) || 0) / 100,
+  };
+}
+
+window.zzLaufzeitInputChanged = function(wert) {
+  const slider = document.getElementById('zz-laufzeit-slider');
+  slider.value = Math.max(1, Math.min(60, Number(wert) || 1));
+  syncRangeFill(slider);
+  zzRecalc();
+};
+
+window.zzLaufzeitSliderInput = function(wert) {
+  document.getElementById('zz-laufzeit').value = wert;
+  zzRecalc();
+};
+
+window.zzRecalc = function() {
+  clearTimeout(zzTimers.recalc);
+  zzTimers.recalc = setTimeout(() => zzLadeUndRender(), 200);
+};
+
+function renderZinseszinsChart(jahre, startkapital) {
+  if (!chartEmptyState('chart-zinseszins', !jahre.length, 'Bitte gültige Werte eingeben.')) {
+    if (state.charts.zinseszins) { state.charts.zinseszins.destroy(); state.charts.zinseszins = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-zinseszins').getContext('2d');
+  const theme = chartTheme();
+
+  if (state.charts.zinseszins) state.charts.zinseszins.destroy();
+
+  state.charts.zinseszins = new Chart(ctx, {
+    type: 'line',
+    data: {
+      // Die Kurve beginnt heute, nicht erst nach dem ersten Sparjahr — sonst
+      // stünde am linken Rand schon ein verzinster Wert und das laufende Jahr
+      // käme in der Achse gar nicht vor.
+      labels: [String(planKalenderjahr(0)), ...jahre.map(j => String(planKalenderjahr(j.jahr)))],
+      datasets: [
+        {
+          label: 'Gesamtkapital',
+          data: [startkapital, ...jahre.map(j => j.gesamtkapital)],
+          borderColor: theme.accent,
+          backgroundColor: 'rgba(201,168,76,0.12)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+        {
+          label: 'Gesamtkapital (real)',
+          data: [startkapital, ...jahre.map(j => j.gesamtkapital_real)],
+          // Gold vs. Orange waren auf der goldenen Fläche kaum zu unterscheiden.
+          // Blau ist der klare Kontrast (s. PALETTE.donut) und bleibt zusätzlich
+          // per Strichelung von der durchgezogenen Gesamtkapital-Linie getrennt.
+          borderColor: '#4DA8E0',
+          borderDash: [5, 4],
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+        {
+          label: 'Eigene Einzahlungen',
+          data: [startkapital, ...jahre.map(j => j.einzahlungen_kumuliert)],
+          borderColor: theme.grey,
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      // Ohne das behält Chart.js das 2:1-Verhältnis bei und lässt rechts in der
+      // Karte eine tote Fläche stehen — das Canvas soll den Container füllen.
+      maintainAspectRatio: false,
+      layout: { padding: { top: 4 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          align: 'start',
+          labels: legendLabels(theme),
+        },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmt.eur(ctx.raw)}` },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            color: theme.grey,
+            callback: (v) => (v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'),
+          },
+          grid: { color: theme.grid },
+        },
+        x: jahresAchse(theme),
+      },
+    },
+  });
+}
+
+async function zzLadeUndRender() {
+  const container = document.getElementById('zz-tabelle-container');
+  if (!container) return;
+  const { startkapital, sparrateMonatlich, zinssatzDezimal, laufzeitJahre, inflationDezimal } = zzLesenFelder();
+
+  if (laufzeitJahre <= 0) {
+    container.innerHTML = '<p class="form-hint" style="padding:1.5rem">Bitte eine Laufzeit von mindestens einem Jahr angeben.</p>';
+    return;
+  }
+
+  try {
+    const erg = await api.zinseszins.simulation({
+      startkapital, sparrate_monatlich: sparrateMonatlich, zinssatz: zinssatzDezimal,
+      laufzeit_jahre: laufzeitJahre, inflationsrate: inflationDezimal,
+    });
+
+    document.getElementById('zz-out-gesamtkapital').textContent = fmt.eur(erg.gesamtkapital_end);
+    document.getElementById('zz-out-einzahlungen').textContent = fmt.eur(erg.einzahlungen_gesamt);
+    document.getElementById('zz-out-zinsertrag').textContent = fmt.eur(erg.zinsertrag_gesamt);
+    // Das inflationsbereinigte Endkapital steht nur pro Jahr in der Antwort —
+    // der Endwert ist also das letzte Jahr. Ohne Inflation ist er identisch
+    // mit dem nominalen Endkapital, das ist so gewollt.
+    document.getElementById('zz-out-gesamtkapital-real').textContent =
+      fmt.eur(erg.jahre.at(-1)?.gesamtkapital_real ?? erg.gesamtkapital_end);
+
+    renderZinseszinsChart(erg.jahre, startkapital);
+
+    if (!erg.jahre.length) {
+      container.innerHTML = '<p class="form-hint" style="padding:1.5rem">Keine Berechnung möglich.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Jahr</th><th class="right">Einzahlungen kumuliert</th><th class="right">Zinsertrag kumuliert</th>
+            <th class="right">Gesamtkapital</th><th class="right">Gesamtkapital (real)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${erg.jahre.map(j => `
+            <tr>
+              <td class="mono">${planKalenderjahr(j.jahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
+              <td class="right mono">${fmt.eur(j.einzahlungen_kumuliert)}</td>
+              <td class="right mono" style="color:#F0A030">${fmt.eur(j.zinsertrag_kumuliert)}</td>
+              <td class="right mono"><strong>${fmt.eur(j.gesamtkapital)}</strong></td>
+              <td class="right mono">${fmt.eur(j.gesamtkapital_real)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    container.innerHTML = `<p class="form-hint" style="padding:1.5rem">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+// ── Kapitalentnahmerechner ───────────────────────────────────────────────────
+// Freier Rechner, unabhängig von gespeicherten Daten — läuft serverseitig in
+// backend/services/kapitalentnahme.py (kanonische, getestete Quelle). Gleiche
+// Anchor-Logik wie der Darlehensrechner (Entnahme ↔ Laufzeit): ein verzinster
+// Kapitalstock, der um eine feste Entnahme schrumpft, folgt exakt derselben
+// Rekursion wie eine Restschuld, die um eine feste Rate schrumpft.
+
+let keAnchor = 'entnahme'; // 'entnahme' | 'laufzeit' — welches Feld der Nutzer zuletzt bewusst gesetzt hat
+const keTimers = {};
+
+// Laufzeit (Monate) aus Entnahme — dieselbe Formel wie restlaufzeitMonate beim
+// Darlehen (Kapital ↔ Restschuld, Entnahme ↔ Rate), nur für die Sofort-Anzeige
+// im Eingabefeld; der eigentliche Rechenweg für die Tabelle läuft über die API.
+function keLaufzeitAusEntnahme(kapital, zinssatzDezimal, entnahme) {
+  if (kapital <= 0 || entnahme <= 0) return null;
+  return restlaufzeitMonate(kapital, zinssatzDezimal, entnahme).monate ?? null;
+}
+
+// Nötige Monatsentnahme für eine gewünschte Laufzeit (Umkehrung der
+// Annuitätenformel — analog zu drRateAusLaufzeit ohne Tilgungsdarlehen-Variante).
+function keEntnahmeAusLaufzeit(kapital, zinssatzDezimal, laufzeitJahre) {
+  const n = Math.round(laufzeitJahre * 12);
+  if (n <= 0 || kapital <= 0) return 0;
+  const r = zinssatzDezimal / 12;
+  if (r <= 0) return kapital / n;
+  return kapital * r / (1 - Math.pow(1 + r, -n));
+}
+
+function keLesenFelder() {
+  return {
+    kapital: parseFloat(document.getElementById('ke-kapital').value) || 0,
+    zinssatzDezimal: (parseFloat(document.getElementById('ke-zinssatz').value) || 0) / 100,
+  };
+}
+
+window.keAnchorChanged = function(feld) {
+  keAnchor = feld;
+  keRecalc();
+};
+
+window.keRecalc = function(nurTabelle = false) {
+  const { kapital, zinssatzDezimal } = keLesenFelder();
+  const entnahmeInput = document.getElementById('ke-entnahme');
+  const laufzeitInput = document.getElementById('ke-laufzeit');
+
+  if (keAnchor === 'laufzeit') {
+    const laufzeitJahre = parseFloat(laufzeitInput.value) || 0;
+    const entnahme = keEntnahmeAusLaufzeit(kapital, zinssatzDezimal, laufzeitJahre);
+    if (entnahme > 0) entnahmeInput.value = entnahme.toFixed(0);
+  } else {
+    const entnahme = parseFloat(entnahmeInput.value) || 0;
+    const monate = keLaufzeitAusEntnahme(kapital, zinssatzDezimal, entnahme);
+    if (monate) laufzeitInput.value = (monate / 12).toFixed(1);
+  }
+
+  clearTimeout(keTimers.recalc);
+  keTimers.recalc = setTimeout(() => keLadeUndRender(), nurTabelle ? 0 : 300);
+};
+
+function renderKeKapitalChart(jahre, kapital) {
+  if (!chartEmptyState('chart-ke-kapital', !jahre.length, 'Keine gültige Entnahmerechnung möglich.')) {
+    if (state.charts.keKapital) { state.charts.keKapital.destroy(); state.charts.keKapital = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-ke-kapital').getContext('2d');
+  const theme = chartTheme();
+
+  if (state.charts.keKapital) state.charts.keKapital.destroy();
+
+  // Startpunkt heute (volles Kapital), s. Zinseszins-/Restschuld-Chart.
+  const labels = [String(planKalenderjahr(0)), ...jahre.map(j => String(planKalenderjahr(j.jahr)))];
+  const daten = [kapital, ...jahre.map(j => j.kapital_ende)];
+
+  state.charts.keKapital = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Kapital',
+        data: daten,
+        borderColor: theme.accent,
+        backgroundColor: 'rgba(201,168,76,0.12)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      layout: { padding: { top: 4 } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${fmt.eur(ctx.raw)}` },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          ticks: {
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            color: theme.grey,
+            callback: (v) => (v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'),
+          },
+          grid: { color: theme.grid },
+        },
+        x: jahresAchse(theme),
+      },
+    },
+  });
+}
+
+async function keLadeUndRender() {
+  const container = document.getElementById('ke-tabelle-container');
+  if (!container) return;
+  const { kapital, zinssatzDezimal } = keLesenFelder();
+  const entnahmeInput = document.getElementById('ke-entnahme');
+  const laufzeitInput = document.getElementById('ke-laufzeit');
+
+  let params;
+  if (keAnchor === 'laufzeit') {
+    const laufzeitJahre = parseFloat(laufzeitInput.value) || 0;
+    if (kapital <= 0 || laufzeitJahre <= 0) {
+      container.innerHTML = '<p class="form-hint">Bitte Kapital und Laufzeit eingeben.</p>';
+      return;
+    }
+    params = { kapital, zinssatz: zinssatzDezimal, modus: 'betrag', laufzeit_jahre: laufzeitJahre };
+  } else {
+    const entnahme = parseFloat(entnahmeInput.value) || 0;
+    if (kapital <= 0 || entnahme <= 0) {
+      container.innerHTML = '<p class="form-hint">Bitte Kapital und Entnahme eingeben.</p>';
+      return;
+    }
+    params = { kapital, zinssatz: zinssatzDezimal, modus: 'laufzeit', entnahme_monatlich: entnahme };
+  }
+
+  try {
+    const plan = await api.kapitalentnahme.simulation(params);
+    // Bei modus='betrag' liefert das Backend die exakte (nicht auf ganze Euro
+    // gerundete) Entnahme zurück — Feld nachziehen, damit Eingabe und
+    // simulierter Kapitalverlauf konsistent bleiben (sonst könnte "10 Jahre"
+    // eingetippt, aber "9 Jahre 11 Monate" simuliert werden).
+    if (keAnchor === 'laufzeit') entnahmeInput.value = plan.monatliche_entnahme.toFixed(0);
+
+    document.getElementById('ke-out-laufzeit').textContent =
+      plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
+    document.getElementById('ke-out-zinsertrag').textContent = fmt.eur(plan.zinsertrag_gesamt);
+    document.getElementById('ke-out-entnahme').textContent = fmt.eur(plan.entnahme_gesamt);
+    document.getElementById('ke-out-max-erhalt').textContent = fmt.eur(plan.max_entnahme_kapitalerhalt);
+
+    renderKeKapitalChart(plan.jahre, kapital);
+
+    if (!plan.jahre.length) {
+      container.innerHTML = '<p class="form-hint">Keine gültige Entnahmerechnung möglich — die Entnahme deckt vermutlich nicht einmal die Zinsen und das Kapital wird nie verzehrt.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Jahr</th><th class="right">Zinsertrag</th><th class="right">Entnahme</th>
+            <th class="right">Kapital z. Jahresende</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${plan.jahre.map(j => `
+            <tr>
+              <td class="mono">${planKalenderjahr(j.jahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
+              <td class="right mono" style="color:#F0A030">${fmt.eur(j.zinsertrag)}</td>
+              <td class="right mono">${fmt.eur(j.entnahme)}</td>
+              <td class="right mono"><strong>${fmt.eur(j.kapital_ende)}</strong></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+// ── Rechner-Seite (Dispatcher) ────────────────────────────────────────────
+
+function renderRechnerZinseszins() {
+  document.querySelectorAll('#view-rechner-zinseszins .range-slider').forEach(syncRangeFill);
+  zzLadeUndRender();
+}
+
+function renderRechnerDarlehen() {
+  document.querySelectorAll('#view-rechner-darlehen .range-slider').forEach(syncRangeFill);
+  drRecalc(true);
+}
+
+function renderRechnerKapitalentnahme() {
+  keRecalc(true);
+}
+
+// ── Sparziele (Sparschwein) ──────────────────────────────────────────────────
+// Fortschritt kommt ausschließlich aus manuellen Fütterungen (nie aus einem
+// Kontostand) — s. Nutzerentscheidung im Chat. Die benötigte Sparrate läuft
+// serverseitig über services/sparziel.py, dieselbe Annuitäten-Familie wie die
+// Rechner-Seite, nur umgekehrt: hier ist das Endkapital vorgegeben.
+
+const SPARZIEL_PIGGY_PATH = 'M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z';
+// y-Bereich, den der Pfad im 24er viewBox tatsächlich einnimmt (empirisch) —
+// der Füllstand soll am Bauch beginnen und an der Oberkante enden, nicht am
+// Rand des vollen 0–24-Rahmens.
+const SPARZIEL_PIGGY_TOP = 3;
+const SPARZIEL_PIGGY_BOTTOM = 20;
+
+function sparzielFuellY(fortschrittPct) {
+  const p = Math.max(0, Math.min(100, fortschrittPct)) / 100;
+  const spanne = SPARZIEL_PIGGY_BOTTOM - SPARZIEL_PIGGY_TOP;
+  return { y: SPARZIEL_PIGGY_BOTTOM - spanne * p, h: spanne * p };
+}
+
+function renderSparziele() {
+  const container = document.getElementById('sparziele-grid');
+  if (!container) return;
+  const liste = [...state.sparziele].filter(s => !s.archiviert);
+
+  if (!liste.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="${SPARZIEL_PIGGY_PATH}"/><path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/>
+        </svg>
+        <p>Noch kein Sparziel angelegt — leg dir eins an, z. B. für die nächste große Reise.</p>
+        <button class="btn btn-primary btn-sm" onclick="openSparzielForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Erstes Sparziel hinzufügen
+        </button>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = liste.map(sparzielKarteHtml).join('');
+}
+
+function sparzielKarteHtml(s) {
+  const fortschrittPct = Math.min(s.fortschritt_pct, 100);
+  const { y: fillY, h: fillH } = sparzielFuellY(fortschrittPct);
+  const erreicht = s.aktueller_stand >= s.zielbetrag;
+  const restTxt = s.monate_bis_ziel > 0 ? `noch ${formatRestlaufzeit(s.monate_bis_ziel)}` : 'Zieldatum erreicht';
+  const clipId = `sparziel-clip-${s.id}`;
+
+  return `
+    <div class="sparziel-card" data-sparziel-id="${s.id}">
+      <div class="sparziel-card-head">
+        <div>
+          <h3>${escapeHtml(s.name)}</h3>
+          <p class="sparziel-sub">Ziel: ${fmt.date(s.zieldatum)} · ${restTxt}</p>
+          ${s.aufbewahrungsort ? `<p class="sparziel-ort">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+            ${escapeHtml(s.aufbewahrungsort)}
+          </p>` : ''}
+        </div>
+        <div class="sparziel-card-actions">
+          <button class="btn-icon" onclick="openSparzielForm(${s.id})" title="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon danger" onclick="deleteSparziel(${s.id})" title="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      ${erreicht ? `<div class="sparziel-erreicht-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 6L9 17l-5-5"/></svg>
+        Ziel erreicht — das Sparschwein ist voll!
+      </div>` : ''}
+
+      <div class="sparziel-piggy-wrap" id="sparziel-piggy-wrap-${s.id}">
+        <svg class="sparziel-piggy" viewBox="0 0 24 24">
+          <defs>
+            <clipPath id="${clipId}">
+              <rect id="sparziel-rect-${s.id}" class="sparziel-piggy-fill-rect" x="0" y="${fillY}" width="24" height="${fillH}"/>
+            </clipPath>
+          </defs>
+          <path class="sparziel-piggy-fill" clip-path="url(#${clipId})" d="${SPARZIEL_PIGGY_PATH}"/>
+          <path class="sparziel-piggy-outline" d="${SPARZIEL_PIGGY_PATH}"/>
+          <path class="sparziel-piggy-outline" d="M16 10h.01"/>
+          <path class="sparziel-piggy-coin-slot" d="M2 8v1a2 2 0 0 0 2 2h1"/>
+        </svg>
+      </div>
+
+      <div class="sparziel-progress-numbers">
+        <div class="stand mono">${fmt.eur(s.aktueller_stand)}<span class="ziel"> / ${fmt.eur(s.zielbetrag)}</span></div>
+        <div class="pct mono" id="sparziel-pct-${s.id}">${fortschrittPct.toFixed(0)} %</div>
+      </div>
+      <div class="sparziel-milestones">
+        ${[0, 25, 50, 75].map(start => {
+          const anteil = Math.max(0, Math.min(1, (fortschrittPct - start) / 25));
+          return `<div class="ms" style="--ms-fill:${anteil}"></div>`;
+        }).join('')}
+      </div>
+
+      <div class="sparziel-stats">
+        <div><span class="label">Benötigte Rate</span><span class="value">${s.benoetigte_monatsrate > 0 ? fmt.eur(s.benoetigte_monatsrate) + ' /Mon.' : '—'}</span></div>
+        <div><span class="label">Restbetrag</span><span class="value">${fmt.eur(s.restbetrag)}</span></div>
+      </div>
+
+      <button class="btn btn-primary sparziel-feed-btn" onclick="openFuetternForm(${s.id})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+          <path d="M13.744 17.736a 6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/><circle cx="16" cy="8" r="6"/>
+        </svg>
+        Füttern
+      </button>
+
+      <details class="sparziel-history">
+        <summary>Fütterungen (${s.fuetterungen.length})</summary>
+        <div class="sparziel-history-list">
+          ${s.fuetterungen.length ? s.fuetterungen.map(f => `
+            <div class="sparziel-history-row">
+              <span class="datum">${fmt.date(f.datum)}</span>
+              <span class="notiz">${escapeHtml(f.notiz ?? '')}</span>
+              <span class="betrag">+ ${fmt.eur(f.betrag)}</span>
+              <button class="btn-icon" onclick="deleteFuetterung(${s.id}, ${f.id})" title="Fütterung löschen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>`).join('') : '<p class="form-hint">Noch keine Fütterung erfasst.</p>'}
+        </div>
+      </details>
+    </div>`;
+}
+
+window.openSparzielForm = function(id = null) {
+  state.editingId = id;
+  const s = id ? state.sparziele.find(x => x.id === id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Sparziel bearbeiten' : 'Sparziel hinzufügen';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Name <span class="required">*</span></label>
+      <input id="f-sz-name" class="form-input" placeholder="z. B. Weltreise" value="${escapeHtml(s?.name ?? '')}">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Zielbetrag (€) <span class="required">*</span></label>
+        <input id="f-sz-ziel" class="form-input mono" type="number" step="100" min="0" value="${s?.zielbetrag ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zieldatum <span class="required">*</span></label>
+        <input id="f-sz-datum" class="form-input" type="date" value="${fmt.dateISO(s?.zieldatum) || ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Zinssatz (% p. a.)</label>
+      <input id="f-sz-zins" class="form-input mono" type="number" step="0.1" min="0" value="${s ? (s.zinssatz * 100) : 0}">
+      <p class="form-hint">Nur relevant, falls das Ersparte z. B. auf einem verzinsten Tagesgeldkonto liegt.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Wo liegt das Geld?</label>
+      <input id="f-sz-ort" class="form-input" placeholder="z. B. Tagesgeldkonto ING, Extra-Sparbuch, Bargeld im Safe" value="${escapeHtml(s?.aufbewahrungsort ?? '')}">
+      <p class="form-hint">Reiner Hinweistext — keine Kontoverknüpfung, das Sparziel bleibt unabhängig vom tatsächlichen Kontostand.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <textarea id="f-sz-notiz" class="form-input" rows="2" style="resize:vertical">${escapeHtml(s?.notiz ?? '')}</textarea>
+    </div>`;
+  document.getElementById('modal-submit').onclick = submitSparzielForm;
+  openModal();
+};
+
+async function submitSparzielForm() {
+  const data = {
+    name: document.getElementById('f-sz-name').value.trim(),
+    zielbetrag: parseFloat(document.getElementById('f-sz-ziel').value) || 0,
+    zieldatum: document.getElementById('f-sz-datum').value || null,
+    zinssatz: (parseFloat(document.getElementById('f-sz-zins').value) || 0) / 100,
+    aufbewahrungsort: document.getElementById('f-sz-ort').value.trim() || null,
+    notiz: document.getElementById('f-sz-notiz').value.trim() || null,
+  };
+  if (!data.name) return toast('Bitte einen Namen fürs Sparziel eingeben.');
+  if (data.zielbetrag <= 0) return toast('Bitte einen Zielbetrag über 0 € eingeben.');
+  if (!data.zieldatum) return toast('Bitte ein Zieldatum eingeben.');
+  try {
+    if (state.editingId) {
+      const upd = await api.sparziele.update(state.editingId, data);
+      state.sparziele = state.sparziele.map(s => s.id === state.editingId ? upd : s);
+      toast('Sparziel aktualisiert.');
+    } else {
+      const neu = await api.sparziele.create(data);
+      state.sparziele.push(neu);
+      toast('Sparziel angelegt.');
+    }
+    closeModal();
+    renderSparziele();
+  } catch (e) { toast(e.message); }
+}
+
+window.deleteSparziel = async function(id) {
+  const name = state.sparziele.find(x => x.id === id)?.name ?? '';
+  if (!confirm(`Sparziel „${name}" wirklich löschen? Alle Fütterungen gehen dabei mit verloren.`)) return;
+  try {
+    await api.sparziele.delete(id);
+    state.sparziele = state.sparziele.filter(x => x.id !== id);
+    renderSparziele();
+    toast('Sparziel gelöscht.');
+  } catch (e) { toast(e.message); }
+};
+
+window.openFuetternForm = function(id) {
+  const s = state.sparziele.find(x => x.id === id);
+  if (!s) return;
+  state.editingId = id;
+  document.getElementById('modal-title').textContent = `${s.name} füttern`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Betrag (€) <span class="required">*</span></label>
+      <input id="f-szf-betrag" class="form-input mono" type="number" step="10" min="0" autofocus>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Datum</label>
+      <input id="f-szf-datum" class="form-input" type="date" value="${fmt.dateISO(new Date().toISOString())}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <input id="f-szf-notiz" class="form-input" placeholder="z. B. Geburtstagsgeld">
+    </div>`;
+  document.getElementById('modal-submit').onclick = () => submitFuetterung(id);
+  openModal();
+  // openModal() setzt den Button-Text auf den Standard "Speichern" zurück —
+  // die eigene Beschriftung muss deshalb NACH dem Öffnen gesetzt werden.
+  document.getElementById('modal-submit').textContent = 'Füttern';
+};
+
+async function submitFuetterung(sparzielId) {
+  const betrag = parseFloat(document.getElementById('f-szf-betrag').value) || 0;
+  if (betrag <= 0) return toast('Bitte einen Betrag über 0 € eingeben.');
+  const data = {
+    betrag,
+    datum: document.getElementById('f-szf-datum').value || fmt.dateISO(new Date().toISOString()),
+    notiz: document.getElementById('f-szf-notiz').value.trim() || null,
+  };
+  try {
+    const upd = await api.sparziele.fuettern(sparzielId, data);
+    closeModal();
+    animateFuetterung(sparzielId, upd);
+  } catch (e) { toast(e.message); }
+}
+
+// Lässt den Füllstand im bereits vorhandenen DOM-Element hochlaufen (CSS
+// transition auf y/height greift nur, wenn dasselbe Element bestehen bleibt —
+// ein sofortiges volles Re-Render würde ohne Übergang direkt zum Endwert
+// springen) und spielt Bounce + Münzwurf ab. Der volle Re-Render danach holt
+// Statistiken/Verlauf nach, ohne noch etwas sichtbar zu verändern.
+function animateFuetterung(sparzielId, updatedSparziel) {
+  state.sparziele = state.sparziele.map(s => s.id === sparzielId ? updatedSparziel : s);
+
+  const rect = document.getElementById(`sparziel-rect-${sparzielId}`);
+  const pctEl = document.getElementById(`sparziel-pct-${sparzielId}`);
+  const wrap = document.getElementById(`sparziel-piggy-wrap-${sparzielId}`);
+  if (!rect || !wrap) { renderSparziele(); return; }
+
+  const { y, h } = sparzielFuellY(Math.min(updatedSparziel.fortschritt_pct, 100));
+  rect.setAttribute('y', y);
+  rect.setAttribute('height', h);
+  if (pctEl) pctEl.textContent = `${Math.min(updatedSparziel.fortschritt_pct, 100).toFixed(0)} %`;
+
+  wrap.classList.add('is-feeding');
+  const coin = document.createElement('div');
+  coin.className = 'sparziel-coin';
+  wrap.appendChild(coin);
+
+  toast('Gefüttert!');
+  setTimeout(() => {
+    wrap.classList.remove('is-feeding');
+    coin.remove();
+    renderSparziele();
+  }, 700);
+}
+
+window.deleteFuetterung = async function(sparzielId, fuetterungId) {
+  if (!confirm('Diese Fütterung wirklich löschen?')) return;
+  try {
+    const upd = await api.sparziele.fuetterungLoeschen(sparzielId, fuetterungId);
+    state.sparziele = state.sparziele.map(s => s.id === sparzielId ? upd : s);
+    renderSparziele();
+    toast('Fütterung gelöscht.');
+  } catch (e) { toast(e.message); }
+};
 
 window.openDarlehenForm = function(id = null) {
   state.editingId = id;
@@ -1743,7 +2504,7 @@ function renderSachwerte() {
       const tuev  = new Date(s.naechster_tuev); tuev.setHours(0,0,0,0);
       const tage  = Math.ceil((tuev - today) / 86400000);
       const warn  = tage <= 30;
-      const farbe = tage < 0 ? 'var(--seal-red)' : warn ? 'var(--seal-red)' : 'var(--wash-grey)';
+      const farbe = tage < 0 ? '#F87171' : warn ? '#F87171' : 'var(--wash-grey)';
       const text  = tage < 0  ? `TÜV überfällig (${Math.abs(tage)} Tage)`
                   : tage === 0 ? 'TÜV heute!'
                   : warn       ? `TÜV in ${tage} Tagen`
@@ -1960,6 +2721,7 @@ function einnahmeRowHtml(p) {
         oninput="spRecalc(); spQueueSaveAmount(${p.id}, this.value)"
         onblur="spSavePosAmount(${p.id}, this.value)"
         onkeydown="if(event.key==='Enter')this.blur()">
+      <span class="sp-pos-unit">€</span>
       <button class="sp-pos-delete" onclick="spDeletePos(${p.id})" title="Löschen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <path d="M18 6L6 18M6 6l12 12"/>
@@ -2015,7 +2777,7 @@ function spPct(val) {
 
 function spPctColor(pct, min, max) {
   if (pct >= min - 0.005 && pct <= max + 0.005) return 'var(--ink-black)';
-  if (pct > max + 0.05 || pct < min - 0.05) return 'var(--seal-red)';
+  if (pct > max + 0.05 || pct < min - 0.05) return '#F87171';
   return '#D97706';
 }
 
@@ -2072,6 +2834,7 @@ async function renderSpendinPlan() {
         onblur="spSavePosAmount(${p.id}, this.value)"
         oninput="spRecalc()"
         onkeydown="if(event.key==='Enter')this.blur()">
+      <span class="sp-pos-unit">€</span>
       <button class="sp-pos-delete" onclick="spDeletePos(${p.id})" title="Löschen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <path d="M18 6L6 18M6 6l12 12"/>
@@ -2089,9 +2852,9 @@ async function renderSpendinPlan() {
     if (!auto.length) return '';
     return `
       <div class="sp-group sp-group-auto">
-        <div class="sp-group-head" title="Diese Beträge stammen aus Darlehen, Versicherungen und Verträgen und aktualisieren sich automatisch.">
+        <div class="sp-group-head" title="Aktualisiert sich automatisch, sobald sich die Werte dort ändern.">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
-          Automatisch übernommen
+          Aus Darlehen, Versicherungen &amp; Verträgen
         </div>
         ${auto.map(p => `
         <div class="sp-position sp-position-auto" onclick="navigate('${p.view}')" title="Aus ${QUELLE_LABEL[p.quelle]} — zum Bearbeiten klicken">
@@ -2131,10 +2894,6 @@ async function renderSpendinPlan() {
             title="Datum anpassen — z. B. auf den aktuellen Monat">
         </p>
       </div>
-      <button class="btn btn-ghost" onclick="openSteuerprognose()" title="Einkommen- und Gewerbesteuer für das laufende Jahr vorausberechnen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
-        Steuerprognose
-      </button>
     </div>
 
     <!-- Allokations-Balken -->
@@ -2167,17 +2926,18 @@ async function renderSpendinPlan() {
         </div>
         <div class="sp-position-list" id="sp-fix-list">
           ${renderAutoPositionen()}
-          ${renderPositionen('fixkosten')}
+          ${renderManuelleFixkosten()}
         </div>
         <div class="sp-sonstiges-row">
-          <span>Sonstiges-Puffer (<input id="sp-puffer-input"
-            style="width:42px;font-family:var(--font-mono);color:var(--ink-black);border:none;border-bottom:1px solid var(--ink-wash);background:transparent;text-align:right"
+          <svg class="sp-sonstiges-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="16" height="16"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>
+          <span class="sp-sonstiges-label">Sonstiges-Puffer <input id="sp-puffer-input"
+            class="sp-sonstiges-input"
             type="number" step="1" min="0" max="30"
             value="${Math.round((spPlan.sonstiges_puffer_pct ?? 0.05) * 100)}"
             onblur="spSavePlanField('sonstiges_puffer_pct', this.value/100)"
             oninput="spRecalc()"
-            onkeydown="if(event.key==='Enter')this.blur()"> % auf Fixkosten)</span>
-          <span id="sp-sonstiges-val" class="mono">${fmt.eur(sonstT)}</span>
+            onkeydown="if(event.key==='Enter')this.blur()"> % auf Fixkosten</span>
+          <span id="sp-sonstiges-val" class="sp-sonstiges-val mono">${fmt.eur(sonstT)}</span>
         </div>
         <button class="sp-add-btn" onclick="spAddPos('fixkosten')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 5v14M5 12h14"/></svg>
@@ -2273,7 +3033,6 @@ async function renderSpendinPlan() {
             style="color:${spPctColor(pctGFS,0.20,0.35)}">${fmt.eur(gfs)}</div>
           <div class="sp-gfs-hint">
             Ausgeben ohne schlechtes Gewissen — Essen gehen, Ausflüge, Hobbies.
-            Ziel laut IWT: <strong>${IWT.gfs.label}</strong>
           </div>
         </div>
       </div>
@@ -2739,6 +3498,588 @@ function renderVertraege() {
   }).join('');
 }
 
+// ── Steuern (Steuerbescheide) ─────────────────────────────────────────────────
+
+// Gesamtbelastung = was tatsächlich an Fiskus und Gemeinde fließt. Die
+// festgesetzte ESt ist bereits um die § 35-Anrechnung gemindert, deshalb darf
+// die Gewerbesteuer hier voll dazu — das ist kein Doppelansatz.
+function sbGesamtbelastung(b) {
+  return (b.einkommensteuer ?? 0) + (b.soli ?? 0) + (b.kirchensteuer ?? 0) + (b.gewerbesteuer ?? 0);
+}
+
+// Belastungsquote auf den Gesamtbetrag der Einkünfte — also auf das, was
+// tatsächlich verdient wurde. Das zvE taugt als Nenner nicht: es ist um
+// Kinderfreibeträge gemindert und treibt die Quote dadurch künstlich hoch
+// (im Bescheid 2023: 32,4 % statt 23,8 %). Fehlt der Gesamtbetrag der
+// Einkünfte, fällt die Anzeige auf das zvE zurück und weist das aus.
+function sbBezugsgroesse(b) {
+  const gde = b.gesamtbetrag_einkuenfte ?? 0;
+  if (gde > 0) return { wert: gde, basis: 'GdE' };
+  return { wert: b.zu_versteuerndes_einkommen ?? 0, basis: 'zvE' };
+}
+
+function sbEffektiverSatz(b) {
+  const { wert } = sbBezugsgroesse(b);
+  return wert > 0 ? (sbGesamtbelastung(b) / wert) * 100 : 0;
+}
+
+// Durchschnittssteuersatz der reinen Einkommensteuer auf das zvE — die
+// klassische Kennzahl aus dem Bescheid, ergänzend zur Gesamtquote oben.
+function sbDurchschnittssatzEst(b) {
+  const zve = b.zu_versteuerndes_einkommen ?? 0;
+  return zve > 0 ? ((b.einkommensteuer ?? 0) / zve) * 100 : 0;
+}
+
+// Was unterm Strich zu zahlen war, inkl. Nachzahlungszinsen (§ 233a AO).
+function sbZahlbetrag(b) {
+  return (b.nachzahlung_erstattung ?? 0) + (b.nachzahlungszinsen ?? 0);
+}
+
+function renderSteuerbelastungChart() {
+  const bescheide = [...(state.steuerbescheide ?? [])].sort((a, b) => a.jahr - b.jahr);
+
+  if (!chartEmptyState('chart-steuerbelastung', bescheide.length === 0, 'Noch keine Steuerbescheide erfasst.')) {
+    if (state.charts.steuerbelastung) { state.charts.steuerbelastung.destroy(); state.charts.steuerbelastung = null; }
+    return;
+  }
+  const ctx = document.getElementById('chart-steuerbelastung').getContext('2d');
+  const theme = chartTheme();
+
+  const gesamt = bescheide.map(sbGesamtbelastung);
+  const effSatz = bescheide.map(sbEffektiverSatz);
+
+  if (state.charts.steuerbelastung) state.charts.steuerbelastung.destroy();
+
+  state.charts.steuerbelastung = new Chart(ctx, {
+    data: {
+      labels: bescheide.map(b => String(b.jahr)),
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Gesamtbelastung',
+          data: gesamt,
+          backgroundColor: theme.accent,
+          borderRadius: 4,
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'Belastungsquote',
+          data: effSatz,
+          borderColor: theme.grey,
+          backgroundColor: theme.grey,
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: {
+          display: true,
+          labels: { font: { family: "'JetBrains Mono', monospace", size: 10 }, color: theme.grey },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.dataset.yAxisID === 'y1' ? ` ${ctx.raw.toFixed(1)} %` : ` ${fmt.eur(ctx.raw)}`,
+          },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          position: 'left',
+          ticks: {
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            color: theme.grey,
+            callback: (v) => (v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'),
+          },
+          grid: { color: theme.grid },
+        },
+        y1: {
+          position: 'right',
+          ticks: {
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            color: theme.grey,
+            callback: (v) => v.toFixed(0) + ' %',
+          },
+          grid: { drawOnChartArea: false },
+        },
+        x: {
+          ticks: { font: { family: "'JetBrains Mono', monospace", size: 10 }, color: theme.grey },
+          grid: { display: false },
+        },
+      },
+    },
+  });
+}
+
+// Der Vergleich läuft über die Jahre, also stehen die Jahre als SPALTEN und die
+// Kennzahlen als Zeilen — so liest man "was hat sich verändert" in einer Zeile
+// ab, und die Tabelle wächst mit jedem Jahr in die Breite statt in unlesbar
+// viele Spalten pro Zeile. Die Zeilenfolge ist die Rechenkette des Bescheids.
+// erklaerung: nur bei Posten gesetzt, deren Bedeutung sich nicht von selbst
+// erschließt — erscheint als Tooltip am Label. Selbsterklärende Zeilen (z. B.
+// "Kirchensteuer", "Gesamtbelastung") bekommen bewusst keine, sonst verliert
+// sich der Hinweis unter zu vielen unterstrichenen Wörtern.
+// Der Gewerbesteuermessbetrag ist bewusst NICHT mehr in dieser Übersicht —
+// er ist nur eine Zwischen-Rechengröße für die Gewerbesteuer der Gemeinde
+// (Messbetrag × Hebesatz), keine Zahl, die für sich genommen etwas übers
+// eigene Geld aussagt. Wer ihn braucht, findet ihn in der Gewerbesteuer-
+// Zerlegung je Gemeinde weiter unten.
+const SB_ZEILEN = [
+  { gruppenkopf: 'Einkünfte' },
+  { label: 'Gewinn Gewerbebetrieb (Ehemann)', feld: 'einkuenfte_gewerbebetrieb' },
+  { label: 'Gewinn Gewerbebetrieb (Ehefrau)', feld: 'einkuenfte_gewerbebetrieb_ehefrau' },
+  { label: 'Nichtselbstständige Arbeit (Ehefrau, netto)', feld: 'einkuenfte_nichtselbststaendig_ehefrau',
+    erklaerung: 'Bruttolohn abzüglich Werbungskosten (mindestens der Arbeitnehmer-Pauschbetrag von 1.230 €).' },
+  { label: 'Vermietung und Verpachtung (netto)', feld: 'einkuenfte_vermietung',
+    erklaerung: 'Mieteinnahmen abzüglich Werbungskosten und Abschreibung (AfA) — nicht die Kaltmiete selbst.' },
+  { label: 'Sonstige Einkünfte', feld: 'einkuenfte_sonstige' },
+  { label: 'Gesamtbetrag der Einkünfte', feld: 'gesamtbetrag_einkuenfte', stark: true, hervor: true },
+  { label: '− Kinderfreibeträge', feld: 'kinderfreibetraege', vorzeichen: '−',
+    erklaerung: 'Wird nur für die Steuerberechnung abgezogen. Das Finanzamt prüft automatisch, ob der Freibetrag oder das bereits erhaltene Kindergeld günstiger ist — war der Freibetrag günstiger, wird das Kindergeld weiter unten wieder hinzugerechnet (§ 31 EStG).' },
+  { label: 'zu versteuerndes Einkommen', feld: 'zu_versteuerndes_einkommen', stark: true, hervor: true,
+    erklaerung: 'Dazwischen liegen noch abgezogene Sonderausgaben (Vorsorgeaufwendungen, Kirchensteuer, Kinderbetreuung u. ä.) — die stehen hier nicht als eigene Zeile, nur ihr Ergebnis fließt in diese Zahl ein.' },
+
+  { gruppenkopf: 'Steuerlast' },
+  { label: 'Tarifliche Einkommensteuer', feld: 'est_tariflich' },
+  { label: '− Anrechnung Gewerbesteuer (§ 35)', feld: 'anrechnung_35', vorzeichen: '−', farbe: '#4ADE80',
+    erklaerung: 'Rechnet die bereits gezahlte Gewerbesteuer pauschal auf die Einkommensteuer an — verhindert, dass derselbe Gewinn doppelt belastet wird (Gewerbe- und Einkommensteuer).' },
+  { label: '+ Kindergeld-Hinzurechnung (§ 31)', feld: 'kindergeld_hinzurechnung', farbe: '#F0A030',
+    erklaerung: 'War oben der Kinderfreibetrag günstiger als das Kindergeld, wird das bereits monatlich ausgezahlte Kindergeld hier wieder hinzugerechnet — sonst hätte man beides zugleich.' },
+  { label: 'Festgesetzte Einkommensteuer', feld: 'einkommensteuer', stark: true, hervor: true },
+  { label: 'Solidaritätszuschlag', feld: 'soli',
+    erklaerung: '5,5 % auf die Einkommensteuer — entfällt seit der 2021 stark angehobenen Freigrenze für die meisten Haushalte komplett.' },
+  { label: 'Kirchensteuer', feld: 'kirchensteuer' },
+  { label: 'Gewerbesteuer', feld: 'gewerbesteuer' },
+  { label: 'Gesamtbelastung', fn: sbGesamtbelastung, stark: true, hervor: true },
+
+  { gruppenkopf: 'Kennzahlen' },
+  { label: 'Belastungsquote', fn: sbEffektiverSatz, prozent: true, quelle: true },
+  { label: 'Ø-Steuersatz ESt (auf zvE)', fn: sbDurchschnittssatzEst, prozent: true },
+
+  { gruppenkopf: 'Abrechnung' },
+  { label: '− Steuerabzugsbeträge', feld: 'steuerabzugsbetraege', vorzeichen: '−',
+    erklaerung: 'Steuern, die während des Jahres schon einbehalten wurden und jetzt gegengerechnet werden — z. B. abgeführte Kapitalertragsteuer auf Zinsen oder Dividenden.' },
+  { label: '− Vorauszahlungen', feld: 'vorauszahlungen_gesamt', vorzeichen: '−' },
+  { label: '+ Nachzahlungszinsen (§ 233a)', feld: 'nachzahlungszinsen', farbe: '#F0A030',
+    erklaerung: 'Zinsen, die das Finanzamt für die Zeit zwischen Ende des Steuerjahres und dem Bescheid auf eine Nachzahlung erhebt (§ 233a AO) — unabhängig vom eigenen Verschulden.' },
+  { label: 'Nachzahlung / Erstattung', fn: sbZahlbetrag, stark: true, hervor: true, nachErstattung: true },
+];
+
+function sbZelle(b, zeile) {
+  if (zeile.fn) {
+    const wert = zeile.fn(b);
+    if (zeile.prozent) return fmt.pct(wert);
+    // Nachzahlung/Erstattung: das Wort sagt schon, was gemeint ist — kein
+    // Vorzeichen mehr nötig. Nur die Zahl selbst trägt die Farbe, das Wort
+    // bleibt in normaler Textfarbe (analog zu den "Erwartete
+    // Nachzahlung/Erstattung"-Stat-Cards in der Prognose).
+    if (zeile.nachErstattung) {
+      const istNachzahlung = wert > 0;
+      const farbe = istNachzahlung ? '#F87171' : '#4ADE80';
+      return `${istNachzahlung ? 'Nachzahlung' : 'Erstattung'} <span style="color:${farbe}">${fmt.eur(Math.abs(wert))}</span>`;
+    }
+    return fmt.eur(wert);
+  }
+  const roh = b[zeile.feld];
+  if (roh == null) return '—';
+  return `${zeile.vorzeichen ?? ''}${zeile.vorzeichen ? ' ' : ''}${fmt.eur(roh)}`;
+}
+
+function renderSteuern() {
+  renderSteuerbelastungChart();
+
+  const container = document.getElementById('steuerbescheide-vergleich');
+  if (!container) return;
+
+  const bescheide = [...(state.steuerbescheide ?? [])].sort((a, b) => b.jahr - a.jahr);
+  if (!bescheide.length) {
+    container.innerHTML = `<p class="form-hint" style="padding:1.5rem">Noch keine Steuerbescheide erfasst.</p>`;
+    return;
+  }
+
+  const kopf = bescheide.map(b => `
+    <th class="right">
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.4rem">
+        <span class="mono">${b.jahr}</span>
+        ${b.vorlaeufig ? `<span class="vs-art-badge" title="§ 165 AO — Festsetzung teilweise vorläufig, kann sich noch ändern">vorläufig</span>` : ''}
+        <button class="btn-icon" onclick="openSteuerbescheidForm(${b.jahr})" title="Bearbeiten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn-icon danger" onclick="deleteSteuerbescheid(${b.jahr})" title="Löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="font-size:var(--text-xs);color:var(--wash-grey);font-weight:400;margin-top:0.15rem">
+        ${b.bescheiddatum ? fmt.date(b.bescheiddatum) : '—'}
+      </div>
+    </th>`).join('');
+
+  const zeilen = SB_ZEILEN.map(z => {
+    if (z.gruppenkopf) {
+      return `<tr class="sb-gruppe-row"><td colspan="${bescheide.length + 1}" class="sb-gruppe-kopf">${z.gruppenkopf}</td></tr>`;
+    }
+    const zellen = bescheide.map(b => {
+      const inhalt = sbZelle(b, z);
+      const farbe = z.farbe ?? '';
+      const stil = [farbe ? `color:${farbe}` : '', z.hervor ? 'font-size:var(--text-sm)' : ''].filter(Boolean).join(';');
+      return `<td class="right mono" style="${stil}">${z.stark ? `<strong>${inhalt}</strong>` : inhalt}</td>`;
+    }).join('');
+    const zusatz = z.quelle
+      ? ` <span style="font-size:var(--text-xs);color:var(--wash-grey)">(auf ${sbBezugsgroesse(bescheide[0]).basis})</span>`
+      : '';
+    const labelHtml = z.erklaerung
+      ? `<span class="sb-hilfe" title="${escapeHtml(z.erklaerung)}">${z.label}</span>`
+      : z.label;
+    return `<tr${z.hervor ? ' style="background:rgba(255,255,255,0.03)"' : ''}>
+      <td${z.stark ? ' style="font-weight:600"' : ''}>${labelHtml}${zusatz}</td>${zellen}
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Kennzahl</th>${kopf}</tr></thead>
+      <tbody>${zeilen}</tbody>
+    </table>
+    ${renderSbZerlegung(bescheide)}`;
+}
+
+// Gewerbesteuer nach Gemeinden — der eigentliche Treiber hinter der GewSt-Zeile.
+function renderSbZerlegung(bescheide) {
+  const mitGemeinden = bescheide.filter(b => (b.gemeinden ?? []).length);
+  if (!mitGemeinden.length) return '';
+
+  const bloecke = mitGemeinden.map(b => {
+    const zeilen = b.gemeinden.map(g => `
+      <tr>
+        <td>${escapeHtml(g.gemeinde)}</td>
+        <td class="right mono">${fmt.eur(g.arbeitsloehne)}</td>
+        <td class="right mono">${fmt.eur(g.zerlegungsanteil)}</td>
+        <td class="right mono">${Number(g.hebesatz ?? 0).toFixed(0)} %</td>
+        <td class="right mono">${fmt.eur(g.gewerbesteuer)}</td>
+      </tr>`).join('');
+    const summeLohn = b.gemeinden.reduce((s, g) => s + (g.arbeitsloehne ?? 0), 0);
+    const summeAnteil = b.gemeinden.reduce((s, g) => s + (g.zerlegungsanteil ?? 0), 0);
+    const summeGewSt = b.gemeinden.reduce((s, g) => s + (g.gewerbesteuer ?? 0), 0);
+    return `
+      <div style="margin-top:1.25rem">
+        <div class="form-section-head">Gewerbesteuer-Zerlegung ${b.jahr}</div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Gemeinde</th><th class="right">Arbeitslöhne</th><th class="right">Zerlegungsanteil</th>
+            <th class="right">Hebesatz</th><th class="right">Gewerbesteuer</th>
+          </tr></thead>
+          <tbody>
+            ${zeilen}
+            <tr style="border-top:1px solid var(--ink-wash)">
+              <td style="font-weight:600">Summe</td>
+              <td class="right mono"><strong>${fmt.eur(summeLohn)}</strong></td>
+              <td class="right mono"><strong>${fmt.eur(summeAnteil)}</strong></td>
+              <td></td>
+              <td class="right mono"><strong>${fmt.eur(summeGewSt)}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  return `<div style="padding:0 1.5rem 1.5rem">${bloecke}</div>`;
+}
+
+// Zerlegungszeilen des gerade offenen Formulars. Wie bei den Betriebsstätten
+// der Prognose lokal gehalten und erst beim Speichern mitgeschickt.
+let sbGemeinden = [];
+
+window.sbAddGemeinde = function() {
+  sbGemeinden.push({ gemeinde: '', arbeitsloehne: 0, zerlegungsanteil: 0, hebesatz: 400, gewerbesteuer: 0 });
+  sbRenderGemeinden();
+};
+
+window.sbRemoveGemeinde = function(i) {
+  sbGemeinden.splice(i, 1);
+  sbRenderGemeinden();
+};
+
+window.sbSetGemeindeField = function(i, key, value, isNumber = true) {
+  sbGemeinden[i][key] = isNumber ? (parseFloat(value) || 0) : value;
+};
+
+function sbRenderGemeinden() {
+  const el = document.getElementById('sb-gemeinden-container');
+  if (!el) return;
+  if (!sbGemeinden.length) {
+    el.innerHTML = `<p class="form-hint">Noch keine Gemeinde erfasst.</p>`;
+    return;
+  }
+  el.innerHTML = sbGemeinden.map((g, i) => `
+    <div class="form-row" style="align-items:flex-end;gap:0.5rem;margin-bottom:0.5rem">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">Gemeinde</label>
+        <input class="form-input" value="${escapeHtml(g.gemeinde ?? '')}" onblur="sbSetGemeindeField(${i},'gemeinde',this.value,false)">
+      </div>
+      <div class="form-group" style="width:7.5rem;margin-bottom:0">
+        <label class="form-label">Arbeitslöhne €</label>
+        <input class="form-input mono" type="number" step="500" value="${g.arbeitsloehne ?? 0}" onblur="sbSetGemeindeField(${i},'arbeitsloehne',this.value)">
+      </div>
+      <div class="form-group" style="width:7.5rem;margin-bottom:0">
+        <label class="form-label">Zerlegungsanteil</label>
+        <input class="form-input mono" type="number" step="0.01" value="${g.zerlegungsanteil ?? 0}" onblur="sbSetGemeindeField(${i},'zerlegungsanteil',this.value)">
+      </div>
+      <div class="form-group" style="width:5.5rem;margin-bottom:0">
+        <label class="form-label">Hebesatz %</label>
+        <input class="form-input mono" type="number" step="1" value="${g.hebesatz ?? 0}" onblur="sbSetGemeindeField(${i},'hebesatz',this.value)">
+      </div>
+      <div class="form-group" style="width:7rem;margin-bottom:0">
+        <label class="form-label">GewSt €</label>
+        <input class="form-input mono" type="number" step="1" value="${g.gewerbesteuer ?? 0}" onblur="sbSetGemeindeField(${i},'gewerbesteuer',this.value)">
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="sbRemoveGemeinde(${i})" title="Gemeinde entfernen" style="margin-bottom:0.1rem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+window.openSteuerbescheidForm = async function(jahr = null) {
+  let b = null;
+  if (jahr) {
+    try { b = await api.steuerbescheide.get(jahr); } catch { toast('Steuerbescheid nicht gefunden.'); return; }
+  }
+  sbGemeinden = (b?.gemeinden ?? []).map(g => ({ ...g }));
+
+  document.getElementById('modal-title').textContent = b ? `Steuerbescheid ${b.jahr} bearbeiten` : 'Steuerbescheid hinzufügen';
+  document.getElementById('modal-body').innerHTML = `
+    <p class="form-hint" style="margin-top:0">Die Reihenfolge folgt dem Bescheid — von oben nach unten abtippbar. Nicht zutreffende Felder bleiben leer.</p>
+
+    <div class="form-section-head">Eckdaten</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Steuerjahr <span class="required">*</span></label>
+        <input id="f-sb-jahr" class="form-input mono" type="number" step="1" value="${b?.jahr ?? new Date().getFullYear() - 1}" ${b ? 'disabled' : ''}>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bescheiddatum</label>
+        <input id="f-sb-datum" class="form-input" type="date" value="${fmt.dateISO(b?.bescheiddatum)}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Veranlagung</label>
+        <select id="f-sb-veranlagung" class="form-select">
+          <option value="zusammen" ${(b?.veranlagung ?? 'zusammen') === 'zusammen' ? 'selected' : ''}>Zusammenveranlagung (Splitting)</option>
+          <option value="einzeln" ${b?.veranlagung === 'einzeln' ? 'selected' : ''}>Einzelveranlagung (Grundtarif)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:var(--text-sm)">
+          <input id="f-sb-vorlaeufig" type="checkbox" ${b?.vorlaeufig ? 'checked' : ''}>
+          <span>Vorläufig (§ 165 AO)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-section-head">Einkünfte</div>
+    <p class="form-hint" style="margin-top:0">Die einzelnen Quellen — für den Jahresvergleich, damit sich eine Veränderung des Gesamtbetrags auf ihre Ursache zurückführen lässt.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gewinn Gewerbebetrieb, Ehemann (€)</label>
+        <input id="f-sb-ek-gewerbe" class="form-input" type="number" step="1" value="${b?.einkuenfte_gewerbebetrieb ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gewinn Gewerbebetrieb, Ehefrau (€)</label>
+        <input id="f-sb-ek-gewerbe-ehefrau" class="form-input" type="number" step="1" value="${b?.einkuenfte_gewerbebetrieb_ehefrau ?? ''}">
+        <p class="form-hint">Eigenes Einzelunternehmen, falls vorhanden.</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nichtselbstständige Arbeit, Ehefrau (€)</label>
+        <input id="f-sb-ek-lohn" class="form-input" type="number" step="1" value="${b?.einkuenfte_nichtselbststaendig_ehefrau ?? ''}">
+        <p class="form-hint">Netto, nach Werbungskosten.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vermietung und Verpachtung (€)</label>
+        <input id="f-sb-ek-vermietung" class="form-input" type="number" step="1" value="${b?.einkuenfte_vermietung ?? ''}">
+        <p class="form-hint">Netto, nach Werbungskosten und AfA.</p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Sonstige Einkünfte (€)</label>
+      <input id="f-sb-ek-sonstige" class="form-input" type="number" step="1" value="${b?.einkuenfte_sonstige ?? ''}">
+    </div>
+
+    <div class="form-section-head">Einkommensteuer</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gesamtbetrag der Einkünfte (€)</label>
+        <input id="f-sb-gde" class="form-input" type="number" step="1" value="${b?.gesamtbetrag_einkuenfte ?? ''}">
+        <p class="form-hint">Bezugsgröße der Belastungsquote — das tatsächlich Verdiente. Steht im Bescheid als eigene Summenzeile, deshalb hier weiterhin frei eintragbar statt aus den Quellen oben berechnet.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Freibeträge für Kinder (€)</label>
+        <input id="f-sb-kfb" class="form-input" type="number" step="1" value="${b?.kinderfreibetraege ?? ''}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Zu versteuerndes Einkommen (€)</label>
+        <input id="f-sb-zve" class="form-input" type="number" step="1" value="${b?.zu_versteuerndes_einkommen ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tarifliche Einkommensteuer (€)</label>
+        <input id="f-sb-esttarif" class="form-input" type="number" step="1" value="${b?.est_tariflich ?? ''}">
+        <p class="form-hint">Vor Anrechnungen — im Bescheid „zu versteuern nach dem …tarif".</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">− Anrechnung Gewerbesteuer § 35 (€)</label>
+        <input id="f-sb-anr35" class="form-input" type="number" step="1" value="${b?.anrechnung_35 ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">+ Kindergeld-Hinzurechnung § 31 (€)</label>
+        <input id="f-sb-kghinz" class="form-input" type="number" step="1" value="${b?.kindergeld_hinzurechnung ?? ''}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Festgesetzte Einkommensteuer (€)</label>
+        <input id="f-sb-est" class="form-input" type="number" step="1" value="${b?.einkommensteuer ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Solidaritätszuschlag (€)</label>
+        <input id="f-sb-soli" class="form-input" type="number" step="1" value="${b?.soli ?? ''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kirchensteuer (€)</label>
+      <input id="f-sb-kist" class="form-input" type="number" step="1" value="${b?.kirchensteuer ?? ''}">
+    </div>
+
+    <div class="form-section-head">Gewerbesteuer</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Gewerbesteuermessbetrag (€)</label>
+        <input id="f-sb-gewstmb" class="form-input" type="number" step="1" value="${b?.gewerbesteuermessbetrag ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gewerbesteuer gesamt (€)</label>
+        <input id="f-sb-gewst" class="form-input" type="number" step="1" value="${b?.gewerbesteuer ?? ''}">
+      </div>
+    </div>
+    <p class="form-hint">Zerlegung laut Zerlegungsbescheid — je Gemeinde eine Zeile. Ohne sie lässt sich später nicht unterscheiden, ob ein Anstieg vom Gewinn oder vom Hebesatz kommt.</p>
+    <div id="sb-gemeinden-container"></div>
+    <button class="sp-add-btn" onclick="sbAddGemeinde()" style="margin-bottom:0.5rem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+      Gemeinde hinzufügen
+    </button>
+
+    <div class="form-section-head">Abrechnung</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">− Steuerabzugsbeträge (€)</label>
+        <input id="f-sb-abzug" class="form-input" type="number" step="1" value="${b?.steuerabzugsbetraege ?? ''}">
+        <p class="form-hint">z. B. angerechnete Kapitalertragsteuer.</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">− Vorauszahlungen / bereits getilgt (€)</label>
+        <input id="f-sb-vz" class="form-input" type="number" step="1" value="${b?.vorauszahlungen_gesamt ?? ''}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nachzahlung (+) / Erstattung (−) (€)</label>
+        <input id="f-sb-nz" class="form-input" type="number" step="1" value="${b?.nachzahlung_erstattung ?? ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">+ Nachzahlungszinsen § 233a (€)</label>
+        <input id="f-sb-zinsen" class="form-input" type="number" step="1" value="${b?.nachzahlungszinsen ?? ''}">
+      </div>
+    </div>
+
+    <div class="form-section-head">Ausblick</div>
+    <div class="form-group">
+      <label class="form-label">Neu festgesetzte Vorauszahlung je Quartal (€)</label>
+      <input id="f-sb-vzfolge" class="form-input" type="number" step="1" value="${b?.vz_folgejahr_quartal ?? ''}">
+      <p class="form-hint">Der Betrag, den der Bescheid für die Folgejahre festsetzt — Grundlage für die Rücklage.</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz</label>
+      <input id="f-sb-notiz" class="form-input" value="${escapeHtml(b?.notiz ?? '')}">
+    </div>
+    <div class="form-section-head">Anhänge</div>
+    ${anhangPlaceholderHtml('steuerbescheid', b?.id)}
+  `;
+  sbRenderGemeinden();
+  document.getElementById('modal-submit').onclick = async () => {
+    const jahrVal = parseInt(document.getElementById('f-sb-jahr').value);
+    const zahl = (id) => parseFloat(document.getElementById(id).value) || 0;
+    const optZahl = (id) => {
+      const v = document.getElementById(id).value;
+      return v !== '' ? parseFloat(v) : null;
+    };
+    const data = {
+      jahr: jahrVal,
+      bescheiddatum: document.getElementById('f-sb-datum').value || null,
+      veranlagung: document.getElementById('f-sb-veranlagung').value,
+      vorlaeufig: document.getElementById('f-sb-vorlaeufig').checked,
+      einkuenfte_gewerbebetrieb: zahl('f-sb-ek-gewerbe'),
+      einkuenfte_gewerbebetrieb_ehefrau: zahl('f-sb-ek-gewerbe-ehefrau'),
+      einkuenfte_nichtselbststaendig_ehefrau: zahl('f-sb-ek-lohn'),
+      einkuenfte_vermietung: zahl('f-sb-ek-vermietung'),
+      einkuenfte_sonstige: zahl('f-sb-ek-sonstige'),
+      gesamtbetrag_einkuenfte: zahl('f-sb-gde'),
+      zu_versteuerndes_einkommen: zahl('f-sb-zve'),
+      kinderfreibetraege: zahl('f-sb-kfb'),
+      est_tariflich: zahl('f-sb-esttarif'),
+      anrechnung_35: zahl('f-sb-anr35'),
+      kindergeld_hinzurechnung: zahl('f-sb-kghinz'),
+      einkommensteuer: zahl('f-sb-est'),
+      soli: zahl('f-sb-soli'),
+      kirchensteuer: zahl('f-sb-kist'),
+      gewerbesteuermessbetrag: optZahl('f-sb-gewstmb'),
+      gewerbesteuer: optZahl('f-sb-gewst'),
+      steuerabzugsbetraege: zahl('f-sb-abzug'),
+      vorauszahlungen_gesamt: zahl('f-sb-vz'),
+      nachzahlungszinsen: zahl('f-sb-zinsen'),
+      nachzahlung_erstattung: zahl('f-sb-nz'),
+      vz_folgejahr_quartal: zahl('f-sb-vzfolge'),
+      notiz: document.getElementById('f-sb-notiz').value.trim() || null,
+      gemeinden: sbGemeinden.filter(g => (g.gemeinde ?? '').trim()),
+    };
+    if (!jahrVal) return toast('Steuerjahr erforderlich.');
+    try {
+      if (b) {
+        const upd = await api.steuerbescheide.update(b.jahr, data);
+        state.steuerbescheide = state.steuerbescheide.map(x => x.jahr === b.jahr ? upd : x);
+        toast('Steuerbescheid aktualisiert.');
+      } else {
+        const neu = await api.steuerbescheide.create(data);
+        state.steuerbescheide.push(neu);
+        toast('Steuerbescheid hinzugefügt.');
+      }
+      closeModal();
+      renderSteuern();
+    } catch (e) { toast(e.message); }
+  };
+  openModal();
+  if (b) loadAnhaenge('steuerbescheid', b.id);
+};
+
+window.deleteSteuerbescheid = async function(jahr) {
+  if (!confirm(`Steuerbescheid ${jahr} wirklich löschen?`)) return;
+  try {
+    await api.steuerbescheide.delete(jahr);
+    state.steuerbescheide = state.steuerbescheide.filter(x => x.jahr !== jahr);
+    renderSteuern();
+    toast('Steuerbescheid gelöscht.');
+  } catch (e) { toast(e.message); }
+};
+
 // ── Versicherung Form ─────────────────────────────────────────────────────────
 
 window.openVersicherungForm = async function(id = null) {
@@ -2965,144 +4306,6 @@ window.deleteVertrag = async function(id) {
   } catch (e) { toast(e.message); }
 };
 
-// ── Dokumente ────────────────────────────────────────────────────────────────
-
-const DOK_KAT_LABEL = {
-  testament:           'Testament',
-  vollmacht:           'Vollmacht',
-  patientenverfuegung: 'Patientenverfügung',
-  sorgerechtsverfuegung: 'Sorgerechtsverfügung',
-  immobilien:          'Immobilien',
-  rente:               'Rente / Pension',
-  steuer:              'Steuer',
-  versicherung:        'Versicherungspolice',
-  sonstiges:           'Sonstiges',
-};
-
-function renderDokumente() {
-  const docs = state.dokumente ?? [];
-  const tbody = document.getElementById('dokumente-tbody');
-  if (!tbody) return;
-  if (!docs.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Noch keine Dokumente erfasst</td></tr>`;
-    return;
-  }
-  const fmtDate = s => s ? new Date(s).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
-  const today = new Date(); today.setHours(0,0,0,0);
-  tbody.innerHTML = docs.map(d => {
-    const katLabel = DOK_KAT_LABEL[d.kategorie] ?? d.kategorie;
-    const abgelaufen = d.gueltig_bis && new Date(d.gueltig_bis) < today;
-    const bald = d.gueltig_bis && !abgelaufen && (new Date(d.gueltig_bis) - today) / 86400000 <= 90;
-    const gueltigCell = d.gueltig_bis
-      ? `<span class="vs-laufzeit-cell${abgelaufen ? ' urgent' : bald ? ' soon' : ''}">${fmtDate(d.gueltig_bis)}${abgelaufen ? ' ⚠' : ''}</span>`
-      : '<span style="color:var(--wash-grey)">unbefristet</span>';
-    return `<tr>
-      <td><span class="vs-art-badge vs-badge-${d.kategorie}">${escapeHtml(katLabel)}</span></td>
-      <td><strong>${escapeHtml(d.titel)}</strong></td>
-      <td>${d.aufbewahrungsort ? escapeHtml(d.aufbewahrungsort) : '<span style="color:var(--wash-grey)">—</span>'}</td>
-      <td>${d.aussteller ? escapeHtml(d.aussteller) : '<span style="color:var(--wash-grey)">—</span>'}</td>
-      <td class="mono" style="font-size:var(--text-xs)">${fmtDate(d.datum)}</td>
-      <td>${gueltigCell}</td>
-      <td class="right">
-        <div class="action-cell">
-          <button class="btn-icon" onclick="openDokumentForm(${d.id})" title="Bearbeiten">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="btn-icon danger" onclick="deleteDokument(${d.id})" title="Löschen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-          </button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-window.openDokumentForm = (id = null) => {
-  state.editingId = id;
-  const d = id ? state.dokumente.find(x => x.id === id) : null;
-  document.getElementById('modal-title').textContent = id ? 'Dokument bearbeiten' : 'Dokument hinzufügen';
-  document.getElementById('modal-body').innerHTML = `
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Kategorie <span class="required">*</span></label>
-        <select id="f-kategorie" class="form-input">
-          ${Object.entries(DOK_KAT_LABEL).map(([v,l]) =>
-            `<option value="${v}" ${d?.kategorie===v?'selected':''}>${l}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Titel <span class="required">*</span></label>
-        <input id="f-titel" class="form-input" type="text" value="${d?.titel ?? ''}">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Aufbewahrungsort</label>
-        <input id="f-aufbew" class="form-input" type="text" value="${d?.aufbewahrungsort ?? ''}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Aussteller</label>
-        <input id="f-aussteller" class="form-input" type="text" value="${d?.aussteller ?? ''}">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Datum des Dokuments</label>
-        <input id="f-datum" class="form-input" type="date" value="${d?.datum ?? ''}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Gültig bis</label>
-        <input id="f-gueltig" class="form-input" type="date" value="${d?.gueltig_bis ?? ''}">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Notiz</label>
-      <textarea id="f-notiz" class="form-input" rows="2">${d?.notiz ?? ''}</textarea>
-    </div>
-    <div class="form-section-head">Anhänge</div>
-    ${anhangPlaceholderHtml('dokument', id)}
-  `;
-  document.getElementById('modal-submit').onclick = async () => {
-    const data = {
-      titel:            document.getElementById('f-titel').value.trim(),
-      kategorie:        document.getElementById('f-kategorie').value,
-      aufbewahrungsort: document.getElementById('f-aufbew').value.trim() || null,
-      aussteller:       document.getElementById('f-aussteller').value.trim() || null,
-      datum:            document.getElementById('f-datum').value || null,
-      gueltig_bis:      document.getElementById('f-gueltig').value || null,
-      notiz:            document.getElementById('f-notiz').value.trim() || null,
-    };
-    if (!data.titel) return toast('Titel ist Pflichtfeld.');
-    try {
-      if (id) {
-        const upd = await api.dokumente.update(id, data);
-        state.dokumente = state.dokumente.map(x => x.id === id ? upd : x);
-        toast('Dokument aktualisiert.');
-      } else {
-        const neu = await api.dokumente.create(data);
-        state.dokumente.push(neu);
-        toast('Dokument gespeichert.');
-      }
-      closeModal();
-      renderDokumente();
-    } catch (e) { toast(e.message); }
-  };
-  openModal();
-  if (id) loadAnhaenge('dokument', id);
-};
-
-window.deleteDokument = async (id) => {
-  const titel = state.dokumente.find(x => x.id === id)?.titel ?? '';
-  if (!confirm(`„${titel}" wirklich löschen?`)) return;
-  try {
-    await api.dokumente.delete(id);
-    state.dokumente = state.dokumente.filter(x => x.id !== id);
-    renderDokumente();
-    toast('Dokument gelöscht.');
-  } catch (e) { toast(e.message); }
-};
-
 // ── Notfall ─────────────────────────────────────────────────────────────────
 
 const NF_KAT_LABEL = {
@@ -3127,12 +4330,21 @@ const NF_ROLLE_LABEL = {
 };
 
 function nfRolleBadge(rolle) {
+  // Feste, helle Textfarbe je Sparte + eigener dunkler Hintergrundton (statt
+  // derselben Farbe nur transparent abgesetzt) — sonst verschwindet die
+  // Badge im dunklen Theme (tokens.css: --surface #242424) fast vollständig,
+  // weil Text und Hintergrund dieselbe dunkle Ausgangsfarbe teilen.
   const colors = {
-    bank:'#4A5568', versicherung:'#6B7532', steuerberater:'#8A1C15',
-    anwalt:'#805A28', notar:'#5A4A8A', arzt:'#2A7A5A', sonstiges:'#808080',
+    bank:          { bg: 'rgba(59, 74, 107, 0.35)',  fg: '#9DB4E0' },
+    versicherung:  { bg: 'rgba(74, 82, 37, 0.35)',   fg: '#C3D17A' },
+    steuerberater: { bg: 'rgba(107, 21, 16, 0.35)',  fg: '#F0958A' },
+    anwalt:        { bg: 'rgba(92, 63, 26, 0.35)',   fg: '#E0B685' },
+    notar:         { bg: 'rgba(61, 50, 96, 0.35)',   fg: '#C4B5F0' },
+    arzt:          { bg: 'rgba(29, 77, 56, 0.35)',   fg: '#7FDBB0' },
+    sonstiges:     { bg: 'rgba(255, 255, 255, 0.08)', fg: 'var(--wash-grey)' },
   };
-  const bg = colors[rolle] ?? '#808080';
-  return `<span class="nf-rolle-badge" style="background:${bg}20;color:${bg};border:1px solid ${bg}40">${NF_ROLLE_LABEL[rolle] ?? rolle}</span>`;
+  const c = colors[rolle] ?? colors.sonstiges;
+  return `<span class="nf-rolle-badge" style="background:${c.bg};color:${c.fg};border:1px solid ${c.bg}">${NF_ROLLE_LABEL[rolle] ?? rolle}</span>`;
 }
 
 function renderNotfall() {
@@ -3231,6 +4443,7 @@ function renderNotfall() {
         <td><strong>${titel}</strong> ${prioBadge}</td>
         <td class="mono" style="color:var(--ink-black)">${e.verweis ? escHtml(e.verweis) : '—'}</td>
         <td style="color:var(--wash-grey);font-style:italic">${e.hinweis ? escHtml(e.hinweis) : ''}</td>
+        <td>${nfGueltigBisCell(e.gueltig_bis)}</td>
         <td class="right"><div class="action-cell">
           <button class="btn-icon" onclick="openNotfallForm(${e.id})" title="Bearbeiten">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -3244,7 +4457,7 @@ function renderNotfall() {
 
     const headers = isSofort
       ? '<th style="width:36px"></th><th>Aufgabe</th><th>Wo / Was</th><th>Hinweis</th><th class="right">Aktionen</th>'
-      : '<th>Titel</th><th>Wo liegt es / Verweis</th><th>Hinweis</th><th class="right">Aktionen</th>';
+      : '<th>Titel</th><th>Wo liegt es / Verweis</th><th>Hinweis</th><th>Gültig bis</th><th class="right">Aktionen</th>';
 
     return `
       <div class="section-heading" style="margin-top:var(--space-6)">
@@ -3263,6 +4476,17 @@ function renderNotfall() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function nfGueltigBisCell(gueltigBis) {
+  if (!gueltigBis) return '<span style="color:var(--wash-grey)">—</span>';
+  const d = new Date(gueltigBis);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const fmtDate = d.toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const abgelaufen = d < today;
+  const bald = !abgelaufen && (d - today) / 86400000 <= 90;
+  const cls = abgelaufen ? 'urgent' : bald ? 'soon' : '';
+  return `<span class="vs-laufzeit-cell ${cls}">${fmtDate}${abgelaufen ? ' ⚠' : ''}</span>`;
 }
 
 window.nfToggleErledigt = async (id, erledigt) => {
@@ -3389,6 +4613,10 @@ window.openNotfallForm = (id = null) => {
       <label class="form-label">Hinweis <span style="color:var(--wash-grey);font-weight:400">(kein Klartext-Passwort!)</span></label>
       <textarea id="f-hinweis" class="form-input" rows="3">${e?.hinweis ?? ''}</textarea>
     </div>
+    <div class="form-group">
+      <label class="form-label">Gültig bis <span style="color:var(--wash-grey);font-weight:400">(optional, z. B. bei Vollmachten/Verfügungen)</span></label>
+      <input id="f-gueltig-bis" class="form-input" type="date" value="${fmt.dateISO(e?.gueltig_bis)}">
+    </div>
     <div class="form-section-head">Anhänge</div>
     ${anhangPlaceholderHtml('notfall', id)}
   `;
@@ -3404,6 +4632,7 @@ async function saveNotfallEintrag() {
     prioritaet: parseInt(document.getElementById('f-prioritaet').value),
     verweis:    document.getElementById('f-verweis').value.trim() || null,
     hinweis:    document.getElementById('f-hinweis').value.trim() || null,
+    gueltig_bis: document.getElementById('f-gueltig-bis').value || null,
   };
   if (!data.titel) { toast('Titel ist Pflichtfeld.'); return; }
   try {
@@ -3654,139 +4883,6 @@ window.deleteTodo = async function(id) {
 };
 
 
-// ── Bugs & Ideen ─────────────────────────────────────────────────────────────
-
-const BI_TYP_LABEL  = { bug: 'Bug', idee: 'Idee', verbesserung: 'Verbesserung' };
-const BI_TYP_COLOR  = { bug: 'var(--seal-red)', idee: '#4A90D9', verbesserung: '#5C9E6A' };
-const BI_STATUS_LABEL = { offen: 'Offen', in_arbeit: 'In Arbeit', erledigt: 'Erledigt' };
-const BI_PRIO_LABEL = { hoch: 'Hoch', mittel: 'Mittel', niedrig: 'Niedrig' };
-
-function renderBugIdeen() {
-  const items = state.bugIdeen ?? [];
-  const host = document.getElementById('bug-ideen-container');
-  if (!host) return;
-
-  if (!items.length) {
-    host.innerHTML = '<p class="empty-state">Noch keine Einträge vorhanden.</p>';
-    return;
-  }
-
-  const byStatus = { offen: [], in_arbeit: [], erledigt: [] };
-  for (const item of items) {
-    const s = item.status ?? 'offen';
-    (byStatus[s] ?? byStatus.offen).push(item);
-  }
-
-  const renderItem = (item) => `
-    <div class="bi-item status-${item.status}">
-      <div class="bi-badges">
-        <span class="badge" style="color:${BI_TYP_COLOR[item.typ]};border-color:currentColor;font-weight:600">${BI_TYP_LABEL[item.typ] ?? item.typ}</span>
-        ${ampelBadge(item.prioritaet)}
-      </div>
-      <div class="bi-body">
-        <span class="bi-titel">${escapeHtml(item.titel)}</span>
-        ${item.beschreibung ? `<span class="bi-desc">${escapeHtml(item.beschreibung)}</span>` : ''}
-      </div>
-      <div class="bi-status-select">
-        <select class="form-input form-input-sm" onchange="updateBiStatus(${item.id}, this.value)">
-          ${Object.entries(BI_STATUS_LABEL).map(([k,l]) => `<option value="${k}"${item.status===k?' selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="todo-actions">
-        <button class="btn-icon" onclick="openBugIdeeForm(${item.id})" title="Bearbeiten">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button class="btn-icon danger" onclick="deleteBugIdee(${item.id})" title="Löschen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-        </button>
-      </div>
-    </div>`;
-
-  const section = (status, list) => list.length ? `
-    <div class="card bi-card">
-      <div class="todo-section-head${status === 'erledigt' ? ' muted' : ''}">${BI_STATUS_LABEL[status]} (${list.length})</div>
-      ${list.map(renderItem).join('')}
-    </div>` : '';
-
-  host.innerHTML = [
-    section('offen',    byStatus.offen),
-    section('in_arbeit', byStatus.in_arbeit),
-    section('erledigt', byStatus.erledigt),
-  ].join('<div style="margin-top:var(--space-6)"></div>');
-}
-
-window.updateBiStatus = async function(id, status) {
-  try {
-    const upd = await api.bugIdeen.update(id, { status });
-    state.bugIdeen = state.bugIdeen.map(x => x.id === id ? upd : x);
-    renderBugIdeen();
-  } catch (e) { toast(e.message); }
-};
-
-window.openBugIdeeForm = function(id = null) {
-  state.editingId = id;
-  const item = id ? state.bugIdeen.find(x => x.id === id) : null;
-  document.getElementById('modal-title').textContent = id ? 'Eintrag bearbeiten' : 'Eintrag hinzufügen';
-  document.getElementById('modal-body').innerHTML = `
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Typ <span class="required">*</span></label>
-        <select id="f-typ" class="form-input">
-          ${Object.entries(BI_TYP_LABEL).map(([k,l]) => `<option value="${k}"${item?.typ===k?' selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Priorität</label>
-        <select id="f-prio" class="form-input">
-          ${Object.entries(BI_PRIO_LABEL).map(([k,l]) => `<option value="${k}"${item?.prioritaet===k?' selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Titel <span class="required">*</span></label>
-      <input id="f-titel" class="form-input" value="${escapeHtml(item?.titel ?? '')}">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Beschreibung</label>
-      <textarea id="f-beschreibung" class="form-input" rows="4" style="resize:vertical">${escapeHtml(item?.beschreibung ?? '')}</textarea>
-    </div>`;
-  document.getElementById('modal-submit').onclick = submitBugIdeeForm;
-  openModal();
-};
-
-async function submitBugIdeeForm() {
-  const data = {
-    typ:          document.getElementById('f-typ').value,
-    prioritaet:   document.getElementById('f-prio').value,
-    titel:        document.getElementById('f-titel').value.trim(),
-    beschreibung: document.getElementById('f-beschreibung').value.trim() || null,
-  };
-  if (!data.titel) return toast('Bitte Titel ausfüllen.');
-  try {
-    if (state.editingId) {
-      const upd = await api.bugIdeen.update(state.editingId, data);
-      state.bugIdeen = state.bugIdeen.map(x => x.id === state.editingId ? upd : x);
-      toast('Eintrag aktualisiert.');
-    } else {
-      const neu = await api.bugIdeen.create(data);
-      state.bugIdeen.unshift(neu);
-      toast('Eintrag gespeichert.');
-    }
-    closeModal();
-    renderBugIdeen();
-  } catch (e) { toast(e.message); }
-}
-
-window.deleteBugIdee = async function(id) {
-  const name = state.bugIdeen.find(x => x.id === id)?.titel ?? '';
-  if (!confirm(`„${name}" wirklich löschen?`)) return;
-  try {
-    await api.bugIdeen.delete(id);
-    state.bugIdeen = state.bugIdeen.filter(x => x.id !== id);
-    renderBugIdeen();
-    toast('Eintrag gelöscht.');
-  } catch (e) { toast(e.message); }
-};
 
 
 // ── Globale Exports (für onclick-Handler in HTML) ───────────────────────────
@@ -3898,7 +4994,7 @@ let stExists = false;
 function stDefaultState(jahr) {
   return {
     jahr, veranlagung: 'zusammen', kirchensteuerpflicht: 'niemand', zerlegungsmodus: 'arbeitsloehne',
-    gewinn_gewerbebetrieb: 0, sonstige_einkuenfte: 0,
+    gewinn_gewerbebetrieb: 0, gewinn_gewerbebetrieb_ehefrau: 0, sonstige_einkuenfte: 0,
     bruttolohn_ehefrau: 0, werbungskosten_ehefrau: 0,
     vermietung_einnahmen: 0, vermietung_werbungskosten: 0, vermietung_afa: 0,
     kv_pv_beitraege_gesamt: 0, basisrente_beitrag: 0,
@@ -3907,7 +5003,6 @@ function stDefaultState(jahr) {
     gewst_hinzurechnung_zinsen_mieten: 0, gewst_kuerzung_grundbesitz: 0,
     est_vz_q1: 0, est_vz_q2: 0, est_vz_q3: 0, est_vz_q4: 0,
     lohnsteuer_ehefrau: 0, soli_ehefrau: 0, kirchensteuer_ehefrau: 0,
-    gewst_vz_standort1: 0, gewst_vz_standort2: 0,
     notiz: '',
     kinder: [],
     betriebsstaetten: [
@@ -3920,14 +5015,13 @@ function stDefaultState(jahr) {
 function stFromApi(obj) {
   const felder = [
     'jahr', 'veranlagung', 'kirchensteuerpflicht', 'zerlegungsmodus',
-    'gewinn_gewerbebetrieb', 'sonstige_einkuenfte', 'bruttolohn_ehefrau', 'werbungskosten_ehefrau',
+    'gewinn_gewerbebetrieb', 'gewinn_gewerbebetrieb_ehefrau', 'sonstige_einkuenfte', 'bruttolohn_ehefrau', 'werbungskosten_ehefrau',
     'vermietung_einnahmen', 'vermietung_werbungskosten', 'vermietung_afa',
     'kv_pv_beitraege_gesamt', 'basisrente_beitrag', 'uebrige_vorsorge_ich', 'uebrige_vorsorge_ehefrau',
     'spenden', 'kinderbetreuungskosten', 'handwerkerleistungen',
     'gewst_hinzurechnung_zinsen_mieten', 'gewst_kuerzung_grundbesitz',
     'est_vz_q1', 'est_vz_q2', 'est_vz_q3', 'est_vz_q4',
     'lohnsteuer_ehefrau', 'soli_ehefrau', 'kirchensteuer_ehefrau',
-    'gewst_vz_standort1', 'gewst_vz_standort2',
   ];
   const out = {};
   felder.forEach(f => { out[f] = obj[f]; });
@@ -3947,8 +5041,15 @@ function stNum(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-window.openSteuerprognose = async function() {
-  const jahr = new Date().getFullYear();
+let stIstNaeherung = false;
+
+// Wählbare Jahre im Formular: zwei zurück, eins voraus ab dem aktuellen Jahr.
+function stJahresliste() {
+  const aktuell = new Date().getFullYear();
+  return [aktuell - 2, aktuell - 1, aktuell, aktuell + 1];
+}
+
+async function stLadeJahr(jahr) {
   stErgebnis = null;
 
   try {
@@ -3964,18 +5065,29 @@ window.openSteuerprognose = async function() {
     } catch { /* Defaults bleiben hart im Formular hinterlegt */ }
   }
 
+  try { stIstNaeherung = (await api.steuer.meta(jahr)).ist_naeherung; } catch { stIstNaeherung = false; }
+
   document.getElementById('modal-title').textContent = `Steuerprognose ${jahr}`;
-  openModal();
-  document.querySelector('#modal-overlay .modal')?.classList.add('modal--wide');
-  const submitBtn = document.getElementById('modal-submit');
-  submitBtn.textContent = 'Speichern & berechnen';
-  submitBtn.onclick = stSaveUndBerechnen;
   stRender();
 
   if (stExists) {
     try { stErgebnis = await api.steuer.berechnung(jahr); } catch { /* Formular bleibt trotzdem nutzbar */ }
     stRender();
   }
+}
+
+window.stSwitchJahr = function(jahr) {
+  stLadeJahr(parseInt(jahr, 10));
+};
+
+window.openSteuerprognose = async function() {
+  openModal();
+  document.querySelector('#modal-overlay .modal')?.classList.add('modal--wide');
+  const submitBtn = document.getElementById('modal-submit');
+  submitBtn.textContent = 'Speichern & berechnen';
+  submitBtn.onclick = stSaveUndBerechnen;
+
+  await stLadeJahr(new Date().getFullYear());
 };
 
 window.stSetField = function(key, value, isNumber = true) {
@@ -4009,24 +5121,24 @@ function stKinderListeHtml() {
     return `<p class="form-hint">Noch keine Kinder erfasst — Kindergeld/-freibetrag bleiben dann unberücksichtigt.</p>`;
   }
   return stState.kinder.map((k, i) => `
-    <div class="form-row" style="align-items:flex-end;gap:0.5rem;margin-bottom:0.5rem">
-      <div class="form-group" style="flex:1.2;margin-bottom:0">
-        <label class="form-label">Name (optional)</label>
-        <input class="form-input" value="${escapeHtml(k.name)}" onblur="stSetKindField(${i},'name',this.value)">
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label">Geburtsdatum</label>
-        <input class="form-input" type="date" value="${k.geburtsdatum}" onchange="stSetKindField(${i},'geburtsdatum',this.value)">
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label" style="display:flex;align-items:center;gap:0.35rem;white-space:nowrap">
-          <input type="checkbox" ${k.in_ausbildung_18_25 ? 'checked' : ''} onchange="stSetKindCheckbox(${i},'in_ausbildung_18_25',this.checked)">
-          18–25, in Ausbildung
-        </label>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="stRemoveKind(${i})" title="Kind entfernen" style="margin-bottom:0.1rem">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <div class="st-kind-card">
+      <button class="st-kind-remove" onclick="stRemoveKind(${i})" title="Kind entfernen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
+      <div class="form-row">
+        <div class="form-group" style="flex:1.2;margin-bottom:0">
+          <label class="form-label">Name (optional)</label>
+          <input class="form-input" value="${escapeHtml(k.name)}" onblur="stSetKindField(${i},'name',this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Geburtsdatum</label>
+          <input class="form-input" type="date" value="${k.geburtsdatum}" onchange="stSetKindField(${i},'geburtsdatum',this.value)">
+        </div>
+      </div>
+      <label class="st-kind-checkbox">
+        <input type="checkbox" ${k.in_ausbildung_18_25 ? 'checked' : ''} onchange="stSetKindCheckbox(${i},'in_ausbildung_18_25',this.checked)">
+        18–25, in Ausbildung
+      </label>
     </div>`).join('');
 }
 
@@ -4038,7 +5150,7 @@ function stRenderKinderListe() {
 // ── Betriebsstätten ──────────────────────────────────────────────────────────
 
 window.stAddBetriebsstaette = function() {
-  stState.betriebsstaetten.push({ gemeinde: '', hebesatz: 400, arbeitsloehne: 0, taetigkeitsanteil_pct: 0, prozent_manuell: 0 });
+  stState.betriebsstaetten.push({ gemeinde: '', hebesatz: 400, arbeitsloehne: 0, taetigkeitsanteil_pct: 0, prozent_manuell: 0, vorauszahlung: 0 });
   stRenderBetriebsstaettenTabelle();
 };
 window.stRemoveBetriebsstaette = function(i) {
@@ -4076,6 +5188,11 @@ function stBetriebsstaettenTabelleHtml() {
         <label class="form-label">Anteil %</label>
         <input class="form-input mono" type="number" step="1" min="0" max="100" value="${b.prozent_manuell}" onblur="stSetBetriebsstaetteField(${i},'prozent_manuell',this.value)">
       </div>`}
+      <div class="form-group" style="width:8rem;margin-bottom:0">
+        <label class="form-label">GewSt-VZ €</label>
+        <input class="form-input mono" type="number" step="100" value="${b.vorauszahlung ?? 0}" onblur="stSetBetriebsstaetteField(${i},'vorauszahlung',this.value)"
+          title="Bereits geleistete Gewerbesteuer-Vorauszahlung an diese Gemeinde">
+      </div>
       <button class="btn btn-ghost btn-sm" onclick="stRemoveBetriebsstaette(${i})" title="Betriebsstätte entfernen" style="margin-bottom:0.1rem">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
@@ -4111,6 +5228,27 @@ async function stSaveUndBerechnen() {
 
 // ── Ergebnis-Darstellung ─────────────────────────────────────────────────────
 
+// Listet die einzelnen Einkunftsquellen auf, bevor sie zur "Summe der
+// Einkünfte" addiert werden — sonst verschwindet die Herkunft einer
+// Veränderung (z. B. Fotostudio-Gewinn gestiegen vs. Vermietung geschrumpft)
+// hinter einer einzigen Zahl. Quellen ohne Wert werden ausgeblendet, damit die
+// Liste nicht mit Nullzeilen (z. B. keine Vermietung) vollläuft.
+function stEinkuenfteZeilenHtml(ek) {
+  if (!ek) return '';
+  const zeilen = [
+    ['Gewinn Gewerbebetrieb (Ehemann)', ek.gewerbebetrieb],
+    ['Gewinn Gewerbebetrieb (Ehefrau)', ek.gewerbebetrieb_ehefrau],
+    ['Nichtselbstständige Arbeit (Ehefrau, netto)', ek.nichtselbststaendig_ehefrau],
+    ['Vermietung und Verpachtung (netto)', ek.vermietung],
+    ['Sonstige Einkünfte', ek.sonstige],
+  ].filter(([, wert]) => wert !== 0);
+  if (!zeilen.length) return '';
+  return zeilen.map(([label, wert]) => `
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0;color:var(--wash-grey)">
+        <span>${label}</span><span class="mono">${fmt.eur(wert)}</span>
+      </div>`).join('');
+}
+
 function stErgebnisHtml() {
   if (!stErgebnis) return '';
   const e = stErgebnis;
@@ -4139,7 +5277,8 @@ function stErgebnisHtml() {
     </div>
 
     <div class="card" style="padding:1rem 1.25rem;margin-top:1rem">
-      <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
+      ${stEinkuenfteZeilenHtml(e.einkuenfte)}
+      <div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-weight:600;border-top:1px dashed var(--ink-wash);margin-top:0.35rem;padding-top:0.6rem">
         <span>Summe der Einkünfte</span><span class="mono">${fmt.eur(e.summe_einkuenfte)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:0.25rem 0">
@@ -4149,7 +5288,7 @@ function stErgebnisHtml() {
         <span>Tarifliche Einkommensteuer</span><span class="mono">${fmt.eur(e.est_tariflich)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:0.25rem 0;color:var(--wash-grey)">
-        <span>./. Anrechnung Gewerbesteuer (§ 35 EStG)</span><span class="mono">− ${fmt.eur(e.anrechnung_35a)}</span>
+        <span>− Anrechnung Gewerbesteuer (§ 35 EStG)</span><span class="mono">− ${fmt.eur(e.anrechnung_35a)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:0.25rem 0;font-weight:600">
         <span>ESt nach Anrechnung</span><span class="mono">${fmt.eur(e.est_nach_anrechnung)}</span>
@@ -4201,6 +5340,13 @@ function stRender() {
     <p class="form-hint">Planungsrechnung zur eigenen Vorsorge — ersetzt keine Steuerberatung. Werte einmal im Monat nachpflegen, um die Prognose aktuell zu halten.</p>
 
     <div class="form-section-head">Grunddaten</div>
+    <div class="form-group" style="max-width:12rem">
+      <label class="form-label">Steuerjahr</label>
+      <select class="form-select mono" onchange="stSwitchJahr(this.value)">
+        ${stJahresliste().map(j => `<option value="${j}" ${j === s.jahr ? 'selected' : ''}>${j}</option>`).join('')}
+      </select>
+    </div>
+    ${stIstNaeherung ? `<p class="form-hint" style="color:#F87171">Für ${s.jahr} liegt noch kein eigens recherchierter Tarif vor — die Berechnung nähert sich mit den Werten des jüngsten bekannten Jahres an.</p>` : ''}
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Veranlagung</label>
@@ -4221,39 +5367,59 @@ function stRender() {
     </div>
 
     <div class="form-section-head">Einkünfte</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Gewinn aus Gewerbebetrieb (€)</label>
-        <input class="form-input mono" type="number" step="500" value="${s.gewinn_gewerbebetrieb}" onblur="stSetField('gewinn_gewerbebetrieb', this.value)">
+    <div class="st-person-cols">
+      <div class="st-person-card">
+        <div class="st-person-card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          Ich
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gewinn aus Gewerbebetrieb (€)</label>
+          <input class="form-input mono" type="number" step="500" value="${s.gewinn_gewerbebetrieb}" onblur="stSetField('gewinn_gewerbebetrieb', this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Sonstige Einkünfte (€)</label>
+          <input class="form-input mono" type="number" step="100" value="${s.sonstige_einkuenfte}" onblur="stSetField('sonstige_einkuenfte', this.value)">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Sonstige Einkünfte (€)</label>
-        <input class="form-input mono" type="number" step="100" value="${s.sonstige_einkuenfte}" onblur="stSetField('sonstige_einkuenfte', this.value)">
+      <div class="st-person-card">
+        <div class="st-person-card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+          Ehefrau
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gewinn aus Gewerbebetrieb (€)</label>
+          <input class="form-input mono" type="number" step="500" value="${s.gewinn_gewerbebetrieb_ehefrau}" onblur="stSetField('gewinn_gewerbebetrieb_ehefrau', this.value)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bruttolohn (€)</label>
+          <input class="form-input mono" type="number" step="500" value="${s.bruttolohn_ehefrau}" onblur="stSetField('bruttolohn_ehefrau', this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Werbungskosten (€)</label>
+          <input class="form-input mono" type="number" step="50" value="${s.werbungskosten_ehefrau}" onblur="stSetField('werbungskosten_ehefrau', this.value)">
+          <p class="form-hint">Mindestens der Arbeitnehmer-Pauschbetrag wird automatisch angesetzt.</p>
+        </div>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Bruttolohn Ehefrau (€)</label>
-        <input class="form-input mono" type="number" step="500" value="${s.bruttolohn_ehefrau}" onblur="stSetField('bruttolohn_ehefrau', this.value)">
+    <div class="st-person-card" style="margin-top:0.75rem">
+      <div class="st-person-card-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Gemeinsam — Vermietung
       </div>
-      <div class="form-group">
-        <label class="form-label">Werbungskosten Ehefrau (€)</label>
-        <input class="form-input mono" type="number" step="50" value="${s.werbungskosten_ehefrau}" onblur="stSetField('werbungskosten_ehefrau', this.value)">
-        <p class="form-hint">Mindestens der Arbeitnehmer-Pauschbetrag wird automatisch angesetzt.</p>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Vermietung — Einnahmen (€)</label>
-        <input class="form-input mono" type="number" step="100" value="${s.vermietung_einnahmen}" onblur="stSetField('vermietung_einnahmen', this.value)">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Vermietung — Werbungskosten (€)</label>
-        <input class="form-input mono" type="number" step="100" value="${s.vermietung_werbungskosten}" onblur="stSetField('vermietung_werbungskosten', this.value)">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Vermietung — AfA (€)</label>
-        <input class="form-input mono" type="number" step="50" value="${s.vermietung_afa}" onblur="stSetField('vermietung_afa', this.value)">
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Einnahmen (€)</label>
+          <input class="form-input mono" type="number" step="100" value="${s.vermietung_einnahmen}" onblur="stSetField('vermietung_einnahmen', this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Werbungskosten (€)</label>
+          <input class="form-input mono" type="number" step="100" value="${s.vermietung_werbungskosten}" onblur="stSetField('vermietung_werbungskosten', this.value)">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">AfA (€)</label>
+          <input class="form-input mono" type="number" step="50" value="${s.vermietung_afa}" onblur="stSetField('vermietung_afa', this.value)">
+        </div>
       </div>
     </div>
 
@@ -4315,8 +5481,9 @@ function stRender() {
     </button>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Hinzurechnung Zinsen/Mieten gesamt (§ 8 GewStG, €)</label>
+        <label class="form-label">Finanzierungsanteile § 8 Nr. 1 GewStG (€)</label>
         <input class="form-input mono" type="number" step="1000" value="${s.gewst_hinzurechnung_zinsen_mieten}" onblur="stSetField('gewst_hinzurechnung_zinsen_mieten', this.value)">
+        <p class="form-hint">Bereits gewichtete Summe wie im Bescheid: Zinsen voll, Miete bewegliche WG ⅕, unbewegliche ⅟₂, Lizenzen ¼. Der Freibetrag von 200.000 € wird automatisch abgezogen.</p>
       </div>
       <div class="form-group">
         <label class="form-label">Kürzung Grundbesitz (§ 9 GewStG, €)</label>
@@ -4337,8 +5504,6 @@ function stRender() {
       <div class="form-group"><label class="form-label">Kirchensteuer Ehefrau (€)</label><input class="form-input mono" type="number" step="10" value="${s.kirchensteuer_ehefrau}" onblur="stSetField('kirchensteuer_ehefrau', this.value)"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">GewSt-VZ Standort 1 (€)</label><input class="form-input mono" type="number" step="100" value="${s.gewst_vz_standort1}" onblur="stSetField('gewst_vz_standort1', this.value)"></div>
-      <div class="form-group"><label class="form-label">GewSt-VZ Standort 2 (€)</label><input class="form-input mono" type="number" step="100" value="${s.gewst_vz_standort2}" onblur="stSetField('gewst_vz_standort2', this.value)"></div>
     </div>
 
     ${stErgebnisHtml()}

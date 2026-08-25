@@ -184,11 +184,18 @@ def gewerbeertrag(gewinn: D, hinzurechnung_zinsen_mieten: D, kuerzung_grundbesit
 
 
 def gewerbesteuermessbetrag(gewerbeertrag_: D, jahr: int) -> D:
-    """§ 11 GewStG: Ertrag auf volle 100 € abrunden, Freibetrag 24.500 €, ×3,5 %."""
+    """§ 11 GewStG: Ertrag auf volle 100 € abrunden, Freibetrag 24.500 €, ×3,5 %,
+    Ergebnis auf volle € abrunden.
+
+    Die letzte Abrundung ist keine Kosmetik: der Messbetrag ist die Grundlage
+    für die Zerlegung UND für den 4-fach-Deckel der § 35-Anrechnung. Der echte
+    Bescheid weist ihn deshalb als glatten Euro-Betrag aus ("abgerundet auf
+    volle €") — 107.500 × 3,5 % = 3.762,50 wird zu 3.762.
+    """
     p = parameter(jahr)
     abgerundet = (D(int(gewerbeertrag_)) // 100) * 100
     nach_freibetrag = max(D(0), abgerundet - p["gewst_freibetrag"])
-    return _round_cent(nach_freibetrag * p["gewst_messzahl"])
+    return D(int(nach_freibetrag * p["gewst_messzahl"]))
 
 
 @dataclass
@@ -198,6 +205,8 @@ class Betriebsstaette:
     arbeitsloehne: D = D(0)          # bereits je AN auf 50.000 € gedeckelt einzutragen
     taetigkeitsanteil_pct: D = D(0)  # Anteil des Inhabers an dieser Betriebsstätte, für den fiktiven Unternehmerlohn
     prozent_manuell: D | None = None  # nur im Modus "prozent" genutzt
+    vorauszahlung: D = D(0)          # GewSt-Vorauszahlung an DIESE Gemeinde
+
 
 
 @dataclass
@@ -292,6 +301,7 @@ class PrognoseInput:
     zerlegungsmodus: str = "arbeitsloehne"  # arbeitsloehne | prozent
 
     gewinn_gewerbebetrieb: D = D(0)
+    gewinn_gewerbebetrieb_ehefrau: D = D(0)
     sonstige_einkuenfte: D = D(0)
     bruttolohn_ehefrau: D = D(0)
     werbungskosten_ehefrau: D = D(0)
@@ -317,8 +327,6 @@ class PrognoseInput:
     lohnsteuer_ehefrau: D = D(0)
     soli_ehefrau: D = D(0)
     kirchensteuer_ehefrau: D = D(0)
-    gewst_vz_standort1: D = D(0)
-    gewst_vz_standort2: D = D(0)
 
     kinder: list[Kind] = field(default_factory=list)
     betriebsstaetten: list[Betriebsstaette] = field(default_factory=list)
@@ -351,7 +359,10 @@ def berechne_prognose(inp: PrognoseInput) -> dict:
         werbungskosten_ehefrau = max(werbungskosten_ehefrau, p["arbeitnehmer_pauschbetrag"])
     einkuenfte_ehefrau = max(D(0), inp.bruttolohn_ehefrau - werbungskosten_ehefrau)
     einkuenfte_vermietung = inp.vermietung_einnahmen - inp.vermietung_werbungskosten - inp.vermietung_afa
-    summe_einkuenfte = inp.gewinn_gewerbebetrieb + inp.sonstige_einkuenfte + einkuenfte_ehefrau + einkuenfte_vermietung
+    summe_einkuenfte = (
+        inp.gewinn_gewerbebetrieb + inp.gewinn_gewerbebetrieb_ehefrau
+        + inp.sonstige_einkuenfte + einkuenfte_ehefrau + einkuenfte_vermietung
+    )
 
     # ── Sonderausgaben ───────────────────────────────────────────────────────
     basisrente_hoechst = p["basisrente_hoechstbetrag_single"] * (D(2) if splitting else D(1))
@@ -419,7 +430,9 @@ def berechne_prognose(inp: PrognoseInput) -> dict:
     # ── Abgleich mit Vorauszahlungen ────────────────────────────────────────
     est_vz_gesamt = inp.est_vz_q1 + inp.est_vz_q2 + inp.est_vz_q3 + inp.est_vz_q4
     lohn_soli_kist_ehefrau = inp.lohnsteuer_ehefrau + inp.soli_ehefrau + inp.kirchensteuer_ehefrau
-    gewst_vz_gesamt = inp.gewst_vz_standort1 + inp.gewst_vz_standort2
+    # Vorauszahlungen hängen an der Betriebsstätte, nicht an festen Standort-Slots:
+    # die Zahl der Gemeinden ergibt sich erst aus der Zerlegung (real: drei).
+    gewst_vz_gesamt = sum((b.vorauszahlung for b in inp.betriebsstaetten), D(0))
 
     nachzahlung_est = (est_nach_anrechnung + soli + kirchensteuer) - est_vz_gesamt - lohn_soli_kist_ehefrau
     nachzahlung_gewst = gewerbesteuer_gesamt - gewst_vz_gesamt
@@ -430,6 +443,13 @@ def berechne_prognose(inp: PrognoseInput) -> dict:
 
     return {
         "jahr": inp.jahr,
+        "einkuenfte": {
+            "gewerbebetrieb": float(inp.gewinn_gewerbebetrieb),
+            "gewerbebetrieb_ehefrau": float(inp.gewinn_gewerbebetrieb_ehefrau),
+            "sonstige": float(inp.sonstige_einkuenfte),
+            "nichtselbststaendig_ehefrau": float(einkuenfte_ehefrau),
+            "vermietung": float(einkuenfte_vermietung),
+        },
         "summe_einkuenfte": float(summe_einkuenfte),
         "zve_vor_kinderfreibetrag": float(zve_vor_kfb),
         "kinder": {

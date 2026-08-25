@@ -171,6 +171,43 @@ class TilgungsplanResponse(BaseModel):
     zinsen_ohne_sondertilgung: float
 
 
+# ── Zinseszins-Simulator ─────────────────────────────────────────────────────
+
+class ZinseszinsJahrResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    jahr: int
+    einzahlungen_kumuliert: float
+    zinsertrag_kumuliert: float
+    gesamtkapital: float
+    gesamtkapital_real: float
+
+
+class ZinseszinsResponse(BaseModel):
+    jahre: list[ZinseszinsJahrResponse]
+    gesamtkapital_end: float
+    einzahlungen_gesamt: float
+    zinsertrag_gesamt: float
+
+
+# ── Kapitalentnahme ──────────────────────────────────────────────────────────
+
+class KapitalentnahmeJahrResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    jahr: int
+    zinsertrag: float
+    entnahme: float
+    kapital_ende: float
+
+
+class KapitalentnahmeResponse(BaseModel):
+    jahre: list[KapitalentnahmeJahrResponse]
+    monatliche_entnahme: float       # eingegeben oder aus der Laufzeit errechnet
+    monate_gesamt: Optional[int] = None
+    zinsertrag_gesamt: float
+    entnahme_gesamt: float
+    max_entnahme_kapitalerhalt: float
+
+
 # ── Spending Plan ──────────────────────────────────────────────────────────────
 
 class SpendingPositionBase(BaseModel):
@@ -380,6 +417,7 @@ class NotfallEintragBase(BaseModel):
     kategorie: str
     verweis: Optional[str] = None
     hinweis: Optional[str] = None
+    gueltig_bis: Optional[date] = None
     prioritaet: int = 2
     erledigt: bool = False
     sort_order: int = 0
@@ -394,44 +432,13 @@ class NotfallEintragUpdate(BaseModel):
     kategorie: Optional[str] = None
     verweis: Optional[str] = None
     hinweis: Optional[str] = None
+    gueltig_bis: Optional[date] = None
     prioritaet: Optional[int] = None
     erledigt: Optional[bool] = None
     sort_order: Optional[int] = None
 
 
 class NotfallEintragResponse(NotfallEintragBase):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    erstellt_am: datetime
-
-
-# ── Dokument ───────────────────────────────────────────────────────────────────
-
-class DokumentBase(BaseModel):
-    titel: str
-    kategorie: str
-    aufbewahrungsort: Optional[str] = None
-    aussteller: Optional[str] = None
-    datum: Optional[date] = None
-    gueltig_bis: Optional[date] = None
-    notiz: Optional[str] = None
-
-
-class DokumentCreate(DokumentBase):
-    pass
-
-
-class DokumentUpdate(BaseModel):
-    titel: Optional[str] = None
-    kategorie: Optional[str] = None
-    aufbewahrungsort: Optional[str] = None
-    aussteller: Optional[str] = None
-    datum: Optional[date] = None
-    gueltig_bis: Optional[date] = None
-    notiz: Optional[str] = None
-
-
-class DokumentResponse(DokumentBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     erstellt_am: datetime
@@ -468,33 +475,6 @@ class TodoResponse(TodoBase):
     id: int
     erstellt_am: datetime
 
-
-# ── BugIdee ────────────────────────────────────────────────────────────────────
-
-class BugIdeeBase(BaseModel):
-    titel: str
-    typ: str = 'idee'
-    beschreibung: Optional[str] = None
-    prioritaet: str = 'mittel'
-    status: str = 'offen'
-
-
-class BugIdeeCreate(BugIdeeBase):
-    pass
-
-
-class BugIdeeUpdate(BaseModel):
-    titel: Optional[str] = None
-    typ: Optional[str] = None
-    beschreibung: Optional[str] = None
-    prioritaet: Optional[str] = None
-    status: Optional[str] = None
-
-
-class BugIdeeResponse(BugIdeeBase):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    erstellt_am: datetime
 
 
 # ── Anhang ─────────────────────────────────────────────────────────────────────
@@ -558,6 +538,7 @@ class SteuerBetriebsstaetteBase(BaseModel):
     arbeitsloehne: float = 0
     taetigkeitsanteil_pct: float = 0
     prozent_manuell: Optional[float] = None
+    vorauszahlung: float = 0
 
 
 class SteuerBetriebsstaetteCreate(SteuerBetriebsstaetteBase):
@@ -576,6 +557,7 @@ class SteuerPrognoseBase(BaseModel):
     zerlegungsmodus: str = 'arbeitsloehne'
 
     gewinn_gewerbebetrieb: float = 0
+    gewinn_gewerbebetrieb_ehefrau: float = 0
     sonstige_einkuenfte: float = 0
     bruttolohn_ehefrau: float = 0
     werbungskosten_ehefrau: float = 0
@@ -603,9 +585,6 @@ class SteuerPrognoseBase(BaseModel):
     soli_ehefrau: float = 0
     kirchensteuer_ehefrau: float = 0
 
-    gewst_vz_standort1: float = 0
-    gewst_vz_standort2: float = 0
-
     notiz: Optional[str] = None
 
 
@@ -624,6 +603,74 @@ class SteuerPrognoseResponse(SteuerPrognoseBase):
     kinder: list[SteuerKindResponse] = []
     betriebsstaetten: list[SteuerBetriebsstaetteResponse] = []
     erstellt_am: datetime
+    aktualisiert_am: datetime
+
+
+# ── Steuerbescheide (Historie der tatsächlichen Steuerlast) ─────────────────
+
+class SteuerBescheidGemeindeBase(BaseModel):
+    gemeinde: str
+    arbeitsloehne: float = 0
+    zerlegungsanteil: float = 0
+    hebesatz: float = 0
+    gewerbesteuer: float = 0
+
+
+class SteuerBescheidGemeindeCreate(SteuerBescheidGemeindeBase):
+    pass
+
+
+class SteuerBescheidGemeindeResponse(SteuerBescheidGemeindeBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class SteuerBescheidBase(BaseModel):
+    jahr: int
+    bescheiddatum: Optional[date] = None
+    veranlagung: str = 'zusammen'
+    vorlaeufig: bool = False
+
+    einkuenfte_gewerbebetrieb: float = 0
+    einkuenfte_gewerbebetrieb_ehefrau: float = 0
+    einkuenfte_nichtselbststaendig_ehefrau: float = 0
+    einkuenfte_vermietung: float = 0
+    einkuenfte_sonstige: float = 0
+    gesamtbetrag_einkuenfte: float = 0
+    zu_versteuerndes_einkommen: float = 0
+    kinderfreibetraege: float = 0
+    est_tariflich: float = 0
+    anrechnung_35: float = 0
+    kindergeld_hinzurechnung: float = 0
+    einkommensteuer: float = 0
+    soli: float = 0
+    kirchensteuer: float = 0
+
+    gewerbesteuermessbetrag: Optional[float] = None
+    gewerbesteuer: Optional[float] = None
+
+    steuerabzugsbetraege: float = 0
+    vorauszahlungen_gesamt: float = 0
+    nachzahlungszinsen: float = 0
+    nachzahlung_erstattung: float = 0
+
+    vz_folgejahr_quartal: float = 0
+
+    notiz: Optional[str] = None
+
+
+class SteuerBescheidCreate(SteuerBescheidBase):
+    gemeinden: list[SteuerBescheidGemeindeCreate] = []
+
+
+class SteuerBescheidUpdate(SteuerBescheidCreate):
+    pass
+
+
+class SteuerBescheidResponse(SteuerBescheidBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    gemeinden: list[SteuerBescheidGemeindeResponse] = []
     aktualisiert_am: datetime
 
 
@@ -648,11 +695,20 @@ class SteuerKinderErgebnis(BaseModel):
     hinzurechnung_kindergeld: float
 
 
+class SteuerEinkuenfteErgebnis(BaseModel):
+    gewerbebetrieb: float
+    gewerbebetrieb_ehefrau: float = 0
+    sonstige: float
+    nichtselbststaendig_ehefrau: float  # netto, nach Werbungskosten
+    vermietung: float                   # netto, nach Werbungskosten + AfA
+
+
 class SteuerErgebnis(BaseModel):
     jahr: int
     hinweis: str = 'Planungsrechnung zur eigenen Vorsorge — keine Steuerberatung und kein Ersatz für die Steuererklärung.'
 
     # Einkommensteuer
+    einkuenfte: SteuerEinkuenfteErgebnis
     summe_einkuenfte: float
     zve_vor_kinderfreibetrag: float
     kinder: SteuerKinderErgebnis
@@ -679,3 +735,53 @@ class SteuerErgebnis(BaseModel):
     nachzahlung_gesamt: float
 
     monatliche_ruecklage_empfehlung: float
+
+
+# ── Sparziele (Sparschwein) ──────────────────────────────────────────────────
+
+class SparzielFuetterungBase(BaseModel):
+    betrag: float
+    datum: date
+    notiz: Optional[str] = None
+
+
+class SparzielFuetterungCreate(SparzielFuetterungBase):
+    pass
+
+
+class SparzielFuetterungResponse(SparzielFuetterungBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class SparzielBase(BaseModel):
+    name: str
+    zielbetrag: float
+    zieldatum: date
+    zinssatz: float = 0
+    aufbewahrungsort: Optional[str] = None
+    notiz: Optional[str] = None
+    archiviert: bool = False
+
+
+class SparzielCreate(SparzielBase):
+    pass
+
+
+class SparzielUpdate(SparzielCreate):
+    pass
+
+
+class SparzielResponse(SparzielBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    fuetterungen: list[SparzielFuetterungResponse] = []
+
+    # Berechnet, nicht gespeichert — s. services/sparziel.py
+    aktueller_stand: float
+    restbetrag: float
+    fortschritt_pct: float
+    monate_bis_ziel: int
+    benoetigte_monatsrate: float
+
+    aktualisiert_am: datetime

@@ -126,6 +126,30 @@ input[type="number"]::-webkit-outer-spin-button {
   cursor: not-allowed;
 }
 
+/* ── Notfall-Menüpunkt ─────────────────────────────────────────────────────
+   Steht als einziger Punkt unter einer Trennlinie am Fuß der Navigation und
+   trägt als einziger einen roten Ton — im Ernstfall soll ihn jemand finden,
+   der die App sonst nie benutzt. Die Selektoren tragen .sidebar-nav, damit sie
+   die späteren .nav-item.active-Regeln sicher überschreiben. */
+.sidebar-nav .nav-item--notfall {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  color: var(--notfall-dim);
+}
+
+.sidebar-nav .nav-item--notfall:hover {
+  color: var(--notfall);
+  background: rgba(226,100,90,0.10);
+}
+
+.sidebar-nav .nav-item--notfall.active {
+  color: var(--notfall);
+  background: rgba(226,100,90,0.14);
+  border-left-color: var(--notfall);
+  font-weight: 500;
+}
+
 .nav-item .nav-badge {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -320,6 +344,20 @@ input[type="number"]::-webkit-outer-spin-button {
 .stat-card--red   .value { color: #F87171; }
 .stat-card--green { border-left: 3px solid #4ADE80; }
 .stat-card--green .value { color: #4ADE80; }
+/* Neutral, aber mit Balken — für Kennzahlen, die neben farbigen Karten stehen
+   und trotzdem nüchtern bleiben sollen. Wert bleibt bewusst hell. */
+.stat-card--grey  { border-left: 3px solid var(--wash-grey); }
+/* Für die inflationsbereinigte Kennzahl — Farbe folgt bewusst der blauen
+   Linie im Kapitalentwicklungs-Chart, damit Karte und Kurve zusammengehören. */
+.stat-card--blue  { border-left: 3px solid #4DA8E0; }
+.stat-card--blue  .value { color: #4DA8E0; }
+
+/* Kurzer Zusatz unter einer Kennzahl, wenn das Label allein Fachjargon wäre. */
+.stat-card .hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+}
 
 /* ── Chart Grid ───────────────────────────────────────────────────────────── */
 
@@ -356,6 +394,483 @@ input[type="number"]::-webkit-outer-spin-button {
   margin-bottom: var(--space-4);
   font-family: 'JetBrains Mono', monospace;
 }
+
+/* ── Sparziele (Sparschwein) ──────────────────────────────────────────────── */
+
+.sparziel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+.sparziel-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--ink-wash);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-6);
+}
+
+.sparziel-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.sparziel-card-head h3 {
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--ink-black);
+  margin-bottom: 2px;
+}
+.sparziel-sub {
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  font-family: var(--font-mono);
+}
+/* "Wo liegt das Geld?" — reiner Hinweistext, keine Kontoverknüpfung, daher
+   bewusst unauffälliger als die Fortschrittszahlen. */
+.sparziel-ort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  margin-top: 2px;
+}
+.sparziel-ort svg { flex-shrink: 0; opacity: 0.7; }
+.sparziel-card-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
+
+/* Sparschwein: ein einziger geschlossener Lucide-Pfad, zweimal übereinander
+   gelegt — einmal als reine Kontur (immer sichtbar), einmal gefüllt und über
+   ein Rect auf den Fortschritt geclippt ("Füllstand"). Kein Fremd-Artwork,
+   bleibt in der Tusche-Linien-Sprache des restigen Designs. */
+.sparziel-piggy-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0 0 var(--space-4);
+}
+.sparziel-piggy { width: 96px; height: 96px; overflow: visible; }
+.sparziel-piggy-outline {
+  fill: none;
+  stroke: var(--wash-grey);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sparziel-piggy-fill { fill: var(--seal-red); opacity: 0.82; }
+.sparziel-piggy-fill-rect {
+  transition: y var(--duration-mid) var(--ease-out), height var(--duration-mid) var(--ease-out);
+}
+.sparziel-piggy-coin-slot { fill: none; stroke: var(--ink-black); stroke-width: 1.4; opacity: 0.5; }
+
+/* Feed-Reaktion: kurzer Bounce beim Füttern, s. saveSparzielFuetterung() */
+@keyframes sparzielBounce {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.08) rotate(-2deg); }
+  60%  { transform: scale(0.97) rotate(1deg); }
+  100% { transform: scale(1); }
+}
+.sparziel-piggy-wrap.is-feeding .sparziel-piggy { animation: sparzielBounce 550ms var(--ease-out); }
+
+/* Münze, die von oben in den Schlitz fällt — reines CSS, kein Sprite */
+@keyframes sparzielCoinDrop {
+  0%   { transform: translate(-50%, -34px) scale(0.6) rotate(0deg); opacity: 0; }
+  25%  { opacity: 1; }
+  75%  { transform: translate(-50%, 6px) scale(1) rotate(120deg); opacity: 1; }
+  100% { transform: translate(-50%, 10px) scale(0.7) rotate(160deg); opacity: 0; }
+}
+.sparziel-coin {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--seal-red);
+  border: 1.5px solid var(--surface);
+  pointer-events: none;
+  animation: sparzielCoinDrop 650ms ease-in forwards;
+}
+
+.sparziel-progress-numbers {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+.sparziel-progress-numbers .stand {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink-black);
+}
+.sparziel-progress-numbers .stand .ziel {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--wash-grey);
+}
+.sparziel-progress-numbers .pct {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--seal-red);
+}
+
+/* Meilenstein-Punkte statt eines zweiten Balkens neben dem Sparschwein —
+   erreichte Marken füllen sich fest ein, wie kleine Siegel. */
+.sparziel-milestones {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.sparziel-milestones .ms {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ink-wash-md, rgba(255,255,255,0.16));
+  position: relative;
+  overflow: hidden;
+}
+.sparziel-milestones .ms::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--seal-red);
+  transform: scaleX(var(--ms-fill, 0));
+  transform-origin: left;
+  transition: transform var(--duration-mid) var(--ease-out);
+}
+
+.sparziel-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3) 0 var(--space-4);
+  border-top: 1px dashed var(--ink-wash);
+  margin-bottom: var(--space-4);
+}
+.sparziel-stats .label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wash-grey);
+  margin-bottom: 2px;
+}
+.sparziel-stats .value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-black);
+}
+
+.sparziel-feed-btn { width: 100%; justify-content: center; }
+
+.sparziel-erreicht-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(201,168,76,0.1);
+  border: 1px solid rgba(201,168,76,0.3);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  color: var(--seal-red);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* Fütterungs-Verlauf, zugeklappt im Default */
+.sparziel-history { margin-top: var(--space-2); }
+.sparziel-history summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  padding: var(--space-2) 0;
+  user-select: none;
+}
+.sparziel-history summary::-webkit-details-marker { display: none; }
+.sparziel-history summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--wash-grey);
+  border-bottom: 1.5px solid var(--wash-grey);
+  transform: rotate(-45deg);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.sparziel-history[open] summary::before { transform: rotate(45deg); }
+
+.sparziel-history-list { margin-top: var(--space-2); }
+.sparziel-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: var(--text-sm);
+}
+.sparziel-history-row:last-child { border-bottom: none; }
+.sparziel-history-row .datum { color: var(--wash-grey); font-family: var(--font-mono); font-size: var(--text-xs); }
+.sparziel-history-row .notiz { color: var(--wash-grey); font-size: var(--text-xs); flex: 1; }
+.sparziel-history-row .betrag { font-family: var(--font-mono); font-weight: 600; color: #4ADE80; }
+
+/* ── Rechner (Zinseszins-Simulator, Darlehensrechner) ────────────────────── */
+
+/* ── Rechner-Übersicht ────────────────────────────────────────────────────
+   Klickbare Kacheln statt eines Dropdowns — Platz für weitere Rechner, ohne
+   dass die Liste bei zwei Einträgen schon verloren wirkt. */
+.rechner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+.rechner-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--ink-wash);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-6);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+.rechner-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(201,168,76,0.35);
+  box-shadow: var(--shadow-md);
+}
+
+.rechner-tile-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(201,168,76,0.1);
+  color: var(--seal-red);
+}
+.rechner-tile-icon svg { width: 22px; height: 22px; }
+
+.rechner-tile-body { flex: 1; min-width: 0; }
+.rechner-tile-body h3 {
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--ink-black);
+  margin-bottom: var(--space-1);
+}
+.rechner-tile-body p {
+  font-size: var(--text-sm);
+  color: var(--wash-grey);
+  line-height: 1.4;
+}
+
+.rechner-tile-chevron {
+  flex-shrink: 0;
+  margin-top: var(--space-1);
+  color: var(--wash-grey);
+  transition: transform var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+.rechner-tile:hover .rechner-tile-chevron {
+  color: var(--seal-red);
+  transform: translateX(3px);
+}
+
+/* Rückweg von einem einzelnen Rechner zur Übersicht */
+.rechner-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--wash-grey);
+  cursor: pointer;
+  margin-bottom: var(--space-5);
+  transition: color var(--duration-fast) var(--ease-out);
+  user-select: none;
+}
+.rechner-back:hover { color: var(--seal-red); }
+.rechner-back svg { width: 15px; height: 15px; }
+
+.rechner-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+  align-items: stretch;
+}
+.rechner-layout > * { min-width: 0; }
+
+/* Die Chart-Karte füllt die volle Höhe der Eingabespalte — sonst klafft
+   rechts unter dem Diagramm eine tote Fläche. */
+.rechner-layout .chart-card {
+  display: flex;
+  flex-direction: column;
+}
+.rechner-layout .chart-canvas-wrap {
+  flex: 1;
+  height: auto;
+  min-height: 240px;
+}
+
+/* Einleitungstext oben in der Eingabekarte */
+.rechner-intro {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--wash-grey);
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--ink-wash);
+}
+
+/* Label links, Zahlenfeld rechts — für Felder, die zusätzlich einen Regler
+   haben und deshalb den Wert direkt neben dem Label zeigen. */
+.field-inline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.field-inline .form-label {
+  margin: 0;
+  min-width: 0;
+}
+.field-inline .form-input {
+  flex: 0 0 7.5rem;
+  width: 7.5rem;
+  text-align: right;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ── Range-Slider ─────────────────────────────────────────────────────────
+   Nativ ist der Regler browserblau — das bricht das Gold-Schema. Die Füllung
+   links vom Griff kommt aus --range-pct, das JS beim Bewegen setzt. */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--seal-red) 0%,
+    var(--seal-red) var(--range-pct, 0%),
+    var(--ink-wash-md) var(--range-pct, 0%),
+    var(--ink-wash-md) 100%
+  );
+}
+.range-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ink-wash-md);
+}
+.range-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--seal-red);
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--seal-red);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--seal-red);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.range-slider:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.range-slider:focus-visible { outline: none; }
+.range-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(201,168,76,0.25);
+}
+.range-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(201,168,76,0.25);
+}
+
+/* Skalen-Endpunkte unter dem Regler */
+.range-scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--wash-grey);
+  margin-top: var(--space-1);
+}
+
+/* Ergebnis-Zeile am Fuß einer Eingabekarte (z. B. Ersparnis durch
+   Sondertilgung) — zwei kleine Kennzahlen, deutlich abgesetzt. */
+.rechner-kpi-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--ink-wash);
+}
+/* Label links, Wert rechts — nebeneinander bräche der Wert in der schmalen
+   Eingabespalte um ("12 Jahre 11\A Monate"). */
+.rechner-kpi-row > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.rechner-kpi-row .label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wash-grey);
+}
+.rechner-kpi-row .value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: #4ADE80;
+  white-space: nowrap;
+}
+.rechner-kpi-row .value.is-empty { color: var(--wash-grey); font-weight: 400; }
 
 .chart-canvas-wrap {
   position: relative;
@@ -398,14 +913,14 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .data-table td {
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
   vertical-align: middle;
 }
 
 .data-table tr:last-child td { border-bottom: none; }
 
 .data-table tr:hover td {
-  background: rgba(0,0,0,0.02);
+  background: rgba(255,255,255,0.03);
 }
 
 .data-table .mono {
@@ -414,6 +929,29 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .data-table .right { text-align: right; }
+
+/* Laufende Planjahr-Nummer neben dem Kalenderjahr — sekundär, damit "Jahr 8
+   meines Plans" ablesbar bleibt, ohne die Spalte zu dominieren. */
+.data-table .jahr-nr {
+  margin-left: var(--space-2);
+  font-size: 0.7rem;
+  color: var(--wash-grey);
+}
+
+
+/* Lange Pläne (Tilgung, Zinseszins) laufen sonst über tausende Pixel und
+   drücken alles Übrige aus dem Blick — deshalb Innenscroll mit fixem Kopf. */
+.table-scroll {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.table-scroll .data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
 
 .data-table .actions {
   display: flex;
@@ -662,7 +1200,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .form-textarea:focus {
   outline: none;
   border-color: var(--seal-red);
-  box-shadow: 0 0 0 2px rgba(138,28,21,0.12);
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.22);
 }
 
 .form-input.mono,
@@ -877,26 +1415,39 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .sp-position {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
   transition: background var(--duration-fast);
 }
 
+.sp-pos-unit {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--wash-grey);
+}
+
 .sp-position:hover { background: rgba(0,0,0,0.02); }
 
-/* Automatisch übernommene Fixkosten (read-only, aus anderen Modulen) */
-.sp-auto-head {
+/* Gruppierung der Fixkosten-Liste: automatisch aus anderen Modulen
+   übernommene Posten vs. manuell eingetragene (nur wenn beide vorkommen). */
+.sp-group-head {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: var(--space-2) var(--space-5) var(--space-1);
+  padding: var(--space-3) var(--space-5) var(--space-1);
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--wash-grey);
 }
+
+.sp-group + .sp-group {
+  border-top: 1px solid var(--ink-wash);
+}
+
+.sp-group-auto .sp-group-head svg { color: var(--seal-red); }
 
 .sp-position-auto {
   grid-template-columns: 1fr auto;
@@ -997,18 +1548,52 @@ input[type="number"]::-webkit-outer-spin-button {
 .sp-sonstiges-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-5);
-  background: rgba(0,0,0,0.025);
-  font-size: var(--text-xs);
-  color: var(--wash-grey);
-  font-family: var(--font-mono);
+  gap: 0.6rem;
+  padding: var(--space-3) var(--space-5);
+  background: rgba(240,160,48,0.07);
+  border-top: 1px dashed var(--ink-wash-md);
+  border-bottom: 1px dashed var(--ink-wash-md);
+  font-size: var(--text-sm);
+  color: var(--ink-black);
 }
 
-.sp-sonstiges-row .mono {
+.sp-sonstiges-icon {
+  color: #F0A030;
+  flex-shrink: 0;
+}
+
+.sp-sonstiges-label {
+  flex: 1;
+}
+
+.sp-sonstiges-input {
+  width: 30px;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 600;
+  color: #F0A030;
+  border: none;
+  border-bottom: 1px solid #F0A030;
+  background: transparent;
+  text-align: right;
+  padding: 0;
+  margin: 0 2px;
+  -moz-appearance: textfield;
+}
+
+.sp-sonstiges-input::-webkit-outer-spin-button,
+.sp-sonstiges-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sp-sonstiges-val {
   min-width: 90px;
   text-align: right;
   padding-right: 26px;
+  font-weight: 600;
+  color: #F0A030;
 }
 
 .sp-add-btn {
@@ -1210,6 +1795,10 @@ input[type="number"]::-webkit-outer-spin-button {
     grid-template-columns: 1fr;
   }
 
+  .rechner-layout {
+    grid-template-columns: 1fr;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
   }
@@ -1318,6 +1907,8 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .vs-laufzeit-cell { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--wash-grey); }
 .vs-laufzeit-cell.unbefristet { color: var(--wash-grey); font-style: italic; }
+.vs-laufzeit-cell.soon { color: #F0A030; font-weight: 600; }
+.vs-laufzeit-cell.urgent { color: var(--seal-red); font-weight: 600; }
 
 /* ── Notfall ────────────────────────────────────────────────────────────────── */
 
@@ -1609,6 +2200,104 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+/* ── Steuerbescheide-Jahresvergleich: erklärungsbedürftige Posten ─────────────
+   Gepunktete Unterstreichung als Signal "hier steckt mehr dahinter" — nur auf
+   den Zeilen, die tatsächlich eine erklaerung tragen (s. SB_ZEILEN), damit
+   nicht die halbe Tabelle unterstrichen aussieht. */
+.sb-hilfe {
+  cursor: help;
+  text-decoration: underline dotted var(--wash-grey) 1px;
+  text-underline-offset: 3px;
+}
+
+/* Gruppenköpfe im Jahresvergleich — derselbe Siegel-Strich wie bei den
+   Rechner-Überschriften (.rechner-section-title), nur als Tabellenzeile statt
+   Flex-Head, damit "was gehört zusammen" auf einen Blick sichtbar ist. */
+.sb-gruppe-kopf {
+  padding: var(--space-6) var(--space-4) var(--space-2) !important;
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wash-grey);
+  border-bottom: none !important;
+}
+.sb-gruppe-kopf::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 0.8em;
+  background: var(--seal-red);
+  margin-right: var(--space-2);
+  vertical-align: -1px;
+  border-radius: 1px;
+}
+.sb-gruppe-row:first-child .sb-gruppe-kopf { padding-top: 0 !important; }
+
+/* ── Steuerprognose: Kind-Karte ───────────────────────────────────────────── */
+
+.st-kind-card {
+  position: relative;
+  border: 1px solid var(--ink-wash);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) 2.25rem var(--space-3) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.st-kind-remove {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--wash-grey);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  display: flex;
+  transition: color var(--duration-fast);
+}
+
+.st-kind-remove:hover { color: var(--seal-red); }
+
+.st-kind-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+/* ── Steuerprognose: Ich/Ehefrau-Spalten ──────────────────────────────────── */
+
+.st-person-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .st-person-cols { grid-template-columns: 1fr; }
+}
+
+.st-person-card {
+  border: 1px solid var(--ink-wash);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.st-person-card-head {
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-black);
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 /* ── Formular-Abschnitt-Titel ─────────────────────────────────────────────── */
@@ -2084,7 +2773,7 @@ body.demo-mode #publish-btn {
 
 /* Einnahme-Zeile: Bezeichnung · Empfänger · Betrag · Löschen */
 .sp-income-pos {
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
 }
 .sp-pos-empf {
   font-family: var(--font-mono);

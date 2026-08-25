@@ -2,13 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Todo, BugIdee
+from ..models import Todo
 from ..schemas import (
     TodoCreate, TodoUpdate, TodoResponse,
-    BugIdeeCreate, BugIdeeUpdate, BugIdeeResponse,
 )
 
-router = APIRouter(tags=['Todos & Ideen'])
+router = APIRouter(tags=['Todos'])
 
 
 # ── Todos ──────────────────────────────────────────────────────────────────────
@@ -44,34 +43,3 @@ def delete_todo(todo_id: int, db: Session = Depends(get_db)):
     db.delete(obj); db.commit()
 
 
-# ── Bug & Ideen ────────────────────────────────────────────────────────────────
-
-@router.get('/bug-ideen/', response_model=list[BugIdeeResponse])
-def list_bug_ideen(db: Session = Depends(get_db)):
-    return db.query(BugIdee).order_by(BugIdee.status, BugIdee.erstellt_am.desc()).all()
-
-
-@router.post('/bug-ideen/', response_model=BugIdeeResponse, status_code=201)
-def create_bug_idee(data: BugIdeeCreate, db: Session = Depends(get_db)):
-    obj = BugIdee(**data.model_dump())
-    db.add(obj); db.commit(); db.refresh(obj)
-    return obj
-
-
-@router.put('/bug-ideen/{item_id}', response_model=BugIdeeResponse)
-def update_bug_idee(item_id: int, data: BugIdeeUpdate, db: Session = Depends(get_db)):
-    obj = db.get(BugIdee, item_id)
-    if not obj:
-        raise HTTPException(404, 'Eintrag nicht gefunden')
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(obj, k, v)
-    db.commit(); db.refresh(obj)
-    return obj
-
-
-@router.delete('/bug-ideen/{item_id}', status_code=204)
-def delete_bug_idee(item_id: int, db: Session = Depends(get_db)):
-    obj = db.get(BugIdee, item_id)
-    if not obj:
-        raise HTTPException(404, 'Eintrag nicht gefunden')
-    db.delete(obj); db.commit()

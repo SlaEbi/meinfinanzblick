@@ -79,14 +79,6 @@ export const DEMO = {
     { id:6, titel:'WLAN-Passwort + Router-Admin', kategorie:'digital', verweis:'Kleines Heft in Schreibtischschublade (links)', hinweis:null, prioritaet:3, erledigt:false, sort_order:5, erstellt_am:'2026-01-01T00:00:00' },
   ],
 
-  dokumente: [
-    { id:1, titel:'Testament (beidseitig)', kategorie:'testament', aufbewahrungsort:'Notariat Dr. Müller + Safe', aussteller:'Notar Dr. Thomas Müller', datum:'2022-03-15', gueltig_bis:null, notiz:'Gegenseitiges Testament, Berliner Testament', erstellt_am:'2026-01-01T00:00:00' },
-    { id:2, titel:'Grundbuchauszug Eigenheim', kategorie:'immobilien', aufbewahrungsort:'Ordner Immobilien', aussteller:'Grundbuchamt Stuttgart-Bad Cannstatt', datum:'2015-06-20', gueltig_bis:null, notiz:null, erstellt_am:'2026-01-01T00:00:00' },
-    { id:3, titel:'Renteninformation 2025', kategorie:'rente', aufbewahrungsort:'Ordner Rente', aussteller:'Deutsche Rentenversicherung Bund', datum:'2025-04-01', gueltig_bis:null, notiz:'Hochrechnung: 1.840 € / Monat (Rentenbeginn 67)', erstellt_am:'2026-01-01T00:00:00' },
-    { id:4, titel:'Einkommensteuerbescheid 2024', kategorie:'steuer', aufbewahrungsort:'Ordner Steuern 2024', aussteller:'Finanzamt Stuttgart-Körperschaften', datum:'2025-08-15', gueltig_bis:null, notiz:null, erstellt_am:'2026-01-01T00:00:00' },
-    { id:5, titel:'Vorsorgevollmacht', kategorie:'vollmacht', aufbewahrungsort:'Notariat Dr. Müller + Safe', aussteller:'Notar Dr. Thomas Müller', datum:'2022-03-15', gueltig_bis:null, notiz:'Gegenseitig (Max ↔ Julia)', erstellt_am:'2026-01-01T00:00:00' },
-  ],
-
   networth: {
     aktuell: {
       summe_konten:        29416.25,

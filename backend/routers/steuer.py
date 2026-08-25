@@ -12,7 +12,7 @@ from ..schemas import (
 from ..services.steuer import (
     PrognoseInput, Kind, Betriebsstaette, berechne_prognose,
 )
-from ..services.steuer_konstanten import parameter as steuer_parameter
+from ..services.steuer_konstanten import parameter as steuer_parameter, ist_naeherung
 
 router = APIRouter(prefix='/steuer', tags=['Steuerprognose'])
 
@@ -38,6 +38,7 @@ def _apply_kinder_betriebsstaetten(db: Session, obj: SteuerPrognose, data: Steue
         SteuerBetriebsstaette(
             gemeinde=b.gemeinde, hebesatz=b.hebesatz, arbeitsloehne=b.arbeitsloehne,
             taetigkeitsanteil_pct=b.taetigkeitsanteil_pct, prozent_manuell=b.prozent_manuell,
+            vorauszahlung=b.vorauszahlung,
         )
         for b in data.betriebsstaetten
     ]
@@ -97,6 +98,7 @@ def berechnung(jahr: int, db: Session = Depends(get_db)):
         kirchensteuerpflicht=obj.kirchensteuerpflicht,
         zerlegungsmodus=obj.zerlegungsmodus,
         gewinn_gewerbebetrieb=D(str(obj.gewinn_gewerbebetrieb or 0)),
+        gewinn_gewerbebetrieb_ehefrau=D(str(obj.gewinn_gewerbebetrieb_ehefrau or 0)),
         sonstige_einkuenfte=D(str(obj.sonstige_einkuenfte or 0)),
         bruttolohn_ehefrau=D(str(obj.bruttolohn_ehefrau or 0)),
         werbungskosten_ehefrau=D(str(obj.werbungskosten_ehefrau or 0)),
@@ -119,8 +121,6 @@ def berechnung(jahr: int, db: Session = Depends(get_db)):
         lohnsteuer_ehefrau=D(str(obj.lohnsteuer_ehefrau or 0)),
         soli_ehefrau=D(str(obj.soli_ehefrau or 0)),
         kirchensteuer_ehefrau=D(str(obj.kirchensteuer_ehefrau or 0)),
-        gewst_vz_standort1=D(str(obj.gewst_vz_standort1 or 0)),
-        gewst_vz_standort2=D(str(obj.gewst_vz_standort2 or 0)),
         kinder=[
             Kind(geburtsdatum=k.geburtsdatum, in_ausbildung_18_25=bool(k.in_ausbildung_18_25), name=k.name or '')
             for k in obj.kinder
@@ -131,6 +131,7 @@ def berechnung(jahr: int, db: Session = Depends(get_db)):
                 arbeitsloehne=D(str(b.arbeitsloehne or 0)),
                 taetigkeitsanteil_pct=D(str(b.taetigkeitsanteil_pct or 0)),
                 prozent_manuell=D(str(b.prozent_manuell)) if b.prozent_manuell is not None else None,
+                vorauszahlung=D(str(b.vorauszahlung or 0)),
             )
             for b in obj.betriebsstaetten
         ],
@@ -149,3 +150,10 @@ def hebesatz_defaults(jahr: int):
     """Default-Hebesätze fürs Formular (Nürtingen/Böblingen), editierbar."""
     p = steuer_parameter(jahr)
     return {g: float(h) for g, h in p['hebesatz_defaults'].items()}
+
+
+@router.get('/{jahr}/meta')
+def meta(jahr: int):
+    """Formular-Metadaten fürs Frontend: ob für dieses Jahr ein eigens
+    recherchierter Tarif vorliegt oder der jüngste bekannte als Näherung dient."""
+    return {'ist_naeherung': ist_naeherung(jahr)}

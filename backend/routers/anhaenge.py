@@ -16,7 +16,7 @@ MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 ALLOWED_ENTITY_TYPEN = {
     'konto', 'darlehen', 'depot', 'sachwert',
-    'versicherung', 'vertrag', 'dokument', 'notfall',
+    'versicherung', 'vertrag', 'notfall', 'steuerbescheid',
 }
 
 router = APIRouter(prefix='/anhaenge', tags=['Anhänge'])

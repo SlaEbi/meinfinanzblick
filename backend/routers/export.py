@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import (
-    Darlehen, Depot, Dokument, Konto, Kontakt, NotfallEintrag, Versicherung,
+    Darlehen, Depot, Konto, Kontakt, NotfallEintrag, Versicherung,
 )
 
 router = APIRouter(prefix='/export', tags=['Export'])
@@ -195,16 +195,6 @@ def build_notfall_pdf(db: Session) -> BytesIO:
             [4.5 * cm, 4.3 * cm, 4.3 * cm, 4 * cm], s,
         ))
 
-    # ── Dokumente ──────────────────────────────────────────────────────────
-    dokumente = db.query(Dokument).order_by(Dokument.kategorie, Dokument.titel).all()
-    if dokumente:
-        story.append(Paragraph('Wichtige Dokumente', s['section']))
-        rows = [[d.titel, d.aufbewahrungsort, d.aussteller] for d in dokumente]
-        story.append(data_table(
-            ['TITEL', 'AUFBEWAHRUNGSORT', 'AUSSTELLER'], rows,
-            [6 * cm, 5.5 * cm, 5.6 * cm], s,
-        ))
-
     # ── Weitere Notfall-Einträge, nach Kategorie ──────────────────────────
     weitere = db.query(NotfallEintrag).filter(
         NotfallEintrag.kategorie != 'sofortmassnahme'
@@ -219,10 +209,13 @@ def build_notfall_pdf(db: Session) -> BytesIO:
             if not eintraege:
                 continue
             story.append(Paragraph(NF_KAT_LABEL.get(kat, kat).upper(), s['kat']))
-            rows = [[e.titel, e.verweis, e.hinweis] for e in eintraege]
+            rows = [
+                [e.titel, e.verweis, e.hinweis, e.gueltig_bis.strftime('%d.%m.%Y') if e.gueltig_bis else '']
+                for e in eintraege
+            ]
             story.append(data_table(
-                ['TITEL', 'VERWEIS (WO LIEGT ES)', 'HINWEIS'], rows,
-                [4.5 * cm, 4.8 * cm, 7.8 * cm], s,
+                ['TITEL', 'VERWEIS (WO LIEGT ES)', 'HINWEIS', 'GÜLTIG BIS'], rows,
+                [4 * cm, 4.3 * cm, 6.3 * cm, 2.5 * cm], s,
             ))
             story.append(Spacer(1, 6))
 

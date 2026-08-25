@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
-  <link rel="stylesheet" href="/css/tokens.css?v=9">
-  <link rel="stylesheet" href="/css/app.css?v=30">
+  <link rel="stylesheet" href="/css/tokens.css?v=10">
+  <link rel="stylesheet" href="/css/app.css?v=41">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -34,6 +34,15 @@
           <path d="M14.5 8H10a2 2 0 000 4h4a2 2 0 010 4H9M12 6v2M12 16v2"/>
         </svg>
         Spending Plan
+      </div>
+
+      <div class="nav-item" data-view="sparziele">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+          <path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/>
+          <path d="M16 10h.01"/>
+          <path d="M2 8v1a2 2 0 0 0 2 2h1"/>
+        </svg>
+        Sparziele
       </div>
 
       <div class="nav-item" data-view="konten">
@@ -85,19 +94,22 @@
         Verträge
       </div>
 
-      <div class="nav-item" data-view="dokumente">
+      <div class="nav-item" data-view="steuern">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-          <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+          <line x1="19" y1="5" x2="5" y2="19"/>
+          <circle cx="6.5" cy="6.5" r="2.5"/>
+          <circle cx="17.5" cy="17.5" r="2.5"/>
         </svg>
-        Dokumente
+        Steuern
       </div>
 
-      <div class="nav-item" data-view="notfall">
+      <div class="nav-item" data-view="rechner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/>
+          <line x1="8" y1="11" x2="8.01" y2="11"/><line x1="12" y1="11" x2="12.01" y2="11"/><line x1="16" y1="11" x2="16.01" y2="11"/>
+          <line x1="8" y1="15" x2="8.01" y2="15"/><line x1="12" y1="15" x2="12.01" y2="15"/><line x1="16" y1="15" x2="16.01" y2="15"/>
         </svg>
-        Notfall
+        Rechner
       </div>
 
       <div class="nav-item" data-view="todos">
@@ -108,12 +120,13 @@
         ToDo-Liste
       </div>
 
-      <div class="nav-item" data-view="bug-ideen">
+      <div class="nav-item nav-item--notfall" data-view="notfall">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-          <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
-        Bugs &amp; Ideen
+        Notfall
       </div>
+
     </nav>
 
     <!-- System Controls -->
@@ -360,10 +373,6 @@
           <p>Hypotheken, Raten- und Konsum­kredite</p>
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center">
-          <button class="btn btn-ghost" onclick="openDarlehensrechner()" title="Darlehensszenarien durchrechnen, unabhängig von gespeicherten Darlehen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="8.01" y2="11"/><line x1="12" y1="11" x2="12.01" y2="11"/><line x1="16" y1="11" x2="16.01" y2="11"/><line x1="8" y1="15" x2="8.01" y2="15"/><line x1="12" y1="15" x2="12.01" y2="15"/><line x1="16" y1="15" x2="16.01" y2="15"/></svg>
-            Rechner
-          </button>
           <button class="btn btn-primary" onclick="openDarlehenForm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M12 5v14M5 12h14"/>
@@ -398,6 +407,23 @@
     <!-- ────────────────── Spending Plan ────────────────── -->
     <section id="view-spending" class="view">
       <div id="sp-content"></div>
+    </section>
+
+    <!-- ────────────────── Sparziele ────────────────── -->
+    <section id="view-sparziele" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Sparziele</h2>
+          <p>Sparschweine für konkrete Wünsche — mit eigener Sparrate und Fortschritt</p>
+        </div>
+        <button class="btn btn-primary" onclick="openSparzielForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Sparziel hinzufügen
+        </button>
+      </div>
+      <div id="sparziele-grid" class="sparziel-grid"></div>
     </section>
 
     <!-- ────────────────── Versicherungen ────────────────── -->
@@ -474,6 +500,296 @@
       </div>
     </section>
 
+    <!-- ────────────────── Steuern ────────────────── -->
+    <section id="view-steuern" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Steuern</h2>
+          <p>Steuerprognose und Entwicklung der Steuerlast über die Jahre</p>
+        </div>
+        <button class="btn btn-ghost" onclick="openSteuerprognose()" title="Einkommen- und Gewerbesteuer für das laufende Jahr vorausberechnen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+          Steuerprognose
+        </button>
+        <button class="btn btn-primary" onclick="openSteuerbescheidForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+          Steuerbescheid hinzufügen
+        </button>
+      </div>
+
+      <div class="chart-grid chart-grid-full">
+        <div class="chart-card">
+          <div class="chart-title">Steuerbelastung — Verlauf</div>
+          <div class="chart-subtitle">Gesamtbelastung und Belastungsquote je Jahr</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-steuerbelastung"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow-x:auto">
+        <div id="steuerbescheide-vergleich"></div>
+      </div>
+    </section>
+
+    <!-- ────────────────── Rechner: Übersicht ────────────────── -->
+    <section id="view-rechner" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Rechner</h2>
+          <p>Freie Szenarien, live berechnet — unabhängig von deinen gespeicherten Daten</p>
+        </div>
+      </div>
+
+      <div class="rechner-grid">
+        <div class="rechner-tile" onclick="navigate('rechner-zinseszins')">
+          <div class="rechner-tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+              <polyline points="16 7 22 7 22 13"/>
+            </svg>
+          </div>
+          <div class="rechner-tile-body">
+            <h3>Zinseszins-Simulator</h3>
+            <p>Wie sich Startkapital und monatliche Sparrate über die Jahre verzinsen — inklusive Kaufkraft nach Inflation.</p>
+          </div>
+          <svg class="rechner-tile-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        <div class="rechner-tile" onclick="navigate('rechner-darlehen')">
+          <div class="rechner-tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+              <path d="M15 9H9a2 2 0 00-2 2v2a2 2 0 002 2h6a2 2 0 002-2v-2a2 2 0 00-2-2z"/>
+              <path d="M12 17v2M12 5v2"/>
+            </svg>
+          </div>
+          <div class="rechner-tile-body">
+            <h3>Darlehensrechner</h3>
+            <p>Tilgungsplan, Restschuld-Verlauf und Sondertilgung frei simulieren — unabhängig von deinen gespeicherten Darlehen.</p>
+          </div>
+          <svg class="rechner-tile-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+
+        <div class="rechner-tile" onclick="navigate('rechner-kapitalentnahme')">
+          <div class="rechner-tile-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+              <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>
+              <polyline points="16 17 22 17 22 11"/>
+            </svg>
+          </div>
+          <div class="rechner-tile-body">
+            <h3>Kapitalentnahmerechner</h3>
+            <p>Wie lange ein Kapitalstock bei fester monatlicher Entnahme reicht — oder welche Entnahme für eine Ziel-Laufzeit möglich ist.</p>
+          </div>
+          <svg class="rechner-tile-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────────────── Rechner: Zinseszins-Simulator ────────────────── -->
+    <section id="view-rechner-zinseszins" class="view">
+      <div class="rechner-back" onclick="navigate('rechner')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Rechner
+      </div>
+      <div class="page-header">
+        <div>
+          <h2>Zinseszins-Simulator</h2>
+          <p>Freier Rechner — live berechnet, unabhängig von deinen gespeicherten Konten und Depots</p>
+        </div>
+      </div>
+
+      <div class="rechner-layout">
+        <div class="card">
+          <p class="rechner-intro">Wie sich Startkapital und monatliche Sparrate über die Jahre verzinsen — inklusive Kaufkraft nach Inflation.</p>
+          <div class="form-group">
+            <label class="form-label">Startkapital (€)</label>
+            <input id="zz-startkapital" class="form-input" type="number" step="500" min="0" value="10000" oninput="zzRecalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Monatliche Sparrate (€)</label>
+            <input id="zz-sparrate" class="form-input" type="number" step="25" min="0" value="300" oninput="zzRecalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zinssatz (% p. a.)</label>
+            <input id="zz-zinssatz" class="form-input" type="number" step="0.1" min="0" value="6" oninput="zzRecalc()">
+          </div>
+          <div class="form-group">
+            <div class="field-inline">
+              <label class="form-label" for="zz-laufzeit">Laufzeit (Jahre)</label>
+              <input id="zz-laufzeit" class="form-input mono" type="number" step="1" min="1" max="60" value="25"
+                oninput="zzLaufzeitInputChanged(this.value)">
+            </div>
+            <input id="zz-laufzeit-slider" class="range-slider" type="range" min="1" max="60" step="1" value="25" oninput="zzLaufzeitSliderInput(this.value)">
+            <div class="range-scale"><span>1 Jahr</span><span>60 Jahre</span></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Inflationsrate (% p. a.)</label>
+            <input id="zz-inflation" class="form-input" type="number" step="0.1" min="0" value="2" oninput="zzRecalc()">
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Kapitalentwicklung</div>
+          <div class="chart-subtitle">Gesamtkapital vs. eigene Einzahlungen über die Jahre</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-zinseszins"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card stat-card--gold"><div class="label">Endkapital</div><div class="value mono" id="zz-out-gesamtkapital">—</div></div>
+        <div class="stat-card stat-card--blue"><div class="label">Endkapital (real)</div><div class="value mono" id="zz-out-gesamtkapital-real">—</div><div class="hint">in Kaufkraft von heute</div></div>
+        <div class="stat-card stat-card--grey"><div class="label">Eigene Einzahlungen</div><div class="value mono" id="zz-out-einzahlungen">—</div></div>
+        <div class="stat-card stat-card--green"><div class="label">Zinsertrag</div><div class="value mono" id="zz-out-zinsertrag">—</div></div>
+      </div>
+      <div class="card table-scroll" style="padding:0">
+        <div id="zz-tabelle-container"><p class="form-hint" style="padding:1.5rem">Lädt…</p></div>
+      </div>
+    </section>
+
+    <!-- ────────────────── Rechner: Darlehensrechner ────────────────── -->
+    <section id="view-rechner-darlehen" class="view">
+      <div class="rechner-back" onclick="navigate('rechner')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Rechner
+      </div>
+      <div class="page-header">
+        <div>
+          <h2>Darlehensrechner</h2>
+          <p>Freier Rechner — live berechnet, unabhängig von deinen gespeicherten Darlehen</p>
+        </div>
+      </div>
+
+      <div class="rechner-layout">
+        <div class="card">
+          <p class="rechner-intro">Simuliere ein Darlehensszenario mit frei wählbaren Werten — unabhängig von deinen gespeicherten Darlehen.</p>
+          <div class="form-group">
+            <label class="form-label">Darlehenssumme (€)</label>
+            <input id="dr-betrag" class="form-input" type="number" step="1000" min="0" value="200000" oninput="drRecalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zinssatz (% p. a.)</label>
+            <input id="dr-zinssatz" class="form-input" type="number" step="0.01" min="0" value="3.50" oninput="drRecalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Darlehenstyp</label>
+            <select id="dr-typ" class="form-select" onchange="drTypChanged()">
+              <option value="annuitaet">Annuitätendarlehen</option>
+              <option value="tilgungsdarlehen">Tilgungsdarlehen (feste Tilgung)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" id="dr-rate-label">Monatliche Rate (€)</label>
+              <input id="dr-rate" class="form-input" type="number" step="10" min="0" value="900" oninput="drAnchorChanged('rate')">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Laufzeit (Jahre)</label>
+              <input id="dr-laufzeit" class="form-input" type="number" step="0.5" min="0" value="" oninput="drAnchorChanged('laufzeit')">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="field-inline">
+              <label class="form-label" for="dr-sonder-input">Sondertilgung (€/Jahr)</label>
+              <input id="dr-sonder-input" class="form-input mono" type="number" step="250" min="0" value="0"
+                oninput="drSonderInputChanged(this.value)">
+            </div>
+            <input id="dr-slider" class="range-slider" type="range" min="0" max="50000" step="250" value="0" oninput="drSliderInput(this.value)">
+            <div class="range-scale">
+              <span>0 €</span>
+              <span id="dr-slider-max">50.000 €</span>
+            </div>
+            <div class="rechner-kpi-row">
+              <div>
+                <span class="label">Laufzeitverkürzung</span>
+                <span class="value is-empty" id="dr-out-monate-diff">—</span>
+              </div>
+              <div>
+                <span class="label">Zinsersparnis</span>
+                <span class="value is-empty" id="dr-out-zinsen-diff">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Restschuld-Verlauf</div>
+          <div class="chart-subtitle" id="dr-chart-subtitle">Restschuld über die gesamte Laufzeit</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-dr-restschuld"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card stat-card--gold"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
+        <div class="stat-card stat-card--amber"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
+        <div class="stat-card stat-card--red"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
+      </div>
+      <div class="card table-scroll" style="padding:0">
+        <div id="dr-tabelle-container"><p class="form-hint" style="padding:1.5rem">Lädt…</p></div>
+      </div>
+    </section>
+
+    <!-- ────────────────── Rechner: Kapitalentnahmerechner ────────────────── -->
+    <section id="view-rechner-kapitalentnahme" class="view">
+      <div class="rechner-back" onclick="navigate('rechner')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Rechner
+      </div>
+      <div class="page-header">
+        <div>
+          <h2>Kapitalentnahmerechner</h2>
+          <p>Freier Rechner — live berechnet, unabhängig von deinen gespeicherten Konten und Depots</p>
+        </div>
+      </div>
+
+      <div class="rechner-layout">
+        <div class="card">
+          <p class="rechner-intro">Simuliert die monatliche Entnahme aus einem Kapitalstock, der währenddessen weiter verzinst wird.</p>
+          <div class="form-group">
+            <label class="form-label">Kapital (€)</label>
+            <input id="ke-kapital" class="form-input" type="number" step="500" min="0" value="15000" oninput="keRecalc()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zinssatz (% p. a.)</label>
+            <input id="ke-zinssatz" class="form-input" type="number" step="0.1" min="0" value="3" oninput="keRecalc()">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Monatliche Entnahme (€)</label>
+              <input id="ke-entnahme" class="form-input" type="number" step="10" min="0" value="100" oninput="keAnchorChanged('entnahme')">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Laufzeit (Jahre)</label>
+              <input id="ke-laufzeit" class="form-input" type="number" step="0.5" min="0" value="" oninput="keAnchorChanged('laufzeit')">
+            </div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Kapitalverlauf</div>
+          <div class="chart-subtitle">Restkapital über die Entnahmedauer</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-ke-kapital"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card stat-card--gold"><div class="label">Laufzeit bis Kapitalverzehr</div><div class="value mono" id="ke-out-laufzeit">—</div></div>
+        <div class="stat-card stat-card--green"><div class="label">Zinserträge gesamt</div><div class="value mono" id="ke-out-zinsertrag">—</div></div>
+        <div class="stat-card stat-card--grey"><div class="label">Entnahmen gesamt</div><div class="value mono" id="ke-out-entnahme">—</div></div>
+        <div class="stat-card stat-card--blue"><div class="label">Max. Entnahme bei Kapitalerhalt</div><div class="value mono" id="ke-out-max-erhalt">—</div><div class="hint">Kapital bleibt nominal erhalten</div></div>
+      </div>
+      <div class="card table-scroll" style="padding:0">
+        <div id="ke-tabelle-container"><p class="form-hint" style="padding:1.5rem">Lädt…</p></div>
+      </div>
+    </section>
+
     <!-- ────────────────── Sachwerte ────────────────── -->
     <section id="view-sachwerte" class="view">
       <div class="page-header">
@@ -543,36 +859,6 @@
             </tr>
           </thead>
           <tbody id="depots-tbody"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ────────────────── Dokumente ────────────────── -->
-    <section id="view-dokumente" class="view">
-      <div class="page-header">
-        <div>
-          <h2>Wichtige Dokumente</h2>
-          <p>Testament, Vollmachten, Verfügungen und andere Urkunden</p>
-        </div>
-        <button class="btn btn-primary" onclick="openDokumentForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
-          Dokument hinzufügen
-        </button>
-      </div>
-      <div class="card" style="padding:0">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Kategorie</th>
-              <th>Titel</th>
-              <th>Aufbewahrungsort</th>
-              <th>Aussteller</th>
-              <th>Datum</th>
-              <th>Gültig bis</th>
-              <th class="right">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody id="dokumente-tbody"></tbody>
         </table>
       </div>
     </section>
@@ -664,20 +950,6 @@
       <div id="todos-container"></div>
     </section>
 
-    <!-- ────────────────── Bugs & Ideen ────────────────── -->
-    <section id="view-bug-ideen" class="view">
-      <div class="page-header">
-        <div>
-          <h2>Bugs &amp; Ideen</h2>
-          <p>Feedback und Verbesserungsvorschläge für MeinFinanzblick</p>
-        </div>
-        <button class="btn btn-primary" onclick="openBugIdeeForm()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Eintrag hinzufügen
-        </button>
-      </div>
-      <div id="bug-ideen-container"></div>
-    </section>
 
   </main><!-- /main-content -->
 </div><!-- /app-shell -->
@@ -704,7 +976,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=67"></script>
+<script type="module" src="/js/app.js?v=98"></script>
 
 
 </body>

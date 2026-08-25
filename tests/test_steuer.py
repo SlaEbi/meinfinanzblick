@@ -1,4 +1,5 @@
 """Tests für die Steuerprognose — Tarif, Zerlegung, Anrechnung, Günstigerprüfung."""
+import pytest
 from datetime import date
 from decimal import Decimal as D
 
@@ -8,9 +9,37 @@ from backend.services.steuer import (
     solidaritaetszuschlag, gewerbeertrag, gewerbesteuermessbetrag,
     zerlegung_arbeitsloehne, zerlegung_prozent, anrechnung_35a,
     Betriebsstaette, monatliche_ruecklage,
+    PrognoseInput, berechne_prognose,
 )
+from backend.services.steuer_konstanten import parameter, ist_naeherung, TARIFE
 
 JAHR = 2026
+
+
+# ── Tarif-Stetigkeit über alle recherchierten Jahre ─────────────────────────
+# Jedes hinterlegte Jahr muss unabhängig vom Testjahr 2026 an den Zonengrenzen
+# einen stetigen Grenzsteuersatz ergeben — das ist die eigentliche Absicherung
+# gegen einen Zahlendreher beim Eintragen der Koeffizienten.
+
+@pytest.mark.parametrize("jahr", sorted(TARIFE.keys()))
+def test_alle_jahre_zonengrenzen_stetig(jahr):
+    p = parameter(jahr)
+    for grenze in (p["zone2_bis"], p["zone3_bis"], p["zone4_bis"]):
+        unten = est_tarif_grund(grenze, jahr)
+        oben = est_tarif_grund(grenze + 1, jahr)
+        assert abs(oben - unten) <= D("1"), f"Sprung an Zonengrenze {grenze} in {jahr}"
+
+
+@pytest.mark.parametrize("jahr", sorted(TARIFE.keys()))
+def test_alle_jahre_unter_grundfreibetrag_keine_steuer(jahr):
+    p = parameter(jahr)
+    assert est_tarif_grund(p["grundfreibetrag"], jahr) == 0
+
+
+def test_ist_naeherung_fuer_unbekanntes_jahr():
+    assert ist_naeherung(2027) is True
+    assert ist_naeherung(2026) is False
+    assert parameter(2027) == parameter(2026)  # Fallback auf jüngstes bekanntes Jahr
 
 
 # ── Einkommensteuertarif ─────────────────────────────────────────────────────
@@ -145,9 +174,22 @@ def test_gewerbeertrag_hinzurechnung_erst_ueber_freibetrag():
 
 
 def test_gewerbesteuermessbetrag_beispielrechnung():
-    # 100.000 € Gewerbeertrag, Freibetrag 24.500 € -> 75.500 €, davon 3,5 % = 2.642,50 €
+    # 100.000 € Gewerbeertrag, Freibetrag 24.500 € -> 75.500 €, davon 3,5 % = 2.642,50 €,
+    # abgerundet auf volle € (§ 11 Abs. 2 GewStG) = 2.642 €
     mb = gewerbesteuermessbetrag(D("100000"), JAHR)
-    assert mb == D("2642.50")
+    assert mb == D("2642")
+
+
+def test_gewerbesteuermessbetrag_echter_bescheid_2023():
+    """Gegenprobe mit dem realen GewSt-Messbescheid 2023 (FA Nürtingen).
+
+    Gewinn 132.090 €, Hinzurechnungen § 8 Nr. 1 von 25.636 € (bleiben unter dem
+    Freibetrag von 200.000 € und wirken daher nicht), Gewerbeertrag abgerundet
+    132.000 €, ./. 24.500 € = 107.500 €, davon 3,5 % = 3.762,50 -> 3.762 €.
+    """
+    ertrag = gewerbeertrag(D("132090"), D("25636"), D(0), 2023)
+    assert ertrag == D("132090")
+    assert gewerbesteuermessbetrag(ertrag, 2023) == D("3762")
 
 
 def test_gewerbesteuermessbetrag_unter_freibetrag_null():
@@ -173,6 +215,47 @@ def test_zerlegung_arbeitsloehne_mit_unternehmerlohn():
     assert boeb.messbetrag_anteil + nuer.messbetrag_anteil == messbetrag
     # Nürtingen hat den größeren Anteil (Unternehmerlohn + höhere Lohnsumme)
     assert nuer.messbetrag_anteil > boeb.messbetrag_anteil
+
+
+def test_zerlegung_drei_gemeinden_echter_bescheid_2023():
+    """Gegenprobe mit dem realen Zerlegungsbescheid 2023 (drei Betriebsstätten).
+
+    Arbeitslöhne 71.000 / 62.000 / 9.000 = 142.000 €, Messbetrag 3.762 €.
+    Der Unternehmerlohn steckt bereits in den ausgewiesenen Lohnsummen, daher
+    hier ohne Tätigkeitsanteil rechnen. Der Bescheid weist 1.881,01 / 1.642,56 /
+    238,43 aus; die Cent-Abweichung stammt aus den im Bescheid gerundet
+    dargestellten Lohnsummen, deshalb wird auf 2 Cent genau geprüft.
+    """
+    betriebsstaetten = [
+        Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("400"), arbeitsloehne=D("71000")),
+        Betriebsstaette(gemeinde="Böblingen", hebesatz=D("400"), arbeitsloehne=D("62000")),
+        Betriebsstaette(gemeinde="Neuffen", hebesatz=D("400"), arbeitsloehne=D("9000")),
+    ]
+    messbetrag = D("3762")
+    ergebnisse = zerlegung_arbeitsloehne(betriebsstaetten, messbetrag, 2023)
+
+    erwartet = {"Nürtingen": D("1881.01"), "Böblingen": D("1642.56"), "Neuffen": D("238.43")}
+    for e in ergebnisse:
+        assert abs(e.messbetrag_anteil - erwartet[e.gemeinde]) <= D("0.02")
+
+    # Die Anteile müssen den Messbetrag exakt ausschöpfen — kein verlorener Cent.
+    assert sum((e.messbetrag_anteil for e in ergebnisse), D(0)) == messbetrag
+
+
+def test_gewst_vorauszahlung_je_betriebsstaette():
+    """Vorauszahlungen hängen an der Betriebsstätte, nicht an zwei festen Slots —
+    mit drei Gemeinden müssen alle drei in den Abgleich eingehen."""
+    inp = PrognoseInput(
+        jahr=2023,
+        gewinn_gewerbebetrieb=D("132090"),
+        betriebsstaetten=[
+            Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("400"), arbeitsloehne=D("71000"), vorauszahlung=D("7000")),
+            Betriebsstaette(gemeinde="Böblingen", hebesatz=D("400"), arbeitsloehne=D("62000"), vorauszahlung=D("6000")),
+            Betriebsstaette(gemeinde="Neuffen", hebesatz=D("400"), arbeitsloehne=D("9000"), vorauszahlung=D("900")),
+        ],
+    )
+    erg = berechne_prognose(inp)
+    assert erg["gewst_vorauszahlungen_gesamt"] == 13900.0
 
 
 def test_zerlegung_prozent_manuell():

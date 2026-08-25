@@ -182,23 +182,10 @@ class NotfallEintrag(Base):
     kategorie = Column(String, nullable=False)  # zugaenge, dokumente, finanzen, digital, sofortmassnahme, sonstiges
     verweis = Column(String)          # wo liegt es (Passwort-Manager, Safe, Notar, etc.)
     hinweis = Column(String)          # zusätzliche Infos — KEINE Klartext-Passwörter
+    gueltig_bis = Column(Date)        # Ablaufdatum, z. B. bei Vollmachten/Verfügungen (optional)
     prioritaet = Column(Integer, default=2)  # 1=sofort, 2=bald, 3=irgendwann
     erledigt = Column(Boolean, default=False)  # für Checkliste
     sort_order = Column(Integer, default=0)
-    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-
-class Dokument(Base):
-    __tablename__ = 'dokumente'
-
-    id = Column(Integer, primary_key=True, index=True)
-    titel = Column(String, nullable=False)
-    kategorie = Column(String, nullable=False)  # testament, vollmacht, patientenverfuegung, immobilien, rente, steuer, versicherung, sonstiges
-    aufbewahrungsort = Column(String)            # Safe, Notar, Ordner, etc.
-    aussteller = Column(String)                  # Notar, Anwalt, Finanzamt, etc.
-    datum = Column(Date)                         # Datum des Dokuments
-    gueltig_bis = Column(Date)                   # Ablaufdatum (optional)
-    notiz = Column(String)
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -216,23 +203,12 @@ class Todo(Base):
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
-class BugIdee(Base):
-    __tablename__ = 'bug_ideen'
-
-    id = Column(Integer, primary_key=True, index=True)
-    titel = Column(String, nullable=False)
-    typ = Column(String, default='idee')     # bug | idee | verbesserung
-    beschreibung = Column(String)
-    prioritaet = Column(String, default='mittel')   # hoch | mittel | niedrig
-    status = Column(String, default='offen')        # offen | in_arbeit | erledigt
-    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
 
 class Anhang(Base):
     __tablename__ = 'anhaenge'
 
     id = Column(Integer, primary_key=True, index=True)
-    entity_typ = Column(String, nullable=False)   # konto, darlehen, depot, sachwert, versicherung, vertrag, dokument, notfall
+    entity_typ = Column(String, nullable=False)   # konto, darlehen, depot, sachwert, versicherung, vertrag, notfall
     entity_id = Column(Integer, nullable=False)
     dateiname = Column(String, nullable=False)    # gespeicherter Dateiname (UUID-basiert)
     original_name = Column(String, nullable=False)
@@ -263,6 +239,10 @@ class SteuerPrognose(Base):
 
     # Einkünfte
     gewinn_gewerbebetrieb = Column(Numeric(14, 2), default=0)
+    # eigenes Gewerbe der Ehefrau: fließt nur in die Summe der Einkünfte (ESt) ein,
+    # NICHT in die Gewerbesteuer-Berechnung unten — die hat eigene Betriebsstätten
+    # und würde eine eigene Zerlegung brauchen, die hier (noch) nicht abgebildet ist.
+    gewinn_gewerbebetrieb_ehefrau = Column(Numeric(14, 2), default=0)
     sonstige_einkuenfte = Column(Numeric(14, 2), default=0)
     bruttolohn_ehefrau = Column(Numeric(14, 2), default=0)
     werbungskosten_ehefrau = Column(Numeric(14, 2), default=0)
@@ -294,9 +274,10 @@ class SteuerPrognose(Base):
     soli_ehefrau = Column(Numeric(14, 2), default=0)
     kirchensteuer_ehefrau = Column(Numeric(14, 2), default=0)
 
-    # Gewerbesteuer-Vorauszahlungen je Gemeinde (max. 2 Standorte im Formular)
-    gewst_vz_standort1 = Column(Numeric(14, 2), default=0)
-    gewst_vz_standort2 = Column(Numeric(14, 2), default=0)
+    # GewSt-Vorauszahlungen hängen an SteuerBetriebsstaette.vorauszahlung — die
+    # Zahl der Gemeinden ergibt sich aus der Zerlegung und ist nicht auf zwei
+    # begrenzt. (Bestandsdatenbanken tragen noch die alten, ungenutzten Spalten
+    # gewst_vz_standort1/2; SQLite kann Spalten nicht ohne Tabellenneubau löschen.)
 
     notiz = Column(String)
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -327,4 +308,126 @@ class SteuerBetriebsstaette(Base):
     arbeitsloehne = Column(Numeric(14, 2), default=0)          # je AN bereits auf 50.000 € gedeckelt
     taetigkeitsanteil_pct = Column(Numeric(5, 2), default=0)   # Anteil des Inhabers hier tätig, für Unternehmerlohn-Verteilung
     prozent_manuell = Column(Numeric(5, 2))                     # nur Modus "prozent"
+    vorauszahlung = Column(Numeric(14, 2), default=0)           # GewSt-Vorauszahlung an diese Gemeinde
     prognose = relationship('SteuerPrognose', back_populates='betriebsstaetten')
+
+
+# ── Steuerbescheide (Historie der tatsächlichen Steuerlast) ─────────────────
+
+class SteuerBescheid(Base):
+    """Ein Steuerjahr, wie es der Bescheid ausweist.
+
+    Die Feldreihenfolge folgt bewusst der Rechenkette des echten Bescheids
+    (Gesamtbetrag der Einkünfte -> zvE -> tarifliche ESt -> Anrechnungen ->
+    festgesetzte ESt -> Abrechnung), damit beim Abtippen nichts gesucht werden
+    muss und der Jahresvergleich die Ursachen einer Veränderung zeigt und nicht
+    nur ihr Ergebnis.
+    """
+    __tablename__ = 'steuer_bescheide'
+
+    id = Column(Integer, primary_key=True, index=True)
+    jahr = Column(Integer, nullable=False, unique=True, index=True)
+    bescheiddatum = Column(Date)
+    veranlagung = Column(String, default='zusammen')            # zusammen | einzeln
+    vorlaeufig = Column(Boolean, default=False)                 # § 165 AO — Bescheid kann sich noch ändern
+
+    # Einkommensteuer — Rechenkette
+    # Einzelne Einkunftsquellen, wie im Bescheid vor der Summenzeile aufgeführt
+    # — sonst verschwindet im Jahresvergleich die Ursache einer Veränderung
+    # (z. B. Gewerbebetrieb gestiegen vs. Vermietung geschrumpft) hinter der
+    # einen Zahl gesamtbetrag_einkuenfte.
+    einkuenfte_gewerbebetrieb = Column(Numeric(14, 2), default=0)          # Ehemann
+    einkuenfte_gewerbebetrieb_ehefrau = Column(Numeric(14, 2), default=0)  # eigenes Einzelunternehmen
+    einkuenfte_nichtselbststaendig_ehefrau = Column(Numeric(14, 2), default=0)
+    einkuenfte_vermietung = Column(Numeric(14, 2), default=0)
+    einkuenfte_sonstige = Column(Numeric(14, 2), default=0)
+    gesamtbetrag_einkuenfte = Column(Numeric(14, 2), default=0)
+    zu_versteuerndes_einkommen = Column(Numeric(14, 2), default=0)
+    kinderfreibetraege = Column(Numeric(14, 2), default=0)      # im zvE bereits abgezogen
+    est_tariflich = Column(Numeric(14, 2), default=0)           # vor Anrechnungen
+    anrechnung_35 = Column(Numeric(14, 2), default=0)           # § 35 EStG, GewSt-Anrechnung
+    kindergeld_hinzurechnung = Column(Numeric(14, 2), default=0)  # § 31 S. 4 EStG
+    einkommensteuer = Column(Numeric(14, 2), default=0)         # festgesetzt laut Bescheid
+    soli = Column(Numeric(14, 2), default=0)
+    kirchensteuer = Column(Numeric(14, 2), default=0)
+
+    # Gewerbesteuer (Aufteilung je Gemeinde in SteuerBescheidGemeinde)
+    gewerbesteuermessbetrag = Column(Numeric(14, 2))
+    gewerbesteuer = Column(Numeric(14, 2))
+
+    # Abrechnung
+    steuerabzugsbetraege = Column(Numeric(14, 2), default=0)    # z. B. angerechnete Kapitalertragsteuer
+    vorauszahlungen_gesamt = Column(Numeric(14, 2), default=0)  # bereits getilgt
+    nachzahlungszinsen = Column(Numeric(14, 2), default=0)      # § 233a AO
+    nachzahlung_erstattung = Column(Numeric(14, 2), default=0)  # positiv=Nachzahlung, negativ=Erstattung
+
+    # Blick nach vorn: im Bescheid neu festgesetzte Vorauszahlung je Quartal
+    vz_folgejahr_quartal = Column(Numeric(14, 2), default=0)
+
+    notiz = Column(String)
+    aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # order_by hält die Reihenfolge des Zerlegungsbescheids (Geschäftsleitung zuerst)
+    gemeinden = relationship(
+        'SteuerBescheidGemeinde', back_populates='bescheid',
+        cascade='all, delete-orphan', order_by='SteuerBescheidGemeinde.id',
+    )
+
+
+class SteuerBescheidGemeinde(Base):
+    """Zerlegungsanteil einer Gemeinde am Gewerbesteuermessbetrag (§§ 28–31 GewStG).
+
+    Ohne diese Aufteilung ließe sich im Jahresvergleich nicht unterscheiden, ob
+    die Gewerbesteuer wegen eines höheren Gewinns, eines angehobenen Hebesatzes
+    oder verschobener Arbeitslöhne gestiegen ist.
+    """
+    __tablename__ = 'steuer_bescheid_gemeinden'
+
+    id = Column(Integer, primary_key=True, index=True)
+    bescheid_id = Column(Integer, ForeignKey('steuer_bescheide.id'), nullable=False)
+    gemeinde = Column(String, nullable=False)
+    arbeitsloehne = Column(Numeric(14, 2), default=0)      # Zerlegungsmaßstab
+    zerlegungsanteil = Column(Numeric(14, 2), default=0)   # Anteil am Messbetrag
+    hebesatz = Column(Numeric(6, 2), default=0)            # in %
+    gewerbesteuer = Column(Numeric(14, 2), default=0)      # von dieser Gemeinde festgesetzt
+    bescheid = relationship('SteuerBescheid', back_populates='gemeinden')
+
+
+# ── Sparziele (Sparschwein) ──────────────────────────────────────────────────
+
+class Sparziel(Base):
+    """Ein konkretes Sparziel mit Zielbetrag und -datum (z. B. "Weltreise in
+    5 Jahren"), losgelöst von den normalen Konten — der Fortschritt kommt aus
+    manuell erfassten Fütterungen, nicht aus einem Kontostand, damit sich ein
+    Sparziel nicht mit anderem Geld auf demselben Konto vermischt."""
+    __tablename__ = 'sparziele'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    zielbetrag = Column(Numeric(14, 2), nullable=False)
+    zieldatum = Column(Date, nullable=False)
+    zinssatz = Column(Numeric(6, 4), default=0)  # Dezimal — falls das Ersparte z. B. auf einem Tagesgeldkonto liegt
+    aufbewahrungsort = Column(String)  # "Wo liegt das Geld?" — reiner Hinweistext, keine Kontoverknüpfung (s. §5 CLAUDE.md)
+    notiz = Column(String)
+    archiviert = Column(Boolean, default=False)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    aktualisiert_am = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    fuetterungen = relationship(
+        'SparzielFuetterung', back_populates='sparziel',
+        cascade='all, delete-orphan', order_by='SparzielFuetterung.datum.desc()',
+    )
+
+
+class SparzielFuetterung(Base):
+    """Eine einzelne Einzahlung ("Fütterung") in ein Sparziel."""
+    __tablename__ = 'sparziel_fuetterungen'
+
+    id = Column(Integer, primary_key=True, index=True)
+    sparziel_id = Column(Integer, ForeignKey('sparziele.id'), nullable=False)
+    betrag = Column(Numeric(14, 2), nullable=False)
+    datum = Column(Date, nullable=False)
+    notiz = Column(String)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    sparziel = relationship('Sparziel', back_populates='fuetterungen')
