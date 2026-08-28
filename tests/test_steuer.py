@@ -180,16 +180,15 @@ def test_gewerbesteuermessbetrag_beispielrechnung():
     assert mb == D("2642")
 
 
-def test_gewerbesteuermessbetrag_echter_bescheid_2023():
-    """Gegenprobe mit dem realen GewSt-Messbescheid 2023 (FA Nürtingen).
-
-    Gewinn 132.090 €, Hinzurechnungen § 8 Nr. 1 von 25.636 € (bleiben unter dem
-    Freibetrag von 200.000 € und wirken daher nicht), Gewerbeertrag abgerundet
-    132.000 €, ./. 24.500 € = 107.500 €, davon 3,5 % = 3.762,50 -> 3.762 €.
+def test_gewerbesteuermessbetrag_bescheid_beispiel():
+    """Gegenprobe mit einem Beispielbescheid: Gewinn 96.480 €, Hinzurechnungen
+    § 8 Nr. 1 von 18.200 € (bleiben unter dem Freibetrag von 200.000 € und
+    wirken daher nicht), Gewerbeertrag abgerundet 96.400 €, ./. 24.500 € =
+    71.900 €, davon 3,5 % = 2.516,50 -> 2.516 €.
     """
-    ertrag = gewerbeertrag(D("132090"), D("25636"), D(0), 2023)
-    assert ertrag == D("132090")
-    assert gewerbesteuermessbetrag(ertrag, 2023) == D("3762")
+    ertrag = gewerbeertrag(D("96480"), D("18200"), D(0), 2023)
+    assert ertrag == D("96480")
+    assert gewerbesteuermessbetrag(ertrag, 2023) == D("2516")
 
 
 def test_gewerbesteuermessbetrag_unter_freibetrag_null():
@@ -197,46 +196,44 @@ def test_gewerbesteuermessbetrag_unter_freibetrag_null():
 
 
 def test_zerlegung_arbeitsloehne_mit_unternehmerlohn():
-    # Böblingen: 1 Vollzeit 45.000 €, kein Tätigkeitsanteil des Inhabers.
-    # Nürtingen: 1 Vollzeit 45.000 € + Minijob 6.000 €, Inhaber zu 100 % dort tätig
-    # (Unternehmerlohn 25.000 € fließt vollständig nach Nürtingen).
+    # Rosenfeld: 1 Vollzeit 45.000 €, kein Tätigkeitsanteil des Inhabers.
+    # Lindenau: 1 Vollzeit 45.000 € + Minijob 6.000 €, Inhaber zu 100 % dort tätig
+    # (Unternehmerlohn 25.000 € fließt vollständig nach Lindenau).
     betriebsstaetten = [
-        Betriebsstaette(gemeinde="Böblingen", hebesatz=D("380"), arbeitsloehne=D("45000"), taetigkeitsanteil_pct=D("0")),
-        Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("390"), arbeitsloehne=D("51000"), taetigkeitsanteil_pct=D("100")),
+        Betriebsstaette(gemeinde="Rosenfeld", hebesatz=D("380"), arbeitsloehne=D("45000"), taetigkeitsanteil_pct=D("0")),
+        Betriebsstaette(gemeinde="Lindenau", hebesatz=D("390"), arbeitsloehne=D("51000"), taetigkeitsanteil_pct=D("100")),
     ]
     messbetrag = D("2642.50")
     ergebnisse = zerlegung_arbeitsloehne(betriebsstaetten, messbetrag, JAHR)
 
-    # Lohnsummen: Böblingen 45.000, Nürtingen 51.000 + 25.000 = 76.000 -> Summe 121.000
-    boeb = next(e for e in ergebnisse if e.gemeinde == "Böblingen")
-    nuer = next(e for e in ergebnisse if e.gemeinde == "Nürtingen")
+    # Lohnsummen: Rosenfeld 45.000, Lindenau 51.000 + 25.000 = 76.000 -> Summe 121.000
+    boeb = next(e for e in ergebnisse if e.gemeinde == "Rosenfeld")
+    nuer = next(e for e in ergebnisse if e.gemeinde == "Lindenau")
     assert boeb.anteil_pct == (D("45000") / D("121000") * D("100"))
     # Messbeträge müssen exakt den Gesamtmessbetrag ergeben (Rest-Zuweisung an letzten Eintrag)
     assert boeb.messbetrag_anteil + nuer.messbetrag_anteil == messbetrag
-    # Nürtingen hat den größeren Anteil (Unternehmerlohn + höhere Lohnsumme)
+    # Lindenau hat den größeren Anteil (Unternehmerlohn + höhere Lohnsumme)
     assert nuer.messbetrag_anteil > boeb.messbetrag_anteil
 
 
-def test_zerlegung_drei_gemeinden_echter_bescheid_2023():
-    """Gegenprobe mit dem realen Zerlegungsbescheid 2023 (drei Betriebsstätten).
+def test_zerlegung_drei_gemeinden_beispiel():
+    """Zerlegung auf drei Betriebsstätten mit glatten Lohnsummen.
 
-    Arbeitslöhne 71.000 / 62.000 / 9.000 = 142.000 €, Messbetrag 3.762 €.
-    Der Unternehmerlohn steckt bereits in den ausgewiesenen Lohnsummen, daher
-    hier ohne Tätigkeitsanteil rechnen. Der Bescheid weist 1.881,01 / 1.642,56 /
-    238,43 aus; die Cent-Abweichung stammt aus den im Bescheid gerundet
-    dargestellten Lohnsummen, deshalb wird auf 2 Cent genau geprüft.
+    Arbeitslöhne 47.000 / 38.000 / 15.000 = 100.000 €, Messbetrag 2.860 €.
+    Da die Anteile (47 % / 38 % / 15 %) glatt aufgehen, lässt sich exakt
+    prüfen statt nur mit Toleranz.
     """
     betriebsstaetten = [
-        Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("400"), arbeitsloehne=D("71000")),
-        Betriebsstaette(gemeinde="Böblingen", hebesatz=D("400"), arbeitsloehne=D("62000")),
-        Betriebsstaette(gemeinde="Neuffen", hebesatz=D("400"), arbeitsloehne=D("9000")),
+        Betriebsstaette(gemeinde="Lindenau", hebesatz=D("400"), arbeitsloehne=D("47000")),
+        Betriebsstaette(gemeinde="Rosenfeld", hebesatz=D("400"), arbeitsloehne=D("38000")),
+        Betriebsstaette(gemeinde="Kaltenbach", hebesatz=D("400"), arbeitsloehne=D("15000")),
     ]
-    messbetrag = D("3762")
+    messbetrag = D("2860")
     ergebnisse = zerlegung_arbeitsloehne(betriebsstaetten, messbetrag, 2023)
 
-    erwartet = {"Nürtingen": D("1881.01"), "Böblingen": D("1642.56"), "Neuffen": D("238.43")}
+    erwartet = {"Lindenau": D("1344.20"), "Rosenfeld": D("1086.80"), "Kaltenbach": D("429.00")}
     for e in ergebnisse:
-        assert abs(e.messbetrag_anteil - erwartet[e.gemeinde]) <= D("0.02")
+        assert e.messbetrag_anteil == erwartet[e.gemeinde]
 
     # Die Anteile müssen den Messbetrag exakt ausschöpfen — kein verlorener Cent.
     assert sum((e.messbetrag_anteil for e in ergebnisse), D(0)) == messbetrag
@@ -247,26 +244,26 @@ def test_gewst_vorauszahlung_je_betriebsstaette():
     mit drei Gemeinden müssen alle drei in den Abgleich eingehen."""
     inp = PrognoseInput(
         jahr=2023,
-        gewinn_gewerbebetrieb=D("132090"),
+        gewinn_gewerbebetrieb=D("96480"),
         betriebsstaetten=[
-            Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("400"), arbeitsloehne=D("71000"), vorauszahlung=D("7000")),
-            Betriebsstaette(gemeinde="Böblingen", hebesatz=D("400"), arbeitsloehne=D("62000"), vorauszahlung=D("6000")),
-            Betriebsstaette(gemeinde="Neuffen", hebesatz=D("400"), arbeitsloehne=D("9000"), vorauszahlung=D("900")),
+            Betriebsstaette(gemeinde="Lindenau", hebesatz=D("400"), arbeitsloehne=D("47000"), vorauszahlung=D("5000")),
+            Betriebsstaette(gemeinde="Rosenfeld", hebesatz=D("400"), arbeitsloehne=D("38000"), vorauszahlung=D("4000")),
+            Betriebsstaette(gemeinde="Kaltenbach", hebesatz=D("400"), arbeitsloehne=D("15000"), vorauszahlung=D("1500")),
         ],
     )
     erg = berechne_prognose(inp)
-    assert erg["gewst_vorauszahlungen_gesamt"] == 13900.0
+    assert erg["gewst_vorauszahlungen_gesamt"] == 10500.0
 
 
 def test_zerlegung_prozent_manuell():
     betriebsstaetten = [
-        Betriebsstaette(gemeinde="Böblingen", hebesatz=D("380"), prozent_manuell=D("33")),
-        Betriebsstaette(gemeinde="Nürtingen", hebesatz=D("390"), prozent_manuell=D("67")),
+        Betriebsstaette(gemeinde="Rosenfeld", hebesatz=D("380"), prozent_manuell=D("33")),
+        Betriebsstaette(gemeinde="Lindenau", hebesatz=D("390"), prozent_manuell=D("67")),
     ]
     messbetrag = D("3000")
     ergebnisse = zerlegung_prozent(betriebsstaetten, messbetrag)
-    boeb = next(e for e in ergebnisse if e.gemeinde == "Böblingen")
-    nuer = next(e for e in ergebnisse if e.gemeinde == "Nürtingen")
+    boeb = next(e for e in ergebnisse if e.gemeinde == "Rosenfeld")
+    nuer = next(e for e in ergebnisse if e.gemeinde == "Lindenau")
     assert boeb.messbetrag_anteil + nuer.messbetrag_anteil == messbetrag
     assert boeb.gewerbesteuer == boeb.messbetrag_anteil * D("380") / D("100")
 
