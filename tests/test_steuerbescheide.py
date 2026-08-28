@@ -76,33 +76,33 @@ def test_list_sorted_desc(client):
 
 
 def test_bescheid_mit_zerlegung_auf_drei_gemeinden(client):
-    """Echter Bescheid 2023: Messbetrag 3.762 € auf drei Gemeinden zerlegt."""
+    """Beispielbescheid 2023: Messbetrag 2.860 € auf drei Gemeinden zerlegt."""
     payload = {
         'jahr': 2023,
-        'gesamtbetrag_einkuenfte': 152025,
-        'zu_versteuerndes_einkommen': 111741,
-        'est_tariflich': 27170,
-        'anrechnung_35': 14436,
-        'kindergeld_hinzurechnung': 9000,
-        'einkommensteuer': 21734,
-        'gewerbesteuermessbetrag': 3762,
-        'gewerbesteuer': 14436,
+        'gesamtbetrag_einkuenfte': 98500,
+        'zu_versteuerndes_einkommen': 79300,
+        'est_tariflich': 15680,
+        'anrechnung_35': 2470,
+        'kindergeld_hinzurechnung': 0,
+        'einkommensteuer': 13140,
+        'gewerbesteuermessbetrag': 2860,
+        'gewerbesteuer': 2860,
         'steuerabzugsbetraege': 1,
-        'vorauszahlungen_gesamt': 4968,
-        'nachzahlungszinsen': 50,
-        'nachzahlung_erstattung': 16765,
+        'vorauszahlungen_gesamt': 3200,
+        'nachzahlungszinsen': 35,
+        'nachzahlung_erstattung': 1200,
         'gemeinden': [
-            {'gemeinde': 'Nürtingen', 'arbeitsloehne': 71000, 'zerlegungsanteil': 1881.01, 'hebesatz': 400},
-            {'gemeinde': 'Böblingen', 'arbeitsloehne': 62000, 'zerlegungsanteil': 1642.56, 'hebesatz': 400},
-            {'gemeinde': 'Neuffen', 'arbeitsloehne': 9000, 'zerlegungsanteil': 238.43, 'hebesatz': 400},
+            {'gemeinde': 'Lindenau', 'arbeitsloehne': 47000, 'zerlegungsanteil': 1344.20, 'hebesatz': 400},
+            {'gemeinde': 'Rosenfeld', 'arbeitsloehne': 38000, 'zerlegungsanteil': 1086.80, 'hebesatz': 400},
+            {'gemeinde': 'Kaltenbach', 'arbeitsloehne': 15000, 'zerlegungsanteil': 429.00, 'hebesatz': 400},
         ],
     }
     res = client.post('/api/v1/steuerbescheide/', json=payload)
     assert res.status_code == 201
     body = res.json()
     assert len(body['gemeinden']) == 3
-    assert round(sum(g['zerlegungsanteil'] for g in body['gemeinden']), 2) == 3762.00
-    assert body['nachzahlungszinsen'] == 50
+    assert round(sum(g['zerlegungsanteil'] for g in body['gemeinden']), 2) == 2860.00
+    assert body['nachzahlungszinsen'] == 35
 
     # Beim Aktualisieren wird die Gemeindeliste ersetzt, nicht angehängt
     payload['gemeinden'] = payload['gemeinden'][:2]

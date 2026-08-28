@@ -5009,8 +5009,7 @@ function stDefaultState(jahr) {
     notiz: '',
     kinder: [],
     betriebsstaetten: [
-      { gemeinde: 'Böblingen', hebesatz: 380, arbeitsloehne: 0, taetigkeitsanteil_pct: 0,   prozent_manuell: 33 },
-      { gemeinde: 'Nürtingen', hebesatz: 390, arbeitsloehne: 0, taetigkeitsanteil_pct: 100,  prozent_manuell: 67 },
+      { gemeinde: '', hebesatz: 400, arbeitsloehne: 0, taetigkeitsanteil_pct: 0, prozent_manuell: 0 },
     ],
   };
 }

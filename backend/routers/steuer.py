@@ -147,7 +147,7 @@ def berechnung(jahr: int, db: Session = Depends(get_db)):
 
 @router.get('/{jahr}/hebesatz-defaults')
 def hebesatz_defaults(jahr: int):
-    """Default-Hebesätze fürs Formular (Nürtingen/Böblingen), editierbar."""
+    """Default-Hebesätze fürs Formular, editierbar."""
     p = steuer_parameter(jahr)
     return {g: float(h) for g, h in p['hebesatz_defaults'].items()}
 

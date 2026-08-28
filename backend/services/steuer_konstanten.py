@@ -34,17 +34,12 @@ _GEWST_STABIL = {
     "uebrige_vorsorge_hoechstbetrag_angestellt": D("1900"),
     "sonderausgaben_pauschbetrag_single": D("36"),
     "sonderausgaben_pauschbetrag_splitting": D("72"),
-    # Hebesätze sind Gemeindebeschlüsse und ändern sich; hier stehen die
-    # AKTUELLEN Sätze als Startwert für Prognosen, im Formular je Prognose frei
-    # überschreibbar. Für zurückliegende Jahre nicht blind übernehmen —
-    # Neuffen lag 2023 noch bei 360 % und wurde erst später auf 380 % angehoben
-    # (belegt durch den Zerlegungsbescheid 2023: 390/380/360 ergeben die dort
-    # abgerechnete Gewerbesteuer von 14.436 € auf zwei Cent genau).
-    "hebesatz_defaults": {
-        "Nürtingen": D("390"),
-        "Böblingen": D("380"),
-        "Neuffen": D("380"),
-    },
+    # Hebesätze sind Gemeindebeschlüsse und ändern sich; hier lassen sich
+    # bekannte Sätze als Startwert für Prognosen hinterlegen (Gemeindename ->
+    # Hebesatz), im Formular je Prognose frei überschreibbar. Für
+    # zurückliegende Jahre nicht blind übernehmen, da sich Hebesätze über die
+    # Zeit ändern. Leer, bis eigene Gemeinden eingetragen werden.
+    "hebesatz_defaults": {},
 }
 
 TARIFE = {
