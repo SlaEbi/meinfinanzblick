@@ -21,7 +21,7 @@ git clone https://github.com/SlaEbi/meinfinanzblick.git
 cd meinfinanzblick
 ```
 
-> Ersetze `DEIN-BENUTZERNAME` durch den GitHub-Benutzernamen, den du von Slava erhalten hast.
+> Ersetze `DEIN-BENUTZERNAME` durch den GitHub-Benutzernamen, den du erhalten hast.
 
 ### Schritt 3 — Einrichten
 
@@ -52,7 +52,7 @@ make start
 
 ## Updates einspielen
 
-Wenn Slava eine neue Version fertig hat, einfach einmal ausführen:
+Wenn eine neue Version fertig ist, einfach einmal ausführen:
 
 ```bash
 make update
@@ -99,4 +99,4 @@ Die Datenbank-Datei ist der einzige Ort, wo deine Daten gespeichert werden.
 
 ## Kontakt
 
-Bei Fragen oder Problemen: Slava anrufen oder schreiben.
+Bei Fragen oder Problemen: den Entwickler kontaktieren.

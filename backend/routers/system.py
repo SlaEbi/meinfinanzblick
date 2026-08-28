@@ -29,10 +29,10 @@ def _friendly_git_error(raw: str) -> str:
     if 'Authentication failed' in raw or 'Permission denied' in raw:
         return 'Zugriff auf GitHub verweigert. Bitte SSH-Key prüfen.'
     if 'conflict' in raw.lower():
-        return 'Es gibt einen Konflikt mit lokalen Änderungen. Bitte Slava kontaktieren.'
+        return 'Es gibt einen Konflikt mit lokalen Änderungen. Bitte den Entwickler kontaktieren.'
     if 'not a git repository' in raw:
-        return 'Kein Git-Repository gefunden. Bitte Slava kontaktieren.'
-    return 'Unbekannter Fehler beim Update. Bitte Slava kontaktieren.'
+        return 'Kein Git-Repository gefunden. Bitte den Entwickler kontaktieren.'
+    return 'Unbekannter Fehler beim Update. Bitte den Entwickler kontaktieren.'
 
 
 @router.post('/system/update', response_model=UpdateResult)
@@ -69,7 +69,7 @@ def run_update():
         return UpdateResult(
             success=False,
             detail='',
-            message='Neue Programm-Bausteine konnten nicht installiert werden. Bitte Slava kontaktieren.',
+            message='Neue Programm-Bausteine konnten nicht installiert werden. Bitte den Entwickler kontaktieren.',
         )
 
     if already_current:

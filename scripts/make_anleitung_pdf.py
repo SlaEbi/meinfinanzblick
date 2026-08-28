@@ -178,7 +178,7 @@ def build():
         ["Weisser Bildschirm im Browser",
          "Kurz warten (10 Sekunden) und Seite neu laden mit Cmd + R."],
         ["Sonstiges",
-         "Slava anrufen &mdash; er hilft sofort weiter."],
+         "Den Entwickler kontaktieren &mdash; er hilft sofort weiter."],
     ]
     prob_rows = [[Paragraph(a, ParagraphStyle("pb", fontName="Helvetica-Bold", fontSize=10, textColor=DARK)),
                   Paragraph(b, s["body"])] for a, b in problems]
