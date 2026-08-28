@@ -4911,6 +4911,29 @@ function applyDemoMode() {
   const banner = document.getElementById('demo-banner');
   if (btn) btn.classList.toggle('active', state.demoMode);
   if (banner) banner.style.display = state.demoMode ? 'flex' : 'none';
+
+  // Notfall-Mappe (PDF) und Backup-ZIP laden serverseitig immer echte Daten —
+  // im Demo-Modus reicht CSS (pointer-events) nicht, weil ein fokussierter
+  // Link auch per Tastatur ausgelöst werden kann. Deshalb href hart entfernen.
+  const ECHTE_DATEN_LINKS = {
+    'notfall-pdf-link': 'Im Demo-Modus deaktiviert — die Notfall-Mappe enthält immer echte Daten.',
+    'backup-zip-link':  'Im Demo-Modus deaktiviert — das Backup enthält immer echte Daten.',
+  };
+  for (const [id, demoTitel] of Object.entries(ECHTE_DATEN_LINKS)) {
+    const link = document.getElementById(id);
+    if (!link) continue;
+    if (state.demoMode) {
+      link.dataset.hrefReal = link.dataset.hrefReal || link.getAttribute('href');
+      link.dataset.titelReal = link.dataset.titelReal || link.title;
+      link.removeAttribute('href');
+      link.setAttribute('aria-disabled', 'true');
+      link.title = demoTitel;
+    } else if (link.dataset.hrefReal) {
+      link.setAttribute('href', link.dataset.hrefReal);
+      link.removeAttribute('aria-disabled');
+      link.title = link.dataset.titelReal ?? '';
+    }
+  }
 }
 
 window.toggleDemoMode = async function() {

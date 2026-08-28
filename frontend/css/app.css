@@ -2489,7 +2489,9 @@ input[type="number"]::-webkit-outer-spin-button {
 body.demo-mode .view .btn-primary:not(#demo-toggle-btn),
 body.demo-mode .view .btn-icon,
 body.demo-mode #update-btn,
-body.demo-mode #publish-btn {
+body.demo-mode #publish-btn,
+body.demo-mode #notfall-pdf-link,
+body.demo-mode #backup-zip-link {
   pointer-events: none;
   opacity: 0.3;
 }
