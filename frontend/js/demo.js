@@ -70,6 +70,70 @@ export const DEMO = {
     { id:4, name:'Markus Engel', rolle:'versicherung', firma:'Allianz Generalvertretung Engel', telefon:'0172 9876543', email:'m.engel@allianz.de', adresse:'Gerberstraße 3, 70178 Stuttgart', notiz:'Zuständig für Haftpflicht + Hausrat', erstellt_am:'2026-01-01T00:00:00' },
   ],
 
+  todos: [
+    { id:1, titel:'Steuerunterlagen 2025 zusammenstellen', notiz:'Belege für die Steuerberaterin sortieren', faelligkeit:'2026-09-30', prioritaet:'hoch', zustaendigkeit:'ich', erledigt:false, sort_order:0, erstellt_am:'2026-06-01T09:00:00' },
+    { id:2, titel:'KFZ-Versicherung vergleichen', notiz:null, faelligkeit:'2026-10-15', prioritaet:'mittel', zustaendigkeit:'beide', erledigt:false, sort_order:1, erstellt_am:'2026-06-01T09:00:00' },
+    { id:3, titel:'Rauchmelder-Batterien wechseln', notiz:null, faelligkeit:null, prioritaet:'niedrig', zustaendigkeit:'ehefrau', erledigt:false, sort_order:2, erstellt_am:'2026-06-01T09:00:00' },
+    { id:4, titel:'ETF-Sparplanrate ab Juli erhöhen', notiz:'Von 500 € auf 600 € anheben', faelligkeit:'2026-07-01', prioritaet:'mittel', zustaendigkeit:'ich', erledigt:true, sort_order:3, erstellt_am:'2026-05-01T09:00:00' },
+    { id:5, titel:'Hausratversicherung: Deckungssumme prüfen', notiz:null, faelligkeit:'2026-08-01', prioritaet:'niedrig', zustaendigkeit:'ich', erledigt:true, sort_order:4, erstellt_am:'2026-05-01T09:00:00' },
+  ],
+
+  steuerbescheide: [
+    {
+      id:2, jahr:2024, bescheiddatum:'2025-08-15', veranlagung:'zusammen', vorlaeufig:false,
+      einkuenfte_gewerbebetrieb:71000, einkuenfte_gewerbebetrieb_ehefrau:0, einkuenfte_nichtselbststaendig_ehefrau:14800,
+      einkuenfte_vermietung:3400, einkuenfte_sonstige:0, gesamtbetrag_einkuenfte:89200,
+      zu_versteuerndes_einkommen:79300, kinderfreibetraege:8500,
+      est_tariflich:15680, anrechnung_35:2470, kindergeld_hinzurechnung:0, einkommensteuer:13140, soli:0, kirchensteuer:0,
+      gewerbesteuermessbetrag:650, gewerbesteuer:2516,
+      steuerabzugsbetraege:180, vorauszahlungen_gesamt:11200, nachzahlungszinsen:0, nachzahlung_erstattung:1760,
+      vz_folgejahr_quartal:3300, notiz:null, aktualisiert_am:'2025-08-20T10:00:00',
+      gemeinden: [
+        { id:1, gemeinde:'Lindenau', arbeitsloehne:45000, zerlegungsanteil:64.3, hebesatz:380, gewerbesteuer:1588 },
+        { id:2, gemeinde:'Rosenfeld', arbeitsloehne:25000, zerlegungsanteil:35.7, hebesatz:400, gewerbesteuer:928 },
+      ],
+    },
+    {
+      id:1, jahr:2023, bescheiddatum:'2024-09-10', veranlagung:'zusammen', vorlaeufig:false,
+      einkuenfte_gewerbebetrieb:61000, einkuenfte_gewerbebetrieb_ehefrau:0, einkuenfte_nichtselbststaendig_ehefrau:13600,
+      einkuenfte_vermietung:2900, einkuenfte_sonstige:0, gesamtbetrag_einkuenfte:77500,
+      zu_versteuerndes_einkommen:69200, kinderfreibetraege:8300,
+      est_tariflich:12920, anrechnung_35:2180, kindergeld_hinzurechnung:0, einkommensteuer:10740, soli:0, kirchensteuer:0,
+      gewerbesteuermessbetrag:560, gewerbesteuer:2180,
+      steuerabzugsbetraege:150, vorauszahlungen_gesamt:9600, nachzahlungszinsen:0, nachzahlung_erstattung:990,
+      vz_folgejahr_quartal:2800, notiz:null, aktualisiert_am:'2024-09-15T10:00:00',
+      gemeinden: [
+        { id:3, gemeinde:'Lindenau', arbeitsloehne:40000, zerlegungsanteil:66.7, hebesatz:380, gewerbesteuer:1420 },
+        { id:4, gemeinde:'Rosenfeld', arbeitsloehne:20000, zerlegungsanteil:33.3, hebesatz:400, gewerbesteuer:760 },
+      ],
+    },
+  ],
+
+  sparziele: [
+    {
+      id:1, name:'Neues Auto', zielbetrag:25000, zieldatum:'2027-06-01', zinssatz:0.02,
+      aufbewahrungsort:'Tagesgeldkonto ING', notiz:null, archiviert:false,
+      fuetterungen: [
+        { id:1, betrag:5000, datum:'2025-09-01', notiz:'Startkapital' },
+        { id:2, betrag:500,  datum:'2026-01-15', notiz:null },
+        { id:3, betrag:500,  datum:'2026-02-15', notiz:null },
+        { id:4, betrag:500,  datum:'2026-03-15', notiz:null },
+      ],
+      aktueller_stand:6500, restbetrag:18500, fortschritt_pct:26.0, monate_bis_ziel:10, benoetigte_monatsrate:1850,
+      aktualisiert_am:'2026-06-01T10:00:00',
+    },
+    {
+      id:2, name:'Urlaub Portugal', zielbetrag:4000, zieldatum:'2027-03-01', zinssatz:0,
+      aufbewahrungsort:'Sparbuch', notiz:'Familienurlaub im Frühjahr', archiviert:false,
+      fuetterungen: [
+        { id:5, betrag:2000, datum:'2026-01-01', notiz:'Anzahlung Flüge' },
+        { id:6, betrag:1400, datum:'2026-05-01', notiz:null },
+      ],
+      aktueller_stand:3400, restbetrag:600, fortschritt_pct:85.0, monate_bis_ziel:7, benoetigte_monatsrate:86,
+      aktualisiert_am:'2026-06-01T10:00:00',
+    },
+  ],
+
   notfall: [
     { id:1, titel:'Online-Banking-Zugänge', kategorie:'zugaenge', verweis:'1Password – Tresor „Finanzen"', hinweis:'Notfallzugang für Julia im Safe (Kuvert mit 1Password-Masterpasswort)', prioritaet:1, erledigt:false, sort_order:0, erstellt_am:'2026-01-01T00:00:00' },
     { id:2, titel:'Depot-Zugänge (Comdirect + Trade Republic)', kategorie:'zugaenge', verweis:'1Password – Tresor „Depots"', hinweis:'TANs per SMS an Handy 0171-xxx → SIM-Karte im Safe', prioritaet:1, erledigt:false, sort_order:1, erstellt_am:'2026-01-01T00:00:00' },

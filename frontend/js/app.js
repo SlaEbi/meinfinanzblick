@@ -1,5 +1,5 @@
 import { api } from './api.js?v=16';
-import { DEMO } from './demo.js?v=1';
+import { DEMO } from './demo.js?v=2';
 
 // ── Formatierung ────────────────────────────────────────────────────────────
 
@@ -295,6 +295,9 @@ async function loadAll() {
     state.kontakte       = DEMO.kontakte;
     state.notfall        = DEMO.notfall;
     state.networth       = DEMO.networth;
+    state.todos          = DEMO.todos;
+    state.steuerbescheide = DEMO.steuerbescheide;
+    state.sparziele      = DEMO.sparziele;
     return;
   }
   const [konten, darlehen, depots, sachwerte, versicherungen, vertraege, kontakte, notfall, networth, todos, steuerbescheide, sparziele] = await Promise.all([
