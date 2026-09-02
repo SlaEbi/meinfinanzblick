@@ -28,6 +28,8 @@ def _friendly_git_error(raw: str) -> str:
         return 'Keine Internetverbindung. Bitte Verbindung prüfen und erneut versuchen.'
     if 'Authentication failed' in raw or 'Permission denied' in raw:
         return 'Zugriff auf GitHub verweigert. Bitte SSH-Key prüfen.'
+    if 'could not read Username' in raw or 'could not read Password' in raw or 'terminal prompts disabled' in raw:
+        return 'Kein GitHub-Login hinterlegt. Bitte einmalig im Terminal "git push" in diesem Ordner ausführen und mit GitHub-Benutzername + Personal-Access-Token anmelden.'
     if 'conflict' in raw.lower():
         return 'Es gibt einen Konflikt mit lokalen Änderungen. Bitte den Entwickler kontaktieren.'
     if 'not a git repository' in raw:
