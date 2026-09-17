@@ -132,11 +132,12 @@ document.addEventListener('input', (e) => {
   if (e.target.classList?.contains('range-slider')) syncRangeFill(e.target);
 });
 
-// Beide Rechner starten immer heute, Planjahr 1 endet also im nächsten
-// Kalenderjahr. Echte Jahreszahlen sind über 25–30 Jahre hinweg deutlich
-// greifbarer als "J. 1" — man sieht sofort, wann man wo steht.
-function planKalenderjahr(jahr) {
-  return new Date().getFullYear() + jahr;
+// Rechner starten meist heute (Startjahr optional überschreibbar, z. B. beim
+// Darlehensrechner), Planjahr 1 endet also im Jahr danach. Echte Jahreszahlen
+// sind über 25–30 Jahre hinweg deutlich greifbarer als "J. 1" — man sieht
+// sofort, wann man wo steht.
+function planKalenderjahr(jahr, startJahr = new Date().getFullYear()) {
+  return startJahr + jahr;
 }
 
 // Achsenkonfiguration für die Jahres-Achse der Rechner-Charts: vierstellige
@@ -227,6 +228,16 @@ function restlaufzeitMonate(restschuld, zinssatz, rate) {
   const zinsAnteil = restschuld * r;
   if (rate <= zinsAnteil) return { fehler: 'rate_zu_niedrig' };
   return { monate: Math.ceil(Math.log(rate / (rate - zinsAnteil)) / Math.log(1 + r)) };
+}
+
+// Kalenderdatum, das `monate` Monate nach `start` liegt — für das exakte
+// Enddatum eines Tilgungsplans (Monatsende, da die letzte Rate den Monat abschließt).
+function datumNachMonaten(start, monate) {
+  const d = new Date(start);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + monate + 1);
+  d.setDate(0);
+  return d.toISOString();
 }
 
 function formatRestlaufzeit(monate) {
@@ -1211,7 +1222,9 @@ function drLesenFelder() {
   const typ = document.getElementById('dr-typ').value;
   // Zahlenfeld ist die Quelle der Wahrheit, der Regler folgt ihm nur visuell.
   const sondertilgung = Number(document.getElementById('dr-sonder-input').value) || 0;
-  return { betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung };
+  const startdatumWert = document.getElementById('dr-startdatum')?.value;
+  const startdatum = startdatumWert ? new Date(startdatumWert) : new Date();
+  return { betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung, startdatum };
 }
 
 window.drTypChanged = function() {
@@ -1259,16 +1272,21 @@ window.drRecalc = function(nurTabelle = false) {
   document.getElementById('dr-slider-max').textContent = fmt.eur(sliderMax);
 
   const rateInput = document.getElementById('dr-rate');
-  const laufzeitInput = document.getElementById('dr-laufzeit');
+  const laufzeitJahreInput = document.getElementById('dr-laufzeit-jahre');
+  const laufzeitMonateInput = document.getElementById('dr-laufzeit-monate');
 
   if (drAnchor === 'laufzeit') {
-    const laufzeitJahre = parseFloat(laufzeitInput.value) || 0;
+    const laufzeitJahre = (parseFloat(laufzeitJahreInput.value) || 0)
+      + (parseFloat(laufzeitMonateInput.value) || 0) / 12;
     const rate = drRateAusLaufzeit(betrag, zinssatzDezimal, laufzeitJahre, typ);
     if (rate > 0) rateInput.value = rate.toFixed(0);
   } else {
     const rate = parseFloat(rateInput.value) || 0;
     const monate = drLaufzeitAusRate(betrag, zinssatzDezimal, rate, typ);
-    if (monate) laufzeitInput.value = (monate / 12).toFixed(1);
+    if (monate) {
+      laufzeitJahreInput.value = Math.floor(monate / 12);
+      laufzeitMonateInput.value = monate % 12;
+    }
   }
 
   clearTimeout(drTimers.recalc);
@@ -1284,7 +1302,7 @@ function setKpi(id, hatWert, text) {
   el.classList.toggle('is-empty', !hatWert);
 }
 
-function renderDrRestschuldChart(jahre, baselineJahre, betrag) {
+function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
   if (!chartEmptyState('chart-dr-restschuld', !jahre.length, 'Keine gültige Tilgungsrechnung möglich.')) {
     if (state.charts.drRestschuld) { state.charts.drRestschuld.destroy(); state.charts.drRestschuld = null; }
     return;
@@ -1321,9 +1339,9 @@ function renderDrRestschuldChart(jahre, baselineJahre, betrag) {
   // Mit Sondertilgung ist das Darlehen früher weg, die Vergleichsreihe läuft
   // also länger. Die Achse muss der längeren Reihe folgen — sonst bricht die
   // gestrichelte Linie mitten in der Luft ab.
-  // Startpunkt heute (volle Darlehenssumme) plus ein Label je Tilgungsjahr.
+  // Startpunkt = Startdatum (volle Darlehenssumme) plus ein Label je Tilgungsjahr.
   const achsenJahre = Math.max(jahre.length, baselineJahre?.length ?? 0);
-  const labels = Array.from({ length: achsenJahre + 1 }, (_, i) => String(planKalenderjahr(i)));
+  const labels = Array.from({ length: achsenJahre + 1 }, (_, i) => String(planKalenderjahr(i, startJahr)));
 
   state.charts.drRestschuld = new Chart(ctx, {
     type: 'line',
@@ -1362,8 +1380,9 @@ function renderDrRestschuldChart(jahre, baselineJahre, betrag) {
 async function drLadeUndRender() {
   const container = document.getElementById('dr-tabelle-container');
   if (!container) return;
-  const { betrag, zinssatzDezimal, typ, sondertilgung } = drLesenFelder();
+  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum } = drLesenFelder();
   const rate = parseFloat(document.getElementById('dr-rate').value) || 0;
+  const startJahr = startdatum.getFullYear();
 
   if (betrag <= 0 || rate <= 0) {
     container.innerHTML = '<p class="form-hint">Bitte Darlehenssumme und Rate eingeben.</p>';
@@ -1385,6 +1404,8 @@ async function drLadeUndRender() {
 
     document.getElementById('dr-out-laufzeit').textContent =
       plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
+    document.getElementById('dr-out-enddatum').textContent =
+      plan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, plan.monate_gesamt)) : '—';
     document.getElementById('dr-out-zinsen').textContent = fmt.eur(plan.zinsen_gesamt);
     // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die Bank
     // fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur schneller
@@ -1407,7 +1428,7 @@ async function drLadeUndRender() {
         : 'Restschuld über die gesamte Laufzeit';
     }
 
-    renderDrRestschuldChart(plan.jahre, baselinePlan?.jahre ?? null, betrag);
+    renderDrRestschuldChart(plan.jahre, baselinePlan?.jahre ?? null, betrag, startJahr);
 
     if (!plan.jahre.length) {
       container.innerHTML = '<p class="form-hint">Keine gültige Tilgungsrechnung möglich — die Rate deckt vermutlich nicht einmal die Zinsen.</p>';
@@ -1427,7 +1448,7 @@ async function drLadeUndRender() {
         <tbody>
           ${plan.jahre.map(j => `
             <tr>
-              <td class="mono">${planKalenderjahr(j.jahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
+              <td class="mono">${planKalenderjahr(j.jahr, startJahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
               <td class="right mono" style="color:#F0A030">${fmt.eur(j.zins)}</td>
               <td class="right mono">${fmt.eur(j.tilgung)}</td>
               ${zeigtSonder ? `<td class="right mono" style="color:#4ADE80">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
@@ -1806,6 +1827,8 @@ function renderRechnerZinseszins() {
 
 function renderRechnerDarlehen() {
   document.querySelectorAll('#view-rechner-darlehen .range-slider').forEach(syncRangeFill);
+  const startdatumInput = document.getElementById('dr-startdatum');
+  if (startdatumInput && !startdatumInput.value) startdatumInput.value = fmt.dateISO(new Date().toISOString());
   drRecalc(true);
 }
 

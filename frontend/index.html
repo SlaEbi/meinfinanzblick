@@ -685,14 +685,21 @@
               <option value="tilgungsdarlehen">Tilgungsdarlehen (feste Tilgung)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label class="form-label" for="dr-startdatum">Startdatum</label>
+            <input id="dr-startdatum" class="form-input" type="date" oninput="drRecalc()">
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" id="dr-rate-label">Monatliche Rate (€)</label>
               <input id="dr-rate" class="form-input" type="number" step="10" min="0" value="900" oninput="drAnchorChanged('rate')">
             </div>
             <div class="form-group">
-              <label class="form-label">Laufzeit (Jahre)</label>
-              <input id="dr-laufzeit" class="form-input" type="number" step="0.5" min="0" value="" oninput="drAnchorChanged('laufzeit')">
+              <label class="form-label">Laufzeit</label>
+              <div class="form-subrow">
+                <input id="dr-laufzeit-jahre" class="form-input" type="number" step="1" min="0" placeholder="Jahre" value="" oninput="drAnchorChanged('laufzeit')">
+                <input id="dr-laufzeit-monate" class="form-input" type="number" step="1" min="0" max="11" placeholder="Monate" value="" oninput="drAnchorChanged('laufzeit')">
+              </div>
             </div>
           </div>
           <div class="form-group">
@@ -728,6 +735,7 @@
       </div>
       <div class="stat-grid">
         <div class="stat-card stat-card--gold"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
+        <div class="stat-card stat-card--gold"><div class="label">Abbezahlt am</div><div class="value mono" id="dr-out-enddatum">—</div></div>
         <div class="stat-card stat-card--amber"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
         <div class="stat-card stat-card--red"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
       </div>
