@@ -1385,13 +1385,16 @@ function niceYTicks(max, count = 5) {
 // Bildschirmhintergrund gedacht, per CSS nicht umfärbbar, und ein Redraw
 // kurz vor dem Druck kommt beim echten PDF-Export öfter zu spät. Wird hier
 // synchron beim normalen Chart-Rendern befüllt, nicht erst beim Drucken.
-function drChartPrintAchsenAktualisieren(wrapId, maxWert, xLabels) {
+function drChartPrintAchsenAktualisieren(wrapId, maxWert, xLabels, legende) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
   const yEl = wrap.querySelector('.dr-print-y');
   const xEl = wrap.querySelector('.dr-print-x');
-  if (!yEl || !xEl) return;
+  const legendEl = wrap.querySelector('.dr-print-legend');
+  if (!yEl || !xEl || !legendEl) return;
 
+  const hatLegende = !!legende?.length;
+  yEl.classList.toggle('has-legend', hatLegende);
   const yTicks = niceYTicks(maxWert);
   yEl.innerHTML = [...yTicks].reverse()
     .map(v => `<span>${v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'}</span>`).join('');
@@ -1400,6 +1403,10 @@ function drChartPrintAchsenAktualisieren(wrapId, maxWert, xLabels) {
   const step = Math.max(1, Math.ceil(xLabels.length / maxLabels));
   const xSel = xLabels.filter((_, i) => i % step === 0 || i === xLabels.length - 1);
   xEl.innerHTML = xSel.map(l => `<span>${escapeHtml(l)}</span>`).join('');
+
+  legendEl.innerHTML = hatLegende
+    ? legende.map(l => `<span><span class="dr-print-legend-swatch${l.dashed ? ' dashed' : ''}" style="border-color:${l.farbe}"></span>${escapeHtml(l.label)}</span>`).join('')
+    : '';
 }
 
 function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
@@ -1442,7 +1449,10 @@ function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
   // Startpunkt = Startdatum (volle Darlehenssumme) plus ein Label je Tilgungsjahr.
   const achsenJahre = Math.max(jahre.length, baselineJahre?.length ?? 0);
   const labels = Array.from({ length: achsenJahre + 1 }, (_, i) => String(planKalenderjahr(i, startJahr)));
-  drChartPrintAchsenAktualisieren('dr-chart-print-achsen', betrag, labels);
+  const legende = baselineJahre?.length
+    ? datasets.map(d => ({ label: d.label, farbe: d.borderColor, dashed: !!d.borderDash }))
+    : null;
+  drChartPrintAchsenAktualisieren('dr-chart-print-achsen', betrag, labels, legende);
 
   state.charts.drRestschuld = new Chart(ctx, {
     type: 'line',

@@ -2877,27 +2877,74 @@ body.demo-mode #backup-zip-link {
     inset: 0;
     pointer-events: none;
   }
+  /* Deckt exakt die Spalte/Zeile ab, in der Chart.js selbst seine (kleinen,
+     grauen) Ticks zeichnet — weiß hinterlegt, damit die eigenen, fetten
+     Beschriftungen die alten nicht durchscheinen lassen und sich beide
+     Ebenen nicht doppelt/versetzt überlagern. top:34px räumt Platz für die
+     Legende ("Mit/Ohne Sondertilgung"), die sonst dort hineinragt — nur
+     wenn eine Legende gezeichnet wird (s. has-legend in app.js). Y-Spalte
+     geht bis bottom:0 (nicht nur bis über die X-Zeile) — sonst bleibt genau
+     in der unteren linken Ecke ein ungedecktes Stück mit Chart.js' eigener
+     "€0"-Beschriftung übrig. */
   .dr-chart-print-achsen .dr-print-y {
     position: absolute;
-    left: 0; top: 0; bottom: 18px;
+    left: 0; top: 6px; bottom: 0; width: 44px;
+    background: #fff;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 4px;
+    box-sizing: border-box;
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 11px;
     color: #000;
   }
+  .dr-chart-print-achsen .dr-print-y.has-legend { top: 34px; }
   .dr-chart-print-achsen .dr-print-x {
     position: absolute;
-    left: 46px; right: 0; bottom: 0; height: 16px;
+    left: 44px; right: 0; bottom: 0; height: 18px;
+    background: #fff;
     display: flex;
     justify-content: space-between;
+    padding-left: 4px;
+    box-sizing: border-box;
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 11px;
     color: #000;
   }
+
+  /* Legende ("Restschuld"/"Ohne Sondertilgung") zeichnet Chart.js in
+     --ink-black — auf dem dunklen Bildschirm hell, auf Papier praktisch
+     unsichtbar. Eigene, volle Breite deckende Leiste analog zu den Achsen:
+     weiß hinterlegt, eigene Farbmarker + schwarzer Text. Bleibt leer/ohne
+     Höhe, wenn kein Vergleich läuft (s. app.js). */
+  .dr-chart-print-achsen .dr-print-legend {
+    position: absolute;
+    left: 0; right: 0; top: 0; height: 30px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-left: 2px;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 11px;
+    color: #000;
+  }
+  .dr-chart-print-achsen .dr-print-legend:empty { display: none; }
+  .dr-print-legend .dr-print-legend-swatch {
+    display: inline-block;
+    width: 16px;
+    height: 0;
+    margin-right: 4px;
+    border-top: 3px solid;
+    vertical-align: middle;
+  }
+  .dr-print-legend .dr-print-legend-swatch.dashed { border-top-style: dashed; }
 
   /* Die scrollbare Tabelle muss beim Druck komplett erscheinen statt auf
      420px abgeschnitten zu werden — und ihr sticky Header trägt eine eigene,
