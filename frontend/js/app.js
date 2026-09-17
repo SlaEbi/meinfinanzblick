@@ -269,6 +269,44 @@ const state = {
   editingId: null,
 };
 
+// Chart.js berechnet die Canvas-Größe aus der Container-Höhe zum Zeitpunkt
+// der letzten Änderung — die Druck-CSS macht den Container flacher, aber
+// ohne expliziten resize() bleibt die Zeichenfläche auf dem Bildschirmmaß
+// stehen (abgeschnitten statt neu skaliert). Die Achsenbeschriftungen sind
+// für den Bildschirm klein und grau (--wash-grey) — auf Papier zu klein und
+// zu kontrastarm, darum kurz vor dem Druck größer und schwarz, danach beides
+// zurück auf die Bildschirmwerte.
+function withChartTicks(fn) {
+  Object.values(state.charts).forEach(chart => {
+    ['x', 'y'].forEach(axis => {
+      const ticks = chart?.options?.scales?.[axis]?.ticks;
+      if (ticks) fn(ticks);
+    });
+  });
+}
+
+// update() ohne 'none' animiert den Redraw über requestAnimationFrame — beim
+// echten Drucken (PDF-Export direkt nach beforeprint) ist der Frame oft noch
+// nicht gezeichnet, wenn der Druck-Snapshot entsteht, darum bleiben Größe
+// und Ticks dann auf dem alten Bildschirmstand hängen. 'none' erzwingt einen
+// sofortigen, synchronen Redraw.
+window.addEventListener('beforeprint', () => {
+  withChartTicks(ticks => {
+    ticks._screenFontSize = ticks.font?.size;
+    ticks._screenColor = ticks.color;
+    ticks.font = { ...ticks.font, size: 16, weight: '600' };
+    ticks.color = '#000';
+  });
+  Object.values(state.charts).forEach(c => { c?.resize(); c?.update('none'); });
+});
+window.addEventListener('afterprint', () => {
+  withChartTicks(ticks => {
+    if (ticks._screenFontSize !== undefined) ticks.font = { ...ticks.font, size: ticks._screenFontSize };
+    if (ticks._screenColor !== undefined) ticks.color = ticks._screenColor;
+  });
+  Object.values(state.charts).forEach(c => { c?.resize(); c?.update('none'); });
+});
+
 // ── Toast ───────────────────────────────────────────────────────────────────
 
 function toast(msg) {
@@ -1302,6 +1340,68 @@ function setKpi(id, hatWert, text) {
   el.classList.toggle('is-empty', !hatWert);
 }
 
+// Kompakte Fließtext-Zusammenfassung der Rahmenbedingungen für den Ausdruck —
+// ersetzt dort die Eingabekarte (die bleibt nur auf dem Bildschirm sichtbar),
+// damit die Kurve mehr Platz bekommt statt zeilenweise abgeschnittener Werte.
+function drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, rate, monateDiff, zinsenDiff }) {
+  const el = document.getElementById('dr-print-summary');
+  if (!el) return;
+  const jahre = document.getElementById('dr-laufzeit-jahre').value || 0;
+  const monate = document.getElementById('dr-laufzeit-monate').value || 0;
+  const typLabel = typ === 'tilgungsdarlehen' ? 'Tilgungsdarlehen' : 'Annuitätendarlehen';
+
+  const teile = [
+    fmt.eur(betrag), fmt.pct(zinssatzDezimal * 100) + ' p. a.', typLabel,
+    'Start ' + fmt.date(startdatum.toISOString()),
+    fmt.eur(rate) + ' / Monat', `Laufzeit ${jahre} J. ${monate} M.`,
+  ];
+  if (sondertilgung > 0) teile.push('Sondertilgung ' + fmt.eur(sondertilgung) + ' / Jahr');
+
+  let html = teile.map(escapeHtml).join(' <span class="sep">·</span> ');
+  if (sondertilgung > 0 && monateDiff > 0) {
+    html += `<br><span class="dr-print-summary-extra">Dadurch ${formatRestlaufzeit(monateDiff)} früher abbezahlt, ${fmt.eur(zinsenDiff)} Zinsersparnis.</span>`;
+  }
+  el.innerHTML = html;
+}
+
+// "Nice numbers"-Schrittweite für eine Achse von 0 bis max — 1/2/5/10 ×
+// Zehnerpotenz, wie es Chart.js intern auch macht. Für die Druck-Achse
+// unabhängig von Chart.js' eigener (Pixel-abhängiger) Tick-Wahl.
+function niceYTicks(max, count = 5) {
+  if (max <= 0) return [0];
+  const rawStep = max / count;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const residual = rawStep / magnitude;
+  const niceResidual = residual >= 5 ? 10 : residual >= 2 ? 5 : residual >= 1 ? 2 : 1;
+  const step = niceResidual * magnitude;
+  const ticks = [];
+  for (let v = 0; v <= max + step / 2; v += step) ticks.push(Math.round(v));
+  return ticks;
+}
+
+// Achsenbeschriftung fürs Papier als eigene, per CSS positionierte HTML-Ebene
+// (s. .dr-chart-print-achsen im Druck-CSS) statt der von Chart.js aufs
+// Canvas gezeichneten Ticks — die sind klein/grau für den dunklen
+// Bildschirmhintergrund gedacht, per CSS nicht umfärbbar, und ein Redraw
+// kurz vor dem Druck kommt beim echten PDF-Export öfter zu spät. Wird hier
+// synchron beim normalen Chart-Rendern befüllt, nicht erst beim Drucken.
+function drChartPrintAchsenAktualisieren(wrapId, maxWert, xLabels) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  const yEl = wrap.querySelector('.dr-print-y');
+  const xEl = wrap.querySelector('.dr-print-x');
+  if (!yEl || !xEl) return;
+
+  const yTicks = niceYTicks(maxWert);
+  yEl.innerHTML = [...yTicks].reverse()
+    .map(v => `<span>${v === 0 ? '€0' : '€' + (v / 1000).toFixed(0) + 'k'}</span>`).join('');
+
+  const maxLabels = 8;
+  const step = Math.max(1, Math.ceil(xLabels.length / maxLabels));
+  const xSel = xLabels.filter((_, i) => i % step === 0 || i === xLabels.length - 1);
+  xEl.innerHTML = xSel.map(l => `<span>${escapeHtml(l)}</span>`).join('');
+}
+
 function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
   if (!chartEmptyState('chart-dr-restschuld', !jahre.length, 'Keine gültige Tilgungsrechnung möglich.')) {
     if (state.charts.drRestschuld) { state.charts.drRestschuld.destroy(); state.charts.drRestschuld = null; }
@@ -1342,6 +1442,7 @@ function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
   // Startpunkt = Startdatum (volle Darlehenssumme) plus ein Label je Tilgungsjahr.
   const achsenJahre = Math.max(jahre.length, baselineJahre?.length ?? 0);
   const labels = Array.from({ length: achsenJahre + 1 }, (_, i) => String(planKalenderjahr(i, startJahr)));
+  drChartPrintAchsenAktualisieren('dr-chart-print-achsen', betrag, labels);
 
   state.charts.drRestschuld = new Chart(ctx, {
     type: 'line',
@@ -1406,6 +1507,8 @@ async function drLadeUndRender() {
       plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
     document.getElementById('dr-out-enddatum').textContent =
       plan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, plan.monate_gesamt)) : '—';
+    document.getElementById('dr-out-enddatum-label').textContent =
+      baselinePlan ? 'Abbezahlt am (mit Sondertilgung)' : 'Abbezahlt am';
     const enddatumOhneCard = document.getElementById('dr-out-enddatum-ohne-card');
     enddatumOhneCard.style.display = baselinePlan ? '' : 'none';
     if (baselinePlan) {
@@ -1424,6 +1527,8 @@ async function drLadeUndRender() {
     const zinsenDiff = sondertilgung > 0 ? Math.max(0, zinsenOhne - zinsenMit) : 0;
     setKpi('dr-out-monate-diff', monateDiff > 0, monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—');
     setKpi('dr-out-zinsen-diff', zinsenDiff > 0, zinsenDiff > 0 ? fmt.eur(zinsenDiff) : '—');
+
+    drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, rate, monateDiff, zinsenDiff });
 
     // Der Untertitel darf keinen Vergleich versprechen, den es ohne
     // Sondertilgung gar nicht gibt.
