@@ -153,6 +153,26 @@ class DarlehenResponse(DarlehenBase):
     id: int
 
 
+class DarlehensSzenarioBase(BaseModel):
+    name: str
+    betrag: float
+    zinssatz: float
+    darlehen_typ: str = 'annuitaet'
+    rate_monatlich: float
+    sondertilgung_jahr: float = 0
+    startdatum: Optional[date] = None
+
+
+class DarlehensSzenarioCreate(DarlehensSzenarioBase):
+    pass
+
+
+class DarlehensSzenarioResponse(DarlehensSzenarioBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    erstellt_am: datetime
+
+
 class JahresZeileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     jahr: int

@@ -662,9 +662,18 @@
       </div>
       <div class="page-header">
         <div>
-          <h2>Darlehensrechner</h2>
-          <p>Freier Rechner — live berechnet, unabhängig von deinen gespeicherten Darlehen</p>
+          <h2 class="no-print">Darlehensrechner</h2>
+          <h2 id="dr-print-titel" class="print-only">Darlehensrechner</h2>
+          <p class="no-print">Freier Rechner — live berechnet, unabhängig von deinen gespeicherten Darlehen</p>
         </div>
+        <button class="btn btn-ghost no-print" onclick="window.print()" title="Berechnung drucken">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="6 9 6 2 18 2 18 9"/>
+            <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="8"/>
+          </svg>
+          Drucken
+        </button>
       </div>
 
       <div class="rechner-layout">
@@ -697,12 +706,18 @@
             <div class="form-group">
               <label class="form-label">Laufzeit</label>
               <div class="form-subrow">
-                <input id="dr-laufzeit-jahre" class="form-input" type="number" step="1" min="0" placeholder="Jahre" value="" oninput="drAnchorChanged('laufzeit')">
-                <input id="dr-laufzeit-monate" class="form-input" type="number" step="1" min="0" max="11" placeholder="Monate" value="" oninput="drAnchorChanged('laufzeit')">
+                <div>
+                  <input id="dr-laufzeit-jahre" class="form-input" type="number" step="1" min="0" placeholder="Jahre" value="" oninput="drAnchorChanged('laufzeit')">
+                  <span class="form-hint">Jahre</span>
+                </div>
+                <div>
+                  <input id="dr-laufzeit-monate" class="form-input" type="number" step="1" min="0" max="11" placeholder="Monate" value="" oninput="drAnchorChanged('laufzeit')">
+                  <span class="form-hint">Monate</span>
+                </div>
               </div>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group form-group--block">
             <div class="field-inline">
               <label class="form-label" for="dr-sonder-input">Sondertilgung (€/Jahr)</label>
               <input id="dr-sonder-input" class="form-input mono" type="number" step="250" min="0" value="0"
@@ -733,9 +748,27 @@
           </div>
         </div>
       </div>
+      <div class="card no-print">
+        <div class="page-header" style="margin-bottom:var(--space-3)">
+          <h3 style="margin:0">Gespeicherte Szenarien</h3>
+        </div>
+        <div style="display:flex; gap:var(--space-3); align-items:center; margin-bottom:var(--space-3)">
+          <select id="dr-szenario-select" class="form-select" style="flex:1" onchange="drSzenarioDropdownChanged(this.value)">
+            <option value="">Szenario wählen…</option>
+          </select>
+          <button class="btn-icon danger" id="dr-szenario-delete-btn" onclick="drSzenarioLoeschenAktuell()" title="Löschen" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div style="display:flex; gap:var(--space-3); align-items:center">
+          <input id="dr-szenario-name" class="form-input" type="text" placeholder="Name, z. B. „Eigenheim 20 Jahre“" maxlength="80" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="drSzenarioSpeichern()">Speichern</button>
+        </div>
+      </div>
       <div class="stat-grid">
         <div class="stat-card stat-card--gold"><div class="label">Laufzeit</div><div class="value mono" id="dr-out-laufzeit">—</div></div>
         <div class="stat-card stat-card--gold"><div class="label">Abbezahlt am</div><div class="value mono" id="dr-out-enddatum">—</div></div>
+        <div class="stat-card stat-card--gold" id="dr-out-enddatum-ohne-card" style="display:none"><div class="label">Abbezahlt am (ohne Sondertilgung)</div><div class="value mono" id="dr-out-enddatum-ohne">—</div></div>
         <div class="stat-card stat-card--amber"><div class="label">Gesamtzinsen</div><div class="value mono" id="dr-out-zinsen">—</div></div>
         <div class="stat-card stat-card--red"><div class="label">Gesamtkosten</div><div class="value mono" id="dr-out-gesamtkosten">—</div></div>
       </div>
@@ -984,7 +1017,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=101"></script>
+<script type="module" src="/js/app.js?v=104"></script>
 
 
 </body>

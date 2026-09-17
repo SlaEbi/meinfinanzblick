@@ -60,6 +60,12 @@ export const api = {
     simulation: (params) => request('GET', `/darlehen/simulation?${new URLSearchParams(params)}`),
   },
 
+  darlehensSzenarien: {
+    list:   ()     => request('GET',    '/darlehens-szenarien/'),
+    create: (data) => request('POST',   '/darlehens-szenarien/', data),
+    delete: (id)   => request('DELETE', `/darlehens-szenarien/${id}`),
+  },
+
   zinseszins: {
     simulation: (params) => request('GET', `/zinseszins/simulation?${new URLSearchParams(params)}`),
   },

@@ -2796,3 +2796,82 @@ body.demo-mode #backup-zip-link {
 }
 .sp-pos-empf:hover { border-color: var(--wash-grey); color: var(--ink-black); }
 .sp-pos-empf:focus { outline: none; border-color: var(--seal-red); }
+
+/* ── Druck ────────────────────────────────────────────────────────────────
+   Die App ist dunkel (einziges Theme), Papier ist es nicht: alle Flächen auf
+   Weiß mit schwarzer Schrift zwingen, Navigation/Regler/Verwaltungs-UI
+   ausblenden — übrig bleibt nur die Berechnung selbst. */
+.print-only { display: none; }
+
+@media print {
+  .sidebar, .demo-banner, .rechner-back, .no-print,
+  .range-slider, .range-scale, .nav-item, .rechner-intro, .page-header p { display: none !important; }
+
+  .print-only { display: block !important; }
+
+  body, .main-content { background: #fff !important; }
+  .main-content { margin-left: 0 !important; max-width: none !important; padding: 0 !important; }
+
+  body, .card, .chart-card, .stat-card,
+  .form-label, .form-hint, h1, h2, h3, .chart-title, .label, .value, td, th {
+    color: #000 !important;
+  }
+
+  .card, .chart-card, .stat-card, .table-scroll {
+    background: #fff !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .form-input, .form-select {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #999 !important;
+  }
+
+  .rechner-layout { grid-template-columns: 1fr !important; }
+
+  /* Die scrollbare Tabelle muss beim Druck komplett erscheinen statt auf
+     420px abgeschnitten zu werden — und ihr sticky Header trägt eine eigene,
+     dunkle Hintergrundfarbe, die die Karten-Regel oben nicht erreicht. */
+  .table-scroll { max-height: none !important; overflow: visible !important; }
+  .table-scroll .data-table th, .data-table thead tr {
+    background: #f0f0f0 !important;
+  }
+  .data-table td, .data-table th { border-color: #ccc !important; }
+
+  /* Eingabefelder als kompakte Label:Wert-Zeile statt der bildschirmgroßen
+     Label-über-Feld-Kacheln — auf Papier zählt nur der Wert, nicht die
+     Klickfläche darum herum. */
+  #view-rechner-darlehen .card { padding: var(--space-3) var(--space-4); }
+
+  #view-rechner-darlehen .form-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: 4px;
+  }
+  #view-rechner-darlehen .form-group.form-group--block { display: block; }
+  #view-rechner-darlehen .form-label { margin-bottom: 0; white-space: nowrap; }
+  #view-rechner-darlehen .form-input,
+  #view-rechner-darlehen .form-select {
+    width: auto;
+    flex: 0 0 auto;
+    min-width: 7rem;
+    padding: 2px 8px;
+    font-size: 0.85rem;
+  }
+
+  #view-rechner-darlehen .form-subrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  #view-rechner-darlehen .form-subrow > div { display: flex; align-items: center; gap: 4px; }
+  #view-rechner-darlehen .form-subrow .form-input { width: 3rem; min-width: 0; }
+  #view-rechner-darlehen .form-subrow .form-hint { margin: 0; }
+
+  #view-rechner-darlehen .field-inline { margin-bottom: 4px; }
+  #view-rechner-darlehen .rechner-kpi-row { margin-top: 4px; }
+}

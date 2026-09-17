@@ -1,4 +1,4 @@
-import { api } from './api.js?v=16';
+import { api } from './api.js?v=17';
 import { DEMO } from './demo.js?v=2';
 
 // ── Formatierung ────────────────────────────────────────────────────────────
@@ -1406,6 +1406,12 @@ async function drLadeUndRender() {
       plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
     document.getElementById('dr-out-enddatum').textContent =
       plan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, plan.monate_gesamt)) : '—';
+    const enddatumOhneCard = document.getElementById('dr-out-enddatum-ohne-card');
+    enddatumOhneCard.style.display = baselinePlan ? '' : 'none';
+    if (baselinePlan) {
+      document.getElementById('dr-out-enddatum-ohne').textContent =
+        baselinePlan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, baselinePlan.monate_gesamt)) : '—';
+    }
     document.getElementById('dr-out-zinsen').textContent = fmt.eur(plan.zinsen_gesamt);
     // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die Bank
     // fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur schneller
@@ -1830,6 +1836,93 @@ function renderRechnerDarlehen() {
   const startdatumInput = document.getElementById('dr-startdatum');
   if (startdatumInput && !startdatumInput.value) startdatumInput.value = fmt.dateISO(new Date().toISOString());
   drRecalc(true);
+  drSzenarioListeRendern();
+}
+
+// ── Darlehensrechner: gespeicherte Szenarien ─────────────────────────────────
+// Ein Szenario ist einfach der aktuelle Stand der freien Eingabefelder, unter
+// einem Namen abgelegt — unabhängig von echten Darlehen (Tabelle
+// darlehens_szenarien), damit sich Konstellationen ("Eigenheim 20 Jahre",
+// "mit Sondertilgung") später wieder exakt so laden lassen.
+
+let drSzenarien = [];
+
+window.drSzenarioSpeichern = async function() {
+  const nameInput = document.getElementById('dr-szenario-name');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); return; }
+
+  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum } = drLesenFelder();
+  const rate = parseFloat(document.getElementById('dr-rate').value) || 0;
+  if (betrag <= 0 || rate <= 0) return;
+
+  try {
+    const s = await api.darlehensSzenarien.create({
+      name, betrag, zinssatz: zinssatzDezimal, darlehen_typ: typ,
+      rate_monatlich: rate, sondertilgung_jahr: sondertilgung,
+      startdatum: fmt.dateISO(startdatum.toISOString()) || null,
+    });
+    nameInput.value = '';
+    await drSzenarioListeRendern();
+    document.getElementById('dr-szenario-select').value = s.id;
+    drSzenarioDropdownChanged(String(s.id));
+  } catch (e) {
+    alert('Speichern fehlgeschlagen: ' + e.message);
+  }
+};
+
+function drSzenarioLaden(s) {
+  document.getElementById('dr-betrag').value = s.betrag;
+  document.getElementById('dr-zinssatz').value = (s.zinssatz * 100).toFixed(2);
+  document.getElementById('dr-typ').value = s.darlehen_typ;
+  drTypChanged();
+  document.getElementById('dr-startdatum').value = fmt.dateISO(s.startdatum) || fmt.dateISO(new Date().toISOString());
+  document.getElementById('dr-rate').value = s.rate_monatlich;
+  document.getElementById('dr-sonder-input').value = s.sondertilgung_jahr || 0;
+  window.drSonderInputChanged(s.sondertilgung_jahr || 0);
+  drAnchor = 'rate';
+  drRecalc(true);
+  document.getElementById('dr-print-titel').textContent = s.name;
+}
+
+// Dropdown-Auswahl: leerer Wert = nichts geladen, Löschen-Button nur bei
+// aktiver Auswahl sichtbar (Löschen ohne Auswahl ergibt keinen Sinn). Die
+// Druck-Überschrift folgt der Auswahl, damit der Ausdruck den Szenario-Namen
+// trägt statt des generischen Seitentitels.
+window.drSzenarioDropdownChanged = function(idStr) {
+  const deleteBtn = document.getElementById('dr-szenario-delete-btn');
+  if (!idStr) {
+    deleteBtn.style.display = 'none';
+    document.getElementById('dr-print-titel').textContent = 'Darlehensrechner';
+    return;
+  }
+  const s = drSzenarien.find(x => x.id === Number(idStr));
+  if (!s) return;
+  deleteBtn.style.display = '';
+  drSzenarioLaden(s);
+};
+
+window.drSzenarioLoeschenAktuell = async function() {
+  const select = document.getElementById('dr-szenario-select');
+  const id = Number(select.value);
+  if (!id || !confirm('Szenario wirklich löschen?')) return;
+  try {
+    await api.darlehensSzenarien.delete(id);
+    await drSzenarioListeRendern();
+    document.getElementById('dr-szenario-delete-btn').style.display = 'none';
+  } catch (e) {
+    alert('Löschen fehlgeschlagen: ' + e.message);
+  }
+};
+
+async function drSzenarioListeRendern() {
+  const select = document.getElementById('dr-szenario-select');
+  if (!select) return;
+  try { drSzenarien = await api.darlehensSzenarien.list(); } catch { return; }
+
+  select.innerHTML = '<option value="">Szenario wählen…</option>' + drSzenarien.map(s => `
+    <option value="${s.id}">${escapeHtml(s.name)} — ${fmt.eur(s.betrag)} · ${fmt.pct(s.zinssatz * 100)}</option>
+  `).join('');
 }
 
 function renderRechnerKapitalentnahme() {

@@ -81,6 +81,23 @@ class Darlehen(Base):
     notiz = Column(String)
 
 
+class DarlehensSzenario(Base):
+    """Gespeicherter Stand des freien Darlehensrechners — eine Konstellation
+    aus frei gewählten Werten (nicht an ein echtes Darlehen gebunden), die
+    später wieder in den Rechner geladen werden kann."""
+    __tablename__ = 'darlehens_szenarien'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    betrag = Column(Numeric(14, 2), nullable=False)
+    zinssatz = Column(Numeric(6, 4), nullable=False)   # 0.0350 = 3.50 %
+    darlehen_typ = Column(String, default='annuitaet')  # annuitaet | tilgungsdarlehen
+    rate_monatlich = Column(Numeric(14, 2), nullable=False)
+    sondertilgung_jahr = Column(Numeric(14, 2), default=0)
+    startdatum = Column(Date)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class SpendingPlan(Base):
     __tablename__ = 'spending_plans'
 
