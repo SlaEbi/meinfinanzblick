@@ -161,6 +161,7 @@ class DarlehensSzenarioBase(BaseModel):
     rate_monatlich: float
     sondertilgung_jahr: float = 0
     startdatum: Optional[date] = None
+    hat_ust_auf_zinsen: bool = False
 
 
 class DarlehensSzenarioCreate(DarlehensSzenarioBase):
