@@ -1545,6 +1545,10 @@ async function drLadeUndRender() {
         baselinePlan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, baselinePlan.monate_gesamt)) : '—';
     }
     document.getElementById('dr-out-zinsen').textContent = fmt.eur(plan.zinsen_gesamt);
+    // zinsen_gesamt ist immer die Nettozinssumme (USt fließt separat, s. unten)
+    // — bei gewerblichen Darlehen wird das im Label explizit gemacht, damit
+    // die Zahl nicht als Bruttoaufwand missverstanden wird.
+    document.getElementById('dr-out-zinsen-label').textContent = hatUst ? 'Gesamtzinsen (netto)' : 'Gesamtzinsen';
     // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die Bank
     // fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur schneller
     // dieselbe Summe; sie wirkt hier ausschließlich über geringere Zinsen.
