@@ -630,39 +630,103 @@ input[type="number"]::-webkit-outer-spin-button {
 /* ── Rechner (Zinseszins-Simulator, Darlehensrechner) ────────────────────── */
 
 /* ── Rechner-Übersicht ────────────────────────────────────────────────────
-   Klickbare Kacheln statt eines Dropdowns — Platz für weitere Rechner, ohne
-   dass die Liste bei zwei Einträgen schon verloren wirkt. */
+   Klickbare Kacheln mit einer kleinen Illustration oben, die zeigt, was der
+   Rechner ausgibt (Wachstumskurve, Restschuld-Balken …) — statt viel Text.
+   2 × 2, damit die Grafiken genug Breite haben (vier Rechner). */
 .rechner-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+@media (max-width: 900px) {
+  .rechner-grid { grid-template-columns: 1fr; }
 }
 
 .rechner-tile {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--ink-wash);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
-  padding: var(--space-6);
+  overflow: hidden;
   cursor: pointer;
   text-align: left;
+  opacity: 0;
+  animation: fadeIn var(--duration-mid) var(--ease-out) forwards;
   transition: transform var(--duration-fast) var(--ease-out),
               border-color var(--duration-fast) var(--ease-out),
               box-shadow var(--duration-fast) var(--ease-out);
 }
+.rechner-tile:nth-child(2) { animation-delay: 60ms; }
+.rechner-tile:nth-child(3) { animation-delay: 120ms; }
+.rechner-tile:nth-child(4) { animation-delay: 180ms; }
 .rechner-tile:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: rgba(201,168,76,0.35);
   box-shadow: var(--shadow-md);
 }
+.rechner-tile:focus-visible { outline: 2px solid var(--seal-red); outline-offset: 2px; }
 
+.rechner-tile-visual {
+  position: relative;
+  height: 170px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(201,168,76,0.07) 0%, transparent 60%),
+    var(--surface-alt);
+  border-bottom: 1px solid var(--ink-wash);
+  overflow: hidden;
+}
+.rechner-tile-svg {
+  position: absolute;
+  inset: 18px 0 0 0;
+  width: 100%;
+  height: calc(100% - 18px);
+  transform-origin: 50% 100%;
+  transition: transform var(--duration-mid) var(--ease-out);
+}
+.rechner-tile:hover .rechner-tile-svg { transform: scale(1.04); }
+
+.rt-grid { stroke: rgba(255,255,255,0.05); stroke-width: 1; }
+.rt-axis { stroke: rgba(255,255,255,0.14); stroke-width: 1; }
+.rt-line { fill: none; stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.rt-line--gold { stroke: var(--seal-red); }
+.rt-line--grey { stroke: var(--wash-grey); stroke-width: 1.5; }
+.rt-line--blue { stroke: #4DA8E0; }
+.rt-line--red  { stroke: #F87171; }
+.rt-dash { stroke-dasharray: 5 5; }
+.rt-fill-grey { fill: rgba(136,136,136,0.16); }
+
+.rechner-tile-legend {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--wash-grey);
+}
+.rechner-tile-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.rt-dot { display: inline-block; width: 12px; height: 3px; border-radius: 2px; }
+.rt-dot--gold { background: var(--seal-red); }
+.rt-dot--grey { background: var(--wash-grey); }
+.rt-dot--blue { background: #4DA8E0; }
+.rt-dot--red  { background: #F87171; }
+.rt-dot--dash { background: repeating-linear-gradient(90deg, var(--wash-grey) 0 4px, transparent 4px 7px); }
+
+.rechner-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-1);
+}
 .rechner-tile-icon {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius);
   display: flex;
   align-items: center;
@@ -670,24 +734,25 @@ input[type="number"]::-webkit-outer-spin-button {
   background: rgba(201,168,76,0.1);
   color: var(--seal-red);
 }
-.rechner-tile-icon svg { width: 22px; height: 22px; }
-
-.rechner-tile-body { flex: 1; min-width: 0; }
-.rechner-tile-body h3 {
+.rechner-tile-icon svg { width: 17px; height: 17px; }
+.rechner-tile-head h3 {
+  flex: 1;
+  min-width: 0;
   font-size: var(--text-body);
   font-weight: 700;
   color: var(--ink-black);
-  margin-bottom: var(--space-1);
+  margin: 0;
 }
-.rechner-tile-body p {
+.rechner-tile-desc {
+  padding: 0 var(--space-5) var(--space-5) calc(var(--space-5) + 32px + var(--space-3));
   font-size: var(--text-sm);
   color: var(--wash-grey);
-  line-height: 1.4;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .rechner-tile-chevron {
   flex-shrink: 0;
-  margin-top: var(--space-1);
   color: var(--wash-grey);
   transition: transform var(--duration-fast) var(--ease-out),
               color var(--duration-fast) var(--ease-out);
@@ -695,6 +760,11 @@ input[type="number"]::-webkit-outer-spin-button {
 .rechner-tile:hover .rechner-tile-chevron {
   color: var(--seal-red);
   transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rechner-tile { animation: none; opacity: 1; }
+  .rechner-tile-svg { transition: none; }
 }
 
 /* Rückweg von einem einzelnen Rechner zur Übersicht */
@@ -871,6 +941,143 @@ input[type="number"]::-webkit-outer-spin-button {
   white-space: nowrap;
 }
 .rechner-kpi-row .value.is-empty { color: var(--wash-grey); font-weight: 400; }
+
+/* ── Immobilienrechner ────────────────────────────────────────────────────
+   Viele Eingaben → breitere, in aufklappbare Blöcke gegliederte Eingabe-
+   spalte; rechts zwei Charts plus Steckbrief statt eines einzelnen Charts. */
+.rechner-layout.im-layout {
+  grid-template-columns: minmax(300px, 380px) 1fr;
+  align-items: start;
+}
+.im-charts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.im-charts .chart-canvas-wrap { min-height: 260px; }
+
+.im-gruppe {
+  border-top: 1px solid var(--ink-wash);
+  padding: var(--space-4) 0;
+}
+.im-gruppe:last-child { padding-bottom: 0; }
+.rechner-intro + .im-gruppe { border-top: none; padding-top: 0; }
+.im-gruppe summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--seal-red);
+  user-select: none;
+}
+.im-gruppe[open] summary { margin-bottom: var(--space-4); }
+.im-gruppe summary::-webkit-details-marker { display: none; }
+.im-gruppe summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--wash-grey);
+  border-bottom: 1.5px solid var(--wash-grey);
+  transform: rotate(-45deg);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.im-gruppe[open] summary::after { transform: rotate(45deg); }
+.im-gruppe summary:focus-visible { outline: 2px solid var(--seal-red); outline-offset: 2px; }
+
+.form-row.im-row-3 { grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+@media (max-width: 768px) {
+  .rechner-layout.im-layout,
+  .form-row.im-row-3 { grid-template-columns: 1fr; }
+  /* Gestapelte Feldpaare: gleichmäßige Abstände statt Grid-Lücke + 0 */
+  .im-eingaben .form-row { gap: 0; }
+  .im-eingaben .form-row .form-group:last-child { margin-bottom: var(--space-5); }
+}
+.im-hint-block { display: block; margin: calc(-1 * var(--space-3)) 0 var(--space-5); }
+
+.im-fakten {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin-top: var(--space-4);
+}
+.im-fakten > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.im-fakten .label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wash-grey);
+}
+.im-fakten .value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-black);
+}
+
+#im-warnungen:empty { display: none; }
+.vs-frist-item.info {
+  background: rgba(77,168,224,0.08);
+  border: 1px solid rgba(77,168,224,0.25);
+}
+.vs-frist-item.info .vs-frist-stamp { background: #4DA8E0; color: #fff; }
+/* Kritische Warnungen hier in Rot statt im goldenen Akzent — ein negativer
+   Cashflow soll nicht wie ein Hinweis aussehen. */
+#im-warnungen .vs-frist-item.urgent {
+  background: rgba(248,113,113,0.08);
+  border-color: rgba(248,113,113,0.3);
+}
+#im-warnungen .vs-frist-item.urgent .vs-frist-stamp { background: #F87171; }
+
+/* Sechs Kennzahlen: auf breiten Schirmen in einer Reihe statt 5 + 1. */
+.stat-grid.im-kpis { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+
+.im-neg { color: #F87171; }
+.im-pos { color: #4ADE80; }
+
+.im-szenario-speichern {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.im-szenario-speichern .form-input { flex: 1; min-width: 200px; }
+
+.im-vergleich { overflow-x: auto; }
+.im-vergleich:not(:empty) {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--ink-wash);
+}
+.im-vergleich-row { cursor: pointer; }
+.im-vergleich-row:focus-visible { outline: 2px solid var(--seal-red); outline-offset: -2px; }
+.im-vergleich-row.is-active td { background: rgba(201,168,76,0.08); }
+.im-vergleich-row.is-active td:first-child { box-shadow: inset 3px 0 0 var(--seal-red); }
+.im-vergleich-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: var(--space-2);
+  border-radius: 50%;
+  background: #F87171;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+.im-plan-table td, .im-plan-table th { white-space: nowrap; }
+.im-disclaimer { margin-top: var(--space-4); line-height: 1.5; }
 
 .chart-canvas-wrap {
   position: relative;
@@ -3043,6 +3250,28 @@ body.demo-mode #backup-zip-link {
   /* Überschriften/Nebentexte, die auf dem Bildschirm bewusst grau sind, auf
      Papier aber kaum lesbar wären. */
   .chart-subtitle { color: #444 !important; }
+
+  /* Immobilienrechner: Eingabekarte entfällt, Kennzahlen kompakt in einer
+     Reihe, Charts nebeneinander — Tabelle darf auf die nächste Seite. */
+  #view-rechner-immobilie .im-charts { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #view-rechner-immobilie .im-fakten-card { grid-column: 1 / -1; }
+  #view-rechner-immobilie .im-fakten .label { color: #444 !important; }
+  #view-rechner-immobilie .im-fakten .value { color: #000 !important; }
+  #view-rechner-immobilie .stat-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  #view-rechner-immobilie .stat-card { padding: 6px var(--space-2); }
+  #view-rechner-immobilie .stat-card .value { font-size: 0.9rem; }
+  #view-rechner-immobilie .stat-card .label { font-size: 0.6rem; margin-bottom: 2px; color: #444 !important; font-weight: 600; }
+  #view-rechner-immobilie .stat-card .hint { font-size: 0.6rem; color: #555 !important; }
+  #view-rechner-immobilie .data-table th { padding: 4px 6px; }
+  #view-rechner-immobilie .data-table td { padding: 3px 6px; font-size: 0.72rem; }
+  #view-rechner-immobilie .im-disclaimer { color: #555 !important; }
+  #im-warnungen { display: none !important; }
+  .im-neg { color: #A82E22 !important; }
+  .im-pos { color: #23803A !important; }
   .data-table .jahr-nr { color: #555 !important; }
 
   /* Plan-Tabelle: Spaltenfarben wie in der App (Zinsen / Sondertilgung),

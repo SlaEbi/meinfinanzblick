@@ -1,4 +1,4 @@
-/* API client v16 — alle Aufrufe gehen an /api/v1/ */
+/* API client v17 — alle Aufrufe gehen an /api/v1/ */
 
 const BASE = '/api/v1';
 
@@ -23,8 +23,10 @@ class DemoSchreibsperre extends Error {
   }
 }
 
-async function request(method, path, body = null) {
-  if (method !== 'GET' && istDemoModus()) throw new DemoSchreibsperre();
+// lesend=true: reine Berechnung per POST (Eingaben zu zahlreich für die
+// Query), die nichts speichert — darf darum auch im Demo-Modus laufen.
+async function request(method, path, body = null, { lesend = false } = {}) {
+  if (method !== 'GET' && !lesend && istDemoModus()) throw new DemoSchreibsperre();
 
   const opts = {
     method,
@@ -72,6 +74,15 @@ export const api = {
 
   kapitalentnahme: {
     simulation: (params) => request('GET', `/kapitalentnahme/simulation?${new URLSearchParams(params)}`),
+  },
+
+  immobilie: {
+    berechnung: (eingaben)  => request('POST', '/immobilie/berechnung', eingaben, { lesend: true }),
+    szenarien:  ()          => request('GET',    '/immobilie/szenarien'),
+    vergleich:  ()          => request('GET',    '/immobilie/szenarien/vergleich'),
+    create:     (data)      => request('POST',   '/immobilie/szenarien', data),
+    update:     (id, data)  => request('PUT',    `/immobilie/szenarien/${id}`, data),
+    delete:     (id)        => request('DELETE', `/immobilie/szenarien/${id}`),
   },
 
   sparziele: {

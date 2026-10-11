@@ -1,4 +1,4 @@
-import { api } from './api.js?v=17';
+import { api } from './api.js?v=18';
 import { DEMO } from './demo.js?v=2';
 
 // ── Formatierung ────────────────────────────────────────────────────────────
@@ -381,6 +381,7 @@ function renderCurrentView() {
   if (state.view === 'rechner-zinseszins')     renderRechnerZinseszins();
   if (state.view === 'rechner-darlehen')       renderRechnerDarlehen();
   if (state.view === 'rechner-kapitalentnahme') renderRechnerKapitalentnahme();
+  if (state.view === 'rechner-immobilie')      renderRechnerImmobilie();
   if (state.view === 'notfall')        renderNotfall();
   if (state.view === 'todos')          renderTodos();
 }
@@ -2205,6 +2206,512 @@ async function drSzenarioListeRendern() {
 
 function renderRechnerKapitalentnahme() {
   keRecalc(true);
+}
+
+// ── Immobilienrechner (Kapitalanlage) ────────────────────────────────────────
+// Freier Rechner für eine vermietete Immobilie — die gesamte Rechnung
+// (Rendite, Tilgung, AfA, Steuereffekt, Prognose, IRR) läuft serverseitig in
+// backend/services/immobilie.py (getestete Quelle der Wahrheit). Hier nur
+// Eingaben sammeln, Ergebnis darstellen und Objekte speichern/vergleichen.
+
+// Grunderwerbsteuer je Bundesland, Stand 2026 — nur Vorbelegung, das Feld
+// bleibt frei überschreibbar.
+const IM_GRUNDERWERBSTEUER = [
+  ['BW', 'Baden-Württemberg', 5.0], ['BY', 'Bayern', 3.5], ['BE', 'Berlin', 6.0],
+  ['BB', 'Brandenburg', 6.5], ['HB', 'Bremen', 5.5], ['HH', 'Hamburg', 5.5],
+  ['HE', 'Hessen', 6.0], ['MV', 'Mecklenburg-Vorpommern', 6.0], ['NI', 'Niedersachsen', 5.0],
+  ['NW', 'Nordrhein-Westfalen', 6.5], ['RP', 'Rheinland-Pfalz', 5.0], ['SL', 'Saarland', 6.5],
+  ['SN', 'Sachsen', 5.5], ['ST', 'Sachsen-Anhalt', 5.0], ['SH', 'Schleswig-Holstein', 6.5],
+  ['TH', 'Thüringen', 5.0],
+];
+
+// Zahlenfelder: Feld-ID im-<key> entspricht 1:1 dem Schlüssel der API-Eingaben
+// (ImmobilieEingabenSchema), so lassen sich Szenarien ohne Mapping laden.
+const IM_ZAHLENFELDER = [
+  'kaufpreis', 'wohnflaeche', 'grundstuecksanteil_pct', 'grunderwerbsteuer_pct',
+  'notar_grundbuch_pct', 'makler_pct', 'renovierung', 'eigenkapital', 'zinssatz_pct',
+  'tilgung_pct', 'zinsbindung_jahre', 'anschlusszins_pct', 'sondertilgung_jahr',
+  'kaltmiete_monat', 'mietsteigerung_pct', 'mietausfall_pct', 'verwaltung_monat',
+  'instandhaltung_monat', 'kostensteigerung_pct', 'zve', 'kirchensteuer_pct',
+  'wertsteigerung_pct', 'betrachtung_jahre', 'afa_satz_pct',
+];
+const IM_GANZZAHLIG = new Set(['zinsbindung_jahre', 'betrachtung_jahre']);
+const IM_AFA_STANDARD = ['2', '2.5', '3'];
+
+const imTimers = {};
+let imAnfrageNr = 0;
+let imSzenarien = [];
+let imAktivesSzenarioId = null;
+
+function imFeld(key) { return document.getElementById(`im-${key}`); }
+
+function imLesenEingaben() {
+  const e = {};
+  IM_ZAHLENFELDER.forEach(key => {
+    const v = imFeld(key).value;
+    e[key] = IM_GANZZAHLIG.has(key) ? (parseInt(v, 10) || 0) : (parseFloat(v) || 0);
+  });
+  const afa = document.getElementById('im-afa').value;
+  e.afa_modus = afa === 'degressiv' ? 'degressiv' : 'linear';
+  if (IM_AFA_STANDARD.includes(afa)) e.afa_satz_pct = parseFloat(afa);
+  e.splitting = imFeld('splitting').value === '1';
+  e.bundesland = imFeld('bundesland').value || null;
+  return e;
+}
+
+function imEingabenSetzen(e) {
+  IM_ZAHLENFELDER.forEach(key => { if (e[key] != null) imFeld(key).value = e[key]; });
+  imFeld('splitting').value = e.splitting ? '1' : '0';
+  if (e.bundesland) imFeld('bundesland').value = e.bundesland;
+  const satz = String(e.afa_satz_pct ?? 2);
+  document.getElementById('im-afa').value =
+    e.afa_modus === 'degressiv' ? 'degressiv' : (IM_AFA_STANDARD.includes(satz) ? satz : 'individuell');
+  imAfaSichtbarkeit();
+  const slider = document.getElementById('im-betrachtung-slider');
+  slider.value = imFeld('betrachtung_jahre').value;
+  syncRangeFill(slider);
+}
+
+function imAfaSichtbarkeit() {
+  document.getElementById('im-afa-individuell-group').hidden =
+    document.getElementById('im-afa').value !== 'individuell';
+}
+
+window.imAfaChanged = function() {
+  imAfaSichtbarkeit();
+  imRecalc();
+};
+
+window.imBundeslandChanged = function() {
+  const eintrag = IM_GRUNDERWERBSTEUER.find(([code]) => code === imFeld('bundesland').value);
+  if (eintrag) imFeld('grunderwerbsteuer_pct').value = eintrag[2];
+  imRecalc();
+};
+
+window.imHaltedauerChanged = function(wert, quelle) {
+  const jahre = Math.max(1, Math.min(40, parseInt(wert, 10) || 1));
+  if (quelle === 'slider') imFeld('betrachtung_jahre').value = jahre;
+  const slider = document.getElementById('im-betrachtung-slider');
+  slider.value = jahre;
+  syncRangeFill(slider);
+  imRecalc();
+};
+
+window.imRecalc = function(sofort = false) {
+  clearTimeout(imTimers.recalc);
+  imTimers.recalc = setTimeout(() => imLadeUndRender(), sofort ? 0 : 300);
+};
+
+const imPct = (dezimal) => dezimal == null ? '—' : fmt.pct(dezimal * 100);
+const imZahl1 = (v) => v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+// Betrag mit Vorzeichenfarbe — für Cashflow und Steuereffekt, wo das
+// Vorzeichen die eigentliche Aussage ist.
+function imEurVz(v) {
+  const cls = v < -0.005 ? 'im-neg' : (v > 0.005 ? 'im-pos' : '');
+  return `<span class="${cls}">${fmt.eur(v)}</span>`;
+}
+
+function imSetzeText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+async function imLadeUndRender() {
+  const container = document.getElementById('im-tabelle-container');
+  if (!container) return;
+  const e = imLesenEingaben();
+  if (e.kaufpreis <= 0) {
+    container.innerHTML = '<p class="form-hint" style="padding:1.5rem">Bitte einen Kaufpreis eingeben.</p>';
+    return;
+  }
+
+  // Bei schnellem Tippen können Antworten überholt eintreffen — nur die
+  // jüngste Anfrage darf rendern.
+  const nr = ++imAnfrageNr;
+  let r;
+  try {
+    r = await api.immobilie.berechnung(e);
+  } catch (err) {
+    if (nr !== imAnfrageNr) return;
+    container.innerHTML = `<p class="form-hint" style="padding:1.5rem">Bitte Eingaben prüfen — mindestens ein Wert liegt außerhalb des gültigen Bereichs.</p>`;
+    return;
+  }
+  if (nr !== imAnfrageNr) return;
+
+  const n = e.betrachtung_jahre;
+
+  // Eingabekarte: Zwischenergebnisse direkt unter dem jeweiligen Block
+  setKpi('im-out-darlehen', r.darlehen > 0, fmt.eur(r.darlehen));
+  setKpi('im-out-rate', r.rate_monatlich > 0, fmt.eur(r.rate_monatlich));
+  setKpi('im-out-afa', r.jahre[0].afa > 0, fmt.eur(r.jahre[0].afa));
+  setKpi('im-out-grenzsteuer', true, imPct(r.grenzsteuersatz));
+
+  // Kennzahlen
+  const cfCard = document.getElementById('im-card-cashflow');
+  cfCard.classList.toggle('stat-card--gold', r.cashflow_nach_steuern_monat >= 0);
+  cfCard.classList.toggle('stat-card--red', r.cashflow_nach_steuern_monat < 0);
+  imSetzeText('im-out-cf-nach', fmt.eur(r.cashflow_nach_steuern_monat));
+  imSetzeText('im-out-cf-vor', `vor Steuern ${fmt.eur(r.cashflow_vor_steuern_monat)}`);
+  imSetzeText('im-out-brutto', imPct(r.bruttomietrendite));
+  imSetzeText('im-out-faktor', r.kaufpreisfaktor != null ? `Kaufpreisfaktor ${imZahl1(r.kaufpreisfaktor)}` : 'ohne Miete kein Faktor');
+  imSetzeText('im-out-netto', imPct(r.nettomietrendite));
+  imSetzeText('im-out-ekr', r.eigenkapitalrendite != null ? imPct(r.eigenkapitalrendite) : 'ohne EK');
+  imSetzeText('im-out-irr', r.irr != null ? imPct(r.irr) : '—');
+  imSetzeText('im-out-irr-hint', r.irr != null
+    ? `auf dein Eigenkapital über ${n} ${n === 1 ? 'Jahr' : 'Jahre'}, inkl. Verkauf`
+    : 'nur mit Eigenkapital berechenbar');
+  const zuwachsCard = document.getElementById('im-card-zuwachs');
+  zuwachsCard.classList.toggle('stat-card--green', r.vermoegenszuwachs >= 0);
+  zuwachsCard.classList.toggle('stat-card--red', r.vermoegenszuwachs < 0);
+  imSetzeText('im-out-zuwachs', fmt.eurKurz(r.vermoegenszuwachs));
+  imSetzeText('im-out-zuwachs-hint', `nach ${n} ${n === 1 ? 'Jahr' : 'Jahren'}, abzüglich Eigenkapital`);
+
+  imWarnungenRendern(r.warnungen);
+  imFaktenRendern(e, r);
+  imPrintSummaryAktualisieren(e, r);
+  renderImCashflowChart(r.jahre);
+  renderImVermoegenChart(r.jahre, e.kaufpreis, r.darlehen);
+  imTabelleRendern(container, r.jahre);
+}
+
+function imWarnungenRendern(warnungen) {
+  const el = document.getElementById('im-warnungen');
+  // Reihenfolge nach Dringlichkeit, damit das Wichtigste oben steht
+  const rang = { urgent: 0, warn: 1, info: 2 };
+  el.innerHTML = [...warnungen].sort((a, b) => rang[a.stufe] - rang[b.stufe]).map(w => `
+    <div class="vs-frist-item ${w.stufe}">
+      <span class="vs-frist-stamp">${w.stufe === 'info' ? 'i' : '!'}</span>
+      <div class="vs-frist-text">${escapeHtml(w.text)}</div>
+    </div>`).join('');
+}
+
+function imFaktenRendern(e, r) {
+  const n = e.betrachtung_jahre;
+  const fakten = [
+    ['Kaufnebenkosten', fmt.eurKurz(r.kaufnebenkosten)],
+    ['Gesamtinvestition', fmt.eurKurz(r.gesamtinvestition)],
+    ['Darlehen', fmt.eurKurz(r.darlehen)],
+    ['Preis pro m²', r.preis_pro_qm != null ? fmt.eurKurz(r.preis_pro_qm) : '—'],
+    ['AfA-Basis (Gebäude)', fmt.eurKurz(r.afa_basis)],
+  ];
+  if (r.darlehen > 0 && e.zinsbindung_jahre > 0) {
+    fakten.push([`Restschuld nach ${e.zinsbindung_jahre} J. Zinsbindung`, fmt.eurKurz(r.restschuld_zinsbindung)]);
+  }
+  fakten.push([`Marktwert nach ${n} J.`, fmt.eurKurz(r.verkaufspreis)]);
+  if (r.spekulationssteuer > 0) fakten.push(['Spekulationssteuer', fmt.eurKurz(r.spekulationssteuer)]);
+  fakten.push(['Erlös nach Schuldentilgung', fmt.eurKurz(r.verkaufserloes_netto)]);
+
+  document.getElementById('im-fakten').innerHTML = fakten.map(([label, wert]) => `
+    <div><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(wert)}</span></div>`).join('');
+}
+
+// Rahmendaten fürs Papier — ersetzt dort die (nicht gedruckte) Eingabekarte,
+// gleiche Optik wie beim Darlehensrechner.
+function imPrintSummaryAktualisieren(e, r) {
+  const el = document.getElementById('im-print-summary');
+  if (!el) return;
+  const afaText = e.afa_modus === 'degressiv' ? '5 % degressiv' : `${fmt.pct(e.afa_satz_pct)} linear`;
+  const felder = [
+    ['Kaufpreis', fmt.eur(e.kaufpreis)],
+    ['Wohnfläche', e.wohnflaeche > 0 ? `${e.wohnflaeche} m²` : '—'],
+    ['Nebenkosten', `${fmt.pct(e.grunderwerbsteuer_pct + e.notar_grundbuch_pct + e.makler_pct)} = ${fmt.eurKurz(r.kaufnebenkosten)}`],
+    ['Eigenkapital', fmt.eur(e.eigenkapital)],
+    ['Darlehen', fmt.eur(r.darlehen)],
+    ['Zins / Tilgung', `${fmt.pct(e.zinssatz_pct)} / ${fmt.pct(e.tilgung_pct)}`],
+    ['Zinsbindung', `${e.zinsbindung_jahre} J., danach ${fmt.pct(e.anschlusszins_pct)}`],
+    ['Rate / Monat', fmt.eur(r.rate_monatlich)],
+    ['Kaltmiete / Monat', fmt.eur(e.kaltmiete_monat)],
+    ['Kosten / Monat', fmt.eur(e.verwaltung_monat + e.instandhaltung_monat)],
+    ['AfA', afaText],
+    ['Grenzsteuersatz', imPct(r.grenzsteuersatz)],
+    ['Haltedauer', `${e.betrachtung_jahre} Jahre`],
+  ];
+  let html = '<div class="dr-print-fakten">' + felder.map(([label, wert]) => `
+    <div><span class="dr-print-fakten-label">${escapeHtml(label)}</span><span class="dr-print-fakten-value">${escapeHtml(wert)}</span></div>
+  `).join('') + '</div>';
+  if (r.warnungen.length) {
+    html += `<div class="dr-print-fakten-notiz">${r.warnungen.map(w => escapeHtml(w.text)).join('<br>')}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Y-Achse in Tausend, mit Vorzeichen — beim Cashflow ist "unter null" die
+// eigentliche Aussage.
+function imTausenderTick(v) {
+  if (v === 0) return '€0';
+  return (v < 0 ? '−€' : '€') + (Math.abs(v) / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + 'k';
+}
+
+function renderImCashflowChart(jahre) {
+  const canvas = document.getElementById('chart-im-cashflow');
+  if (!canvas) return;
+  const theme = chartTheme();
+  if (state.charts.imCashflow) state.charts.imCashflow.destroy();
+
+  state.charts.imCashflow = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: jahre.map(j => String(planKalenderjahr(j.jahr - 1))),
+      datasets: [
+        {
+          label: 'Vor Steuern',
+          data: jahre.map(j => j.cashflow_vor_steuern),
+          backgroundColor: 'rgba(136,136,136,0.45)',
+          borderRadius: 2,
+        },
+        {
+          label: 'Nach Steuern',
+          data: jahre.map(j => j.cashflow_nach_steuern),
+          backgroundColor: theme.accent,
+          borderRadius: 2,
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { ...legendLabels(theme), pointStyle: 'rect', boxHeight: 10, boxWidth: 10 } },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmt.eur(ctx.raw)}` },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          ticks: { font: { family: "'JetBrains Mono', monospace", size: 10 }, color: theme.grey, callback: imTausenderTick },
+          grid: { color: (ctx) => ctx.tick.value === 0 ? 'rgba(255,255,255,0.25)' : theme.grid },
+        },
+        x: jahresAchse(theme),
+      },
+    },
+  });
+}
+
+function renderImVermoegenChart(jahre, kaufpreis, darlehen) {
+  const canvas = document.getElementById('chart-im-vermoegen');
+  if (!canvas) return;
+  const theme = chartTheme();
+  if (state.charts.imVermoegen) state.charts.imVermoegen.destroy();
+
+  // Startpunkt "Kauf": Marktwert = Kaufpreis, volle Darlehenssumme offen.
+  const labels = ['Kauf', ...jahre.map(j => String(planKalenderjahr(j.jahr - 1)))];
+  const linie = (label, daten, farbe, extra = {}) => ({
+    label, data: daten, borderColor: farbe, borderWidth: 2, tension: 0.25,
+    pointRadius: 0, pointHoverRadius: 4, fill: false, ...extra,
+  });
+
+  state.charts.imVermoegen = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        linie('Marktwert', [kaufpreis, ...jahre.map(j => j.marktwert)], '#4DA8E0'),
+        linie('Restschuld', [darlehen, ...jahre.map(j => j.restschuld)], '#F87171'),
+        linie('Nettovermögen', [kaufpreis - darlehen, ...jahre.map(j => j.nettovermoegen)], theme.accent,
+          { fill: 'origin', backgroundColor: 'rgba(201,168,76,0.12)' }),
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: legendLabels(theme) },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${fmt.eur(ctx.raw)}` },
+          bodyFont: { family: "'JetBrains Mono', monospace" },
+        },
+      },
+      scales: {
+        y: {
+          ticks: { font: { family: "'JetBrains Mono', monospace", size: 10 }, color: theme.grey, callback: imTausenderTick },
+          grid: { color: theme.grid },
+        },
+        x: jahresAchse(theme),
+      },
+    },
+  });
+}
+
+function imTabelleRendern(container, jahre) {
+  container.innerHTML = `
+    <table class="data-table im-plan-table">
+      <thead>
+        <tr>
+          <th>Jahr</th>
+          <th class="right">Miete</th>
+          <th class="right">Kosten</th>
+          <th class="right">Zinsen</th>
+          <th class="right">Tilgung</th>
+          <th class="right">AfA</th>
+          <th class="right">Ergebnis V+V</th>
+          <th class="right">Steuer ±</th>
+          <th class="right">CF vor St.</th>
+          <th class="right">CF nach St.</th>
+          <th class="right">Restschuld</th>
+          <th class="right">Nettovermögen</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${jahre.map(j => `
+          <tr>
+            <td class="mono">${planKalenderjahr(j.jahr - 1)}<span class="jahr-nr">J. ${j.jahr}</span></td>
+            <td class="right mono">${fmt.eurKurz(j.miete)}</td>
+            <td class="right mono">${fmt.eurKurz(j.kosten + j.erhaltungsaufwand)}</td>
+            <td class="right mono" style="color:#F0A030">${fmt.eurKurz(j.zins)}</td>
+            <td class="right mono">${fmt.eurKurz(j.tilgung)}</td>
+            <td class="right mono">${fmt.eurKurz(j.afa)}</td>
+            <td class="right mono">${fmt.eurKurz(j.steuerliches_ergebnis)}</td>
+            <td class="right mono">${imEurVz(Math.round(j.steuereffekt))}</td>
+            <td class="right mono">${imEurVz(Math.round(j.cashflow_vor_steuern))}</td>
+            <td class="right mono"><strong>${imEurVz(Math.round(j.cashflow_nach_steuern))}</strong></td>
+            <td class="right mono">${fmt.eurKurz(j.restschuld)}</td>
+            <td class="right mono">${fmt.eurKurz(j.nettovermoegen)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderRechnerImmobilie() {
+  const bl = imFeld('bundesland');
+  if (bl && !bl.options.length) {
+    bl.innerHTML = IM_GRUNDERWERBSTEUER.map(([code, name, satz]) =>
+      `<option value="${code}">${escapeHtml(name)} — ${fmt.pct(satz)}</option>`).join('');
+    bl.value = 'BW';
+    imFeld('grunderwerbsteuer_pct').value = 5.0;
+  }
+  syncRangeFill(document.getElementById('im-betrachtung-slider'));
+  imAfaSichtbarkeit();
+  imRecalc(true);
+  imSzenarioListeRendern();
+}
+
+// ── Immobilienrechner: gespeicherte Objekte & Vergleich ─────────────────────
+// Ein Objekt ist der komplette Stand der Eingabefelder unter einem Namen
+// (Tabelle immobilien_szenarien, Eingaben als JSON). Der Vergleich rechnet
+// alle gespeicherten Objekte serverseitig frisch durch.
+
+window.imSzenarioSpeichern = async function() {
+  const nameInput = document.getElementById('im-szenario-name');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); return; }
+  try {
+    const s = await api.immobilie.create({ name, eingaben: imLesenEingaben() });
+    imAktivesSzenarioId = s.id;
+    await imSzenarioListeRendern();
+    toast('Objekt gespeichert.');
+  } catch (e) {
+    alert('Speichern fehlgeschlagen: ' + e.message);
+  }
+};
+
+window.imSzenarioUeberschreiben = async function() {
+  const s = imSzenarien.find(x => x.id === imAktivesSzenarioId);
+  if (!s) return;
+  const name = document.getElementById('im-szenario-name').value.trim() || s.name;
+  try {
+    await api.immobilie.update(s.id, { name, eingaben: imLesenEingaben() });
+    await imSzenarioListeRendern();
+    toast('Änderungen gespeichert.');
+  } catch (e) {
+    alert('Speichern fehlgeschlagen: ' + e.message);
+  }
+};
+
+function imSzenarioLaden(s) {
+  imAktivesSzenarioId = s.id;
+  imEingabenSetzen(s.eingaben);
+  document.getElementById('im-szenario-name').value = s.name;
+  document.getElementById('im-print-titel').textContent = s.name;
+  imAuswahlAnzeigen();
+  imRecalc(true);
+}
+
+function imAuswahlAnzeigen() {
+  const aktiv = imSzenarien.some(x => x.id === imAktivesSzenarioId);
+  if (!aktiv) imAktivesSzenarioId = null;
+  document.getElementById('im-szenario-select').value = aktiv ? String(imAktivesSzenarioId) : '';
+  document.getElementById('im-szenario-delete-btn').style.display = aktiv ? '' : 'none';
+  document.getElementById('im-szenario-update-btn').style.display = aktiv ? '' : 'none';
+  document.querySelectorAll('#im-vergleich tr[data-id]').forEach(tr =>
+    tr.classList.toggle('is-active', Number(tr.dataset.id) === imAktivesSzenarioId));
+}
+
+window.imSzenarioDropdownChanged = function(idStr) {
+  if (!idStr) {
+    imAktivesSzenarioId = null;
+    document.getElementById('im-szenario-name').value = '';
+    document.getElementById('im-print-titel').textContent = 'Immobilienrechner';
+    imAuswahlAnzeigen();
+    return;
+  }
+  const s = imSzenarien.find(x => x.id === Number(idStr));
+  if (s) imSzenarioLaden(s);
+};
+
+window.imSzenarioLoeschenAktuell = async function() {
+  const s = imSzenarien.find(x => x.id === imAktivesSzenarioId);
+  if (!s || !confirm(`Objekt „${s.name}“ wirklich löschen?`)) return;
+  try {
+    await api.immobilie.delete(s.id);
+    imAktivesSzenarioId = null;
+    document.getElementById('im-szenario-name').value = '';
+    document.getElementById('im-print-titel').textContent = 'Immobilienrechner';
+    await imSzenarioListeRendern();
+  } catch (e) {
+    alert('Löschen fehlgeschlagen: ' + e.message);
+  }
+};
+
+async function imSzenarioListeRendern() {
+  const select = document.getElementById('im-szenario-select');
+  if (!select) return;
+  let vergleich = [];
+  try {
+    [imSzenarien, vergleich] = await Promise.all([api.immobilie.szenarien(), api.immobilie.vergleich()]);
+  } catch { return; }
+
+  select.innerHTML = '<option value="">Objekt wählen…</option>' + imSzenarien.map(s => `
+    <option value="${s.id}">${escapeHtml(s.name)} — ${fmt.eurKurz(s.eingaben.kaufpreis)}</option>`).join('');
+
+  const el = document.getElementById('im-vergleich');
+  if (vergleich.length < 1) {
+    el.innerHTML = '';
+  } else {
+    el.innerHTML = `
+      <div class="chart-title" style="margin-bottom:var(--space-3)">Vergleich</div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Objekt</th>
+            <th class="right">Kaufpreis</th>
+            <th class="right">Brutto</th>
+            <th class="right">Faktor</th>
+            <th class="right">CF/Monat n. St.</th>
+            <th class="right">EK-Rendite</th>
+            <th class="right">IRR</th>
+            <th class="right">Zuwachs</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${vergleich.map(v => `
+            <tr data-id="${v.id}" class="im-vergleich-row" tabindex="0" role="button"
+                onclick="imSzenarioDropdownChanged('${v.id}')"
+                onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); imSzenarioDropdownChanged('${v.id}'); }">
+              <td>${escapeHtml(v.name)}${v.warnungen_kritisch ? `<span class="im-vergleich-stamp" title="${v.warnungen_kritisch} kritische Warnung(en)">!</span>` : ''}</td>
+              <td class="right mono">${fmt.eurKurz(v.kaufpreis)}</td>
+              <td class="right mono">${imPct(v.bruttomietrendite)}</td>
+              <td class="right mono">${v.kaufpreisfaktor != null ? imZahl1(v.kaufpreisfaktor) : '—'}</td>
+              <td class="right mono">${imEurVz(Math.round(v.cashflow_nach_steuern_monat))}</td>
+              <td class="right mono">${imPct(v.eigenkapitalrendite)}</td>
+              <td class="right mono">${imPct(v.irr)}</td>
+              <td class="right mono">${fmt.eurKurz(v.vermoegenszuwachs)}<span class="jahr-nr">${v.betrachtung_jahre} J.</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+  imAuswahlAnzeigen();
 }
 
 // ── Sparziele (Sparschwein) ──────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
@@ -99,6 +99,20 @@ class DarlehensSzenario(Base):
     tilgungsfreie_monate = Column(Integer, default=0)     # Anlaufmonate, in denen nur Zinsen gezahlt werden
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+
+
+class ImmobilienSzenario(Base):
+    """Gespeicherter Stand des Immobilienrechners (Kapitalanlage) — ein
+    Objekt mit allen Eingaben, um es später wieder zu laden oder mit anderen
+    Objekten zu vergleichen. Die Eingaben liegen als JSON in einer Spalte,
+    weil der Rechner viele Felder hat, die sich noch weiterentwickeln; das
+    Schema prüft sie beim Speichern und Laden (ImmobilieEingabenSchema)."""
+    __tablename__ = 'immobilien_szenarien'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    eingaben = Column(JSON, nullable=False)
+    erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class SpendingPlan(Base):
     __tablename__ = 'spending_plans'

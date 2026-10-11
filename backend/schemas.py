@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 
 # ── Konto ──────────────────────────────────────────────────────────────────────
@@ -238,6 +238,117 @@ class KapitalentnahmeResponse(BaseModel):
     zinsertrag_gesamt: float
     entnahme_gesamt: float
     max_entnahme_kapitalerhalt: float
+
+
+# ── Immobilienrechner (Kapitalanlage) ────────────────────────────────────────
+
+class ImmobilieEingabenSchema(BaseModel):
+    """Eingaben des Immobilienrechners — Prozentwerte als Prozent (6.5 = 6,5 %),
+    Geldwerte in €, laufende Kosten und Miete monatlich."""
+    kaufpreis: float = Field(gt=0)
+    bundesland: Optional[str] = None      # nur für die Oberfläche (Vorbelegung Grunderwerbsteuer)
+    grunderwerbsteuer_pct: float = Field(6.5, ge=0, le=20)
+    notar_grundbuch_pct: float = Field(2.0, ge=0, le=20)
+    makler_pct: float = Field(3.57, ge=0, le=20)
+    grundstuecksanteil_pct: float = Field(25.0, ge=0, le=100)
+    renovierung: float = Field(0.0, ge=0)
+    wohnflaeche: float = Field(0.0, ge=0)
+    eigenkapital: float = Field(0.0, ge=0)
+    zinssatz_pct: float = Field(3.5, ge=0, le=20)
+    tilgung_pct: float = Field(2.0, ge=0, le=20)
+    zinsbindung_jahre: int = Field(10, ge=0, le=40)
+    anschlusszins_pct: float = Field(4.0, ge=0, le=20)
+    sondertilgung_jahr: float = Field(0.0, ge=0)
+    kaltmiete_monat: float = Field(0.0, ge=0)
+    mietsteigerung_pct: float = Field(1.5, ge=-10, le=20)
+    mietausfall_pct: float = Field(2.0, ge=0, le=100)
+    verwaltung_monat: float = Field(0.0, ge=0)
+    instandhaltung_monat: float = Field(0.0, ge=0)
+    kostensteigerung_pct: float = Field(2.0, ge=-10, le=20)
+    afa_modus: Literal['linear', 'degressiv'] = 'linear'
+    afa_satz_pct: float = Field(2.0, ge=0, le=20)
+    zve: float = Field(0.0, ge=0)
+    splitting: bool = False
+    kirchensteuer_pct: float = Field(0.0, ge=0, le=9)
+    wertsteigerung_pct: float = Field(1.5, ge=-20, le=20)
+    betrachtung_jahre: int = Field(15, ge=1, le=40)
+
+
+class ImmobilieJahrResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    jahr: int
+    miete: float
+    kosten: float
+    zins: float
+    tilgung: float
+    restschuld: float
+    afa: float
+    erhaltungsaufwand: float
+    steuerliches_ergebnis: float
+    steuereffekt: float
+    cashflow_vor_steuern: float
+    cashflow_nach_steuern: float
+    marktwert: float
+    nettovermoegen: float
+
+
+class ImmobilieWarnungResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    code: str
+    stufe: str
+    text: str
+
+
+class ImmobilieErgebnisResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    kaufnebenkosten: float
+    gesamtinvestition: float
+    darlehen: float
+    rate_monatlich: float
+    afa_basis: float
+    grenzsteuersatz: float
+    bruttomietrendite: float
+    nettomietrendite: float
+    kaufpreisfaktor: Optional[float] = None
+    preis_pro_qm: Optional[float] = None
+    cashflow_vor_steuern_monat: float
+    cashflow_nach_steuern_monat: float
+    eigenkapitalrendite: Optional[float] = None
+    jahre: list[ImmobilieJahrResponse]
+    restschuld_zinsbindung: float
+    verkaufspreis: float
+    spekulationssteuer: float
+    verkaufserloes_netto: float
+    vermoegenszuwachs: float
+    irr: Optional[float] = None
+    warnungen: list[ImmobilieWarnungResponse]
+
+
+class ImmobilienSzenarioCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    eingaben: ImmobilieEingabenSchema
+
+
+class ImmobilienSzenarioResponse(ImmobilienSzenarioCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    erstellt_am: datetime
+
+
+class ImmobilienVergleichZeile(BaseModel):
+    """Kennzahlen eines gespeicherten Szenarios für die Vergleichstabelle."""
+    id: int
+    name: str
+    kaufpreis: float
+    eigenkapital: float
+    betrachtung_jahre: int
+    bruttomietrendite: float
+    kaufpreisfaktor: Optional[float] = None
+    cashflow_nach_steuern_monat: float
+    eigenkapitalrendite: Optional[float] = None
+    irr: Optional[float] = None
+    vermoegenszuwachs: float
+    warnungen_kritisch: int
 
 
 # ── Spending Plan ──────────────────────────────────────────────────────────────
