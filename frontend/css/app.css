@@ -943,32 +943,58 @@ input[type="number"]::-webkit-outer-spin-button {
 .rechner-kpi-row .value.is-empty { color: var(--wash-grey); font-weight: 400; }
 
 /* ── Immobilienrechner ────────────────────────────────────────────────────
-   Viele Eingaben → breitere, in aufklappbare Blöcke gegliederte Eingabe-
-   spalte; rechts zwei Charts plus Steckbrief statt eines einzelnen Charts. */
-.rechner-layout.im-layout {
-  grid-template-columns: minmax(300px, 380px) 1fr;
+   Ergebnisse oben, darunter die Eingaben in voller Breite: die fünf Blöcke
+   fließen in Spalten (CSS columns gleicht die unterschiedlichen Höhen aus),
+   statt als lange schmale Spalte neben zu kurzen Charts zu stehen. Die
+   Charts folgen nebeneinander. */
+.im-eingaben { margin-bottom: var(--space-6); }
+.im-eingaben-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 var(--space-8);
   align-items: start;
 }
+/* Steuer über zwei Spalten, Inhalt selbst zweispaltig — so ist die zweite
+   Reihe (Steuer + Prognose) etwa so hoch wie die erste. */
+.im-gruppe--breit { grid-column: span 2; }
+.im-gruppe--breit .im-gruppe-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
+  align-items: start;
+}
+.im-gruppe--breit .rechner-kpi-row { margin-top: 0; }
+@media (max-width: 1100px) {
+  .im-eingaben-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .im-eingaben-grid,
+  .im-gruppe--breit .im-gruppe-body { grid-template-columns: 1fr; }
+  .im-gruppe--breit { grid-column: auto; }
+}
 .im-charts {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-6);
-  min-width: 0;
+  margin-bottom: var(--space-6);
 }
-.im-charts .chart-canvas-wrap { min-height: 260px; }
+.im-charts > * { min-width: 0; }
+.im-charts .chart-canvas-wrap { height: 260px; }
+.im-fakten-card { grid-column: 1 / -1; }
+.im-fakten-card .im-fakten { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 768px) {
+  .im-fakten-card .im-fakten { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
-.im-gruppe {
-  border-top: 1px solid var(--ink-wash);
-  padding: var(--space-4) 0;
-}
-.im-gruppe:last-child { padding-bottom: 0; }
-.rechner-intro + .im-gruppe { border-top: none; padding-top: 0; }
+.im-gruppe { padding-bottom: var(--space-6); min-width: 0; }
 .im-gruppe summary {
   cursor: pointer;
   list-style: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--ink-wash);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -992,8 +1018,10 @@ input[type="number"]::-webkit-outer-spin-button {
 .im-gruppe summary:focus-visible { outline: 2px solid var(--seal-red); outline-offset: 2px; }
 
 .form-row.im-row-3 { grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+@media (max-width: 900px) {
+  .im-charts { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
-  .rechner-layout.im-layout,
   .form-row.im-row-3 { grid-template-columns: 1fr; }
   /* Gestapelte Feldpaare: gleichmäßige Abstände statt Grid-Lücke + 0 */
   .im-eingaben .form-row { gap: 0; }

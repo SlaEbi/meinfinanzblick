@@ -271,7 +271,7 @@ class ImmobilieEingabenSchema(BaseModel):
     splitting: bool = False
     kirchensteuer_pct: float = Field(0.0, ge=0, le=9)
     wertsteigerung_pct: float = Field(1.5, ge=-20, le=20)
-    betrachtung_jahre: int = Field(15, ge=1, le=40)
+    betrachtung_jahre: int = Field(10, ge=1, le=40)
 
 
 class ImmobilieJahrResponse(BaseModel):

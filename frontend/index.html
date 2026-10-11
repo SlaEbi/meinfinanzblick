@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeinFinanzblick</title>
   <link rel="stylesheet" href="/css/tokens.css?v=10">
-  <link rel="stylesheet" href="/css/app.css?v=51">
+  <link rel="stylesheet" href="/css/app.css?v=53">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -904,9 +904,18 @@
 
       <div id="im-warnungen" class="vs-fristen-banner"></div>
 
-      <div class="rechner-layout im-layout">
-        <div class="card no-print im-eingaben">
-          <p class="rechner-intro">Kaufpreis, Finanzierung, Miete und Steuer eintragen — Rendite, Cashflow und Vermögensaufbau rechnen sich live mit.</p>
+      <div class="stat-grid im-kpis">
+        <div class="stat-card stat-card--gold" id="im-card-cashflow"><div class="label">Cashflow / Monat</div><div class="value mono" id="im-out-cf-nach">—</div><div class="hint mono" id="im-out-cf-vor">—</div></div>
+        <div class="stat-card stat-card--blue"><div class="label">Bruttomietrendite</div><div class="value mono" id="im-out-brutto">—</div><div class="hint mono" id="im-out-faktor">—</div></div>
+        <div class="stat-card stat-card--blue"><div class="label">Nettomietrendite</div><div class="value mono" id="im-out-netto">—</div><div class="hint">auf Kaufpreis + Nebenkosten</div></div>
+        <div class="stat-card stat-card--gold"><div class="label">EK-Rendite</div><div class="value mono" id="im-out-ekr">—</div><div class="hint">1. Jahr, inkl. Tilgung, ohne Wertsteigerung</div></div>
+        <div class="stat-card stat-card--gold"><div class="label">Rendite p. a.</div><div class="value mono" id="im-out-irr">—</div><div class="hint" id="im-out-irr-hint">auf dein Eigenkapital, inkl. Verkauf</div></div>
+        <div class="stat-card stat-card--green" id="im-card-zuwachs"><div class="label">Vermögenszuwachs</div><div class="value mono" id="im-out-zuwachs">—</div><div class="hint" id="im-out-zuwachs-hint">—</div></div>
+      </div>
+
+      <div class="card no-print im-eingaben">
+        <p class="rechner-intro">Kaufpreis, Finanzierung, Miete und Steuer eintragen — Rendite, Cashflow und Vermögensaufbau oben rechnen sich live mit.</p>
+        <div class="im-eingaben-grid">
 
           <details class="im-gruppe" open>
             <summary>Kauf</summary>
@@ -1019,8 +1028,9 @@
             </div>
           </details>
 
-          <details class="im-gruppe" open>
+          <details class="im-gruppe im-gruppe--breit" open>
             <summary>Steuer</summary>
+            <div class="im-gruppe-body">
             <div class="form-group">
               <label class="form-label" for="im-afa">Abschreibung (AfA)</label>
               <select id="im-afa" class="form-select" onchange="imAfaChanged()">
@@ -1061,6 +1071,7 @@
               <div><span class="label">AfA im 1. Jahr</span><span class="value is-empty" id="im-out-afa">—</span></div>
               <div><span class="label">Grenzsteuersatz</span><span class="value is-empty" id="im-out-grenzsteuer">—</span></div>
             </div>
+            </div>
           </details>
 
           <details class="im-gruppe" open>
@@ -1072,17 +1083,18 @@
             <div class="form-group">
               <div class="field-inline">
                 <label class="form-label" for="im-betrachtung_jahre">Haltedauer (Jahre)</label>
-                <input id="im-betrachtung_jahre" class="form-input mono" type="number" step="1" min="1" max="40" value="15"
+                <input id="im-betrachtung_jahre" class="form-input mono" type="number" step="1" min="1" max="40" value="10"
                   oninput="imHaltedauerChanged(this.value, 'input')">
               </div>
-              <input id="im-betrachtung-slider" class="range-slider" type="range" min="1" max="40" step="1" value="15" oninput="imHaltedauerChanged(this.value, 'slider')">
+              <input id="im-betrachtung-slider" class="range-slider" type="range" min="1" max="40" step="1" value="10" oninput="imHaltedauerChanged(this.value, 'slider')">
               <div class="range-scale"><span>1 Jahr</span><span>40 Jahre</span></div>
-              <span class="form-hint">Am Ende wird ein Verkauf zum Marktwert angenommen — steuerfrei ab 10 Jahren</span>
+              <span class="form-hint">Danach Verkauf zum Marktwert — ab 10 Jahren steuerfrei (Verkauf direkt nach Ablauf der Spekulationsfrist)</span>
             </div>
           </details>
         </div>
+      </div>
 
-        <div class="im-charts">
+      <div class="im-charts">
           <div class="chart-card">
             <div class="chart-title">Cashflow pro Jahr</div>
             <div class="chart-subtitle">Vor und nach Steuern — unter null zahlst du zu</div>
@@ -1101,17 +1113,8 @@
             <div class="chart-title">Investition &amp; Exit</div>
             <div class="im-fakten" id="im-fakten"></div>
           </div>
-        </div>
       </div>
 
-      <div class="stat-grid im-kpis">
-        <div class="stat-card stat-card--gold" id="im-card-cashflow"><div class="label">Cashflow / Monat nach Steuern</div><div class="value mono" id="im-out-cf-nach">—</div><div class="hint mono" id="im-out-cf-vor">—</div></div>
-        <div class="stat-card stat-card--blue"><div class="label">Bruttomietrendite</div><div class="value mono" id="im-out-brutto">—</div><div class="hint mono" id="im-out-faktor">—</div></div>
-        <div class="stat-card stat-card--blue"><div class="label">Nettomietrendite</div><div class="value mono" id="im-out-netto">—</div><div class="hint">auf Kaufpreis + Nebenkosten</div></div>
-        <div class="stat-card stat-card--gold"><div class="label">Eigenkapitalrendite (1. Jahr)</div><div class="value mono" id="im-out-ekr">—</div><div class="hint">inkl. Tilgung, ohne Wertsteigerung</div></div>
-        <div class="stat-card stat-card--gold"><div class="label">Rendite p. a. (IRR)</div><div class="value mono" id="im-out-irr">—</div><div class="hint" id="im-out-irr-hint">auf dein Eigenkapital, inkl. Verkauf</div></div>
-        <div class="stat-card stat-card--green" id="im-card-zuwachs"><div class="label">Vermögenszuwachs</div><div class="value mono" id="im-out-zuwachs">—</div><div class="hint" id="im-out-zuwachs-hint">—</div></div>
-      </div>
 
       <div class="card no-print">
         <div class="page-header" style="margin-bottom:var(--space-3)">
@@ -1325,7 +1328,7 @@
 <!-- ── Toasts ── -->
 <div id="toast-container" class="toast-container"></div>
 
-<script type="module" src="/js/app.js?v=125"></script>
+<script type="module" src="/js/app.js?v=127"></script>
 
 
 </body>

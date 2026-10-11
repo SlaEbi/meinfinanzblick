@@ -2352,14 +2352,14 @@ async function imLadeUndRender() {
   cfCard.classList.toggle('stat-card--gold', r.cashflow_nach_steuern_monat >= 0);
   cfCard.classList.toggle('stat-card--red', r.cashflow_nach_steuern_monat < 0);
   imSetzeText('im-out-cf-nach', fmt.eur(r.cashflow_nach_steuern_monat));
-  imSetzeText('im-out-cf-vor', `vor Steuern ${fmt.eur(r.cashflow_vor_steuern_monat)}`);
+  imSetzeText('im-out-cf-vor', `nach Steuern · vor Steuern ${fmt.eur(r.cashflow_vor_steuern_monat)}`);
   imSetzeText('im-out-brutto', imPct(r.bruttomietrendite));
   imSetzeText('im-out-faktor', r.kaufpreisfaktor != null ? `Kaufpreisfaktor ${imZahl1(r.kaufpreisfaktor)}` : 'ohne Miete kein Faktor');
   imSetzeText('im-out-netto', imPct(r.nettomietrendite));
   imSetzeText('im-out-ekr', r.eigenkapitalrendite != null ? imPct(r.eigenkapitalrendite) : 'ohne EK');
   imSetzeText('im-out-irr', r.irr != null ? imPct(r.irr) : '—');
   imSetzeText('im-out-irr-hint', r.irr != null
-    ? `auf dein Eigenkapital über ${n} ${n === 1 ? 'Jahr' : 'Jahre'}, inkl. Verkauf`
+    ? `IRR auf dein Eigenkapital über ${n} ${n === 1 ? 'Jahr' : 'Jahre'}, inkl. Verkauf`
     : 'nur mit Eigenkapital berechenbar');
   const zuwachsCard = document.getElementById('im-card-zuwachs');
   zuwachsCard.classList.toggle('stat-card--green', r.vermoegenszuwachs >= 0);

@@ -88,7 +88,7 @@ class ImmobilieEingaben:
     kirchensteuer_pct: float = 0.0         # 0, 8 oder 9
     # Prognose
     wertsteigerung_pct: float = 1.5
-    betrachtung_jahre: int = 15
+    betrachtung_jahre: int = 10           # Haltedauer, danach Verkauf
     steuerjahr: Optional[int] = None       # Default: aktuelles Jahr
 
 
@@ -323,6 +323,9 @@ def berechne(e: ImmobilieEingaben) -> ImmobilieErgebnis:
     letztes = jahre[-1]
     verkaufspreis = letztes.marktwert
     spekulationssteuer = 0.0
+    # Haltedauer = volle Jahre ab Kauf zu Jahresbeginn; bei genau 10 Jahren
+    # wird der Verkauf direkt nach Ablauf der Frist angenommen (steuerfrei) —
+    # real muss der notarielle Verkauf mehr als 10 Jahre nach dem Kauf liegen.
     if jahre_n < SPEKULATIONSFRIST_JAHRE:
         # Veräußerungsgewinn = Verkaufspreis − (Anschaffungskosten inkl.
         # aktivierter Renovierung − bisherige AfA), versteuert zum Tarif
