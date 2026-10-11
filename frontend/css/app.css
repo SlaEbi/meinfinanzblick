@@ -939,6 +939,33 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 
+/* Darlehensrechner: Planjahre aufklappbar, darunter die einzelnen Raten. */
+.dr-plan-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+.dr-plan-table .dr-jahr-row { cursor: pointer; }
+.dr-plan-table .dr-jahr-row:focus-visible { outline: 2px solid var(--seal-red); outline-offset: -2px; }
+.dr-jahr-chevron {
+  width: 12px;
+  height: 12px;
+  margin-right: var(--space-2);
+  vertical-align: -1px;
+  color: var(--wash-grey);
+  transition: transform 200ms ease-out;
+}
+.dr-jahr-row.is-open .dr-jahr-chevron { transform: rotate(90deg); }
+.dr-jahr-row.is-open td { border-bottom-color: transparent; }
+.dr-plan-table .dr-monat-row td {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  background: rgba(255,255,255,0.02);
+  border-bottom-color: rgba(255,255,255,0.03);
+}
+.dr-plan-table .dr-monat-row td:first-child { padding-left: calc(var(--space-4) + 12px + var(--space-2)); }
+
 /* Lange Pläne (Tilgung, Zinseszins) laufen sonst über tausende Pixel und
    drücken alles Übrige aus dem Blick — deshalb Innenscroll mit fixem Kopf. */
 .table-scroll {
@@ -2839,7 +2866,7 @@ body.demo-mode #backup-zip-link {
   .dr-print-summary { margin: 2px 0 12px; }
   .dr-print-fakten {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 8px 18px;
     padding-bottom: 8px;
     border-bottom: 1px solid #ccc;
@@ -2847,16 +2874,18 @@ body.demo-mode #backup-zip-link {
   .dr-print-fakten > div { display: flex; flex-direction: column; gap: 2px; }
   .dr-print-fakten-label {
     font-family: var(--font-mono);
-    font-size: 8px;
+    font-size: 9px;
+    font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: #777;
+    color: #444;
   }
   .dr-print-fakten-value {
     font-family: var(--font-mono);
     font-weight: 700;
     font-size: 12.5px;
     color: #000;
+    overflow-wrap: anywhere;
   }
   .dr-print-fakten-notiz {
     margin-top: 6px;
@@ -2992,4 +3021,36 @@ body.demo-mode #backup-zip-link {
   #view-rechner-darlehen .stat-card { padding: 6px var(--space-2); }
   #view-rechner-darlehen .stat-card .value { font-size: 0.9rem; }
   #view-rechner-darlehen .stat-card .label { font-size: 0.6rem; margin-bottom: 2px; }
+
+  /* Kennzahlen farbig wie in der App (Fakt / Kosten / Gesamtkosten), nur in
+     druckfesten, dunkleren Tönen auf zart getöntem Grund — die Bildschirm-
+     farben sind für den dunklen Hintergrund gedacht und auf Weiß zu blass.
+     print-color-adjust, sonst lässt der Browser die Hintergründe weg. */
+  .stat-card[class*="stat-card--"], .dr-plan-table thead tr, .dr-plan-table .dr-monat-row td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .stat-card--gold  { border-left: 4px solid #A8842A !important; background: #FBF6E9 !important; }
+  .stat-card--amber { border-left: 4px solid #D9861A !important; background: #FEF4E6 !important; }
+  .stat-card--red   { border-left: 4px solid #C0392B !important; background: #FCEDEB !important; }
+  .stat-card--green { border-left: 4px solid #2F9E44 !important; background: #EBF7EE !important; }
+  .stat-card--gold  .value { color: #8A6A1C !important; }
+  .stat-card--amber .value { color: #B86E00 !important; }
+  .stat-card--red   .value { color: #A82E22 !important; }
+  .stat-card--green .value { color: #23803A !important; }
+  #view-rechner-darlehen .stat-card .label { color: #444 !important; font-weight: 600; }
+
+  /* Überschriften/Nebentexte, die auf dem Bildschirm bewusst grau sind, auf
+     Papier aber kaum lesbar wären. */
+  .chart-subtitle { color: #444 !important; }
+  .data-table .jahr-nr { color: #555 !important; }
+
+  /* Plan-Tabelle: Spaltenfarben wie in der App (Zinsen / Sondertilgung),
+     Aufklapp-Pfeil hat auf Papier keine Funktion. */
+  .dr-plan-table td.dr-col-zins   { color: #B86E00 !important; }
+  .dr-plan-table td.dr-col-sonder { color: #23803A !important; }
+  .dr-plan-table .dr-jahr-chevron { display: none; }
+  .dr-plan-table .dr-jahr-row td { font-weight: 600; }
+  .dr-plan-table .dr-monat-row td { background: #F7F5EF !important; font-size: 0.72rem !important; }
+  #view-rechner-darlehen .dr-plan-table .dr-monat-row td:first-child { padding-left: 22px; }
 }

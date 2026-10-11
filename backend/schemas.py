@@ -161,7 +161,8 @@ class DarlehensSzenarioBase(BaseModel):
     rate_monatlich: float
     sondertilgung_jahr: float = 0
     startdatum: Optional[date] = None
-    hat_ust_auf_zinsen: bool = False
+    tilgungsfreie_monate: int = 0
+    erste_rate_datum: Optional[date] = None
 
 
 class DarlehensSzenarioCreate(DarlehensSzenarioBase):
@@ -174,6 +175,15 @@ class DarlehensSzenarioResponse(DarlehensSzenarioBase):
     erstellt_am: datetime
 
 
+class MonatsZeileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    monat: int
+    zins: float
+    tilgung: float
+    sondertilgung: float
+    restschuld_ende: float
+
+
 class JahresZeileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     jahr: int
@@ -181,6 +191,7 @@ class JahresZeileResponse(BaseModel):
     tilgung: float
     sondertilgung: float
     restschuld_ende: float
+    monate: list[MonatsZeileResponse] = []
 
 
 class TilgungsplanResponse(BaseModel):

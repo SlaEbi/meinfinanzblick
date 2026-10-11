@@ -95,7 +95,8 @@ class DarlehensSzenario(Base):
     rate_monatlich = Column(Numeric(14, 2), nullable=False)
     sondertilgung_jahr = Column(Numeric(14, 2), default=0)
     startdatum = Column(Date)
-    hat_ust_auf_zinsen = Column(Boolean, default=False)  # 19 % USt auf Zinsen (gewerbliches Darlehen)
+    erste_rate_datum = Column(Date)                      # erste Abbuchung; startdatum = Darlehensbeginn
+    tilgungsfreie_monate = Column(Integer, default=0)     # Anlaufmonate, in denen nur Zinsen gezahlt werden
     erstellt_am = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

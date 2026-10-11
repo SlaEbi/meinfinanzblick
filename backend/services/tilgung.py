@@ -41,12 +41,23 @@ def restlaufzeit_monate(restschuld: float, zinssatz: float, rate: float) -> Rest
 
 
 @dataclass
+class MonatsZeile:
+    monat: int            # laufende Rate (1 = erste Abbuchung)
+    zins: float
+    tilgung: float
+    sondertilgung: float
+    restschuld_ende: float
+
+
+@dataclass
 class JahresZeile:
     jahr: int
     zins: float
     tilgung: float
     sondertilgung: float
     restschuld_ende: float
+    # Einzelne Raten des Planjahres — für die aufklappbare Monatsansicht
+    monate: list[MonatsZeile] = field(default_factory=list)
 
 
 @dataclass
@@ -64,6 +75,8 @@ def tilgungsplan(
     darlehen_typ: str = 'annuitaet',
     tilgungsrate_monatlich: float = 0.0,
     sondertilgung_jahr: float = 0.0,
+    tilgungsfreie_monate: int = 0,
+    zinstage_erste_rate: int = 30,
     max_jahre: int = 60,
 ) -> TilgungsplanErgebnis:
     """Simuliert die Tilgung Monat für Monat, aggregiert auf Jahresebene.
@@ -75,6 +88,17 @@ def tilgungsplan(
     Eine optionale jährliche Sondertilgung wird einmal pro Kalenderjahr
     angesetzt (typischer Vertragsstichtag: nach der Dezember-Rate) und
     zusätzlich zur laufenden Tilgung von der Restschuld abgezogen.
+
+    Tilgungsfreie Monate am Anfang: In dieser Anlaufphase werden nur die
+    Zinsen gezahlt, die Restschuld bleibt stehen — auch keine Sondertilgung.
+    Danach startet die normale Tilgung mit der vollen Darlehenssumme; die
+    Gesamtlaufzeit (monate_gesamt) enthält die tilgungsfreie Zeit.
+
+    Zinstage bis zur ersten Rate (30/360): Liegt die erste Abbuchung nicht
+    genau einen Monat nach Darlehensbeginn, fallen in der ersten Periode
+    anteilig mehr oder weniger Zinsen an (z. B. Beginn 1.3., erste Rate
+    30.3. → 29 Tage). Bei der Annuität ändert das nur den Tilgungsanteil
+    der ersten Rate, ab der zweiten Rate läuft alles im Monatsraster.
     """
     if restschuld <= 0:
         return TilgungsplanErgebnis()
@@ -86,13 +110,20 @@ def tilgungsplan(
     jahr_zins = jahr_tilgung = jahr_sonder = 0.0
     monat_in_jahr = 0
     monate_gesamt: Optional[int] = None
+    tilgungsfreie_monate = max(0, int(tilgungsfreie_monate))
+    jahr_monate: list[MonatsZeile] = []
 
     for monat_idx in range(max_jahre * 12):
         if rest <= 0.005:
             break
 
         zins_monat = rest * r_monat
-        if darlehen_typ == 'tilgungsdarlehen':
+        if monat_idx == 0:
+            zins_monat *= max(0, zinstage_erste_rate) / 30.0
+        tilgungsfrei = monat_idx < tilgungsfreie_monate
+        if tilgungsfrei:
+            tilgung_monat = 0.0
+        elif darlehen_typ == 'tilgungsdarlehen':
             tilgung_monat = min(tilgungsrate_monatlich, rest)
         else:
             tilgung_monat = min(max(rate_monatlich - zins_monat, 0.0), rest)
@@ -106,10 +137,19 @@ def tilgungsplan(
         # Sondertilgung nur, wenn das Jahr voll ist UND noch etwas offen ist —
         # sonst würde ein im Dezember bereits getilgtes Darlehen eine
         # Sondertilgung "ins Leere" verbuchen.
-        if monat_in_jahr == 12 and sondertilgung_jahr > 0 and rest > 0.005:
+        sonder = 0.0
+        if monat_in_jahr == 12 and not tilgungsfrei and sondertilgung_jahr > 0 and rest > 0.005:
             sonder = min(sondertilgung_jahr, rest)
             rest = max(rest - sonder, 0.0)
             jahr_sonder += sonder
+
+        jahr_monate.append(MonatsZeile(
+            monat=monat_idx + 1,
+            zins=round(zins_monat, 2),
+            tilgung=round(tilgung_monat, 2),
+            sondertilgung=round(sonder, 2),
+            restschuld_ende=round(rest, 2),
+        ))
 
         if rest <= 0.005 and monate_gesamt is None:
             monate_gesamt = monat_idx + 1
@@ -121,8 +161,10 @@ def tilgungsplan(
                 tilgung=round(jahr_tilgung, 2),
                 sondertilgung=round(jahr_sonder, 2),
                 restschuld_ende=round(rest, 2),
+                monate=jahr_monate,
             ))
             jahr_zins = jahr_tilgung = jahr_sonder = 0.0
             monat_in_jahr = 0
+            jahr_monate = []
 
     return TilgungsplanErgebnis(jahre=jahre, monate_gesamt=monate_gesamt, zinsen_gesamt=round(zinsen_gesamt, 2))

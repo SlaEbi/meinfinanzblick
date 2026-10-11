@@ -230,16 +230,6 @@ function restlaufzeitMonate(restschuld, zinssatz, rate) {
   return { monate: Math.ceil(Math.log(rate / (rate - zinsAnteil)) / Math.log(1 + r)) };
 }
 
-// Kalenderdatum, das `monate` Monate nach `start` liegt — für das exakte
-// Enddatum eines Tilgungsplans (Monatsende, da die letzte Rate den Monat abschließt).
-function datumNachMonaten(start, monate) {
-  const d = new Date(start);
-  d.setDate(1);
-  d.setMonth(d.getMonth() + monate + 1);
-  d.setDate(0);
-  return d.toISOString();
-}
-
 function formatRestlaufzeit(monate) {
   const jahre  = Math.floor(monate / 12);
   const monRest = monate % 12;
@@ -1232,6 +1222,9 @@ async function tpLadeUndRender(id, sondertilgungJahr) {
 // Annuität: gibt der Nutzer die Rate ein, wird die Laufzeit draus berechnet
 // (und umgekehrt, klassische Annuitätenformel). Tilgungsdarlehen: linear,
 // daher reicht Dreisatz in beide Richtungen.
+// Tilgungsfreie Monate: Die Laufzeit-Felder meinen die Gesamtlaufzeit. In der
+// Anlaufphase bleibt die Restschuld stehen, also wird Rate ↔ Laufzeit nur
+// über die verbleibende Tilgungsphase mit der vollen Summe gerechnet.
 
 let drAnchor = 'rate'; // 'rate' | 'laufzeit' — welches Feld der Nutzer zuletzt bewusst gesetzt hat
 const drTimers = {};
@@ -1262,14 +1255,68 @@ function drLesenFelder() {
   const sondertilgung = Number(document.getElementById('dr-sonder-input').value) || 0;
   const startdatumWert = document.getElementById('dr-startdatum')?.value;
   const startdatum = startdatumWert ? new Date(startdatumWert) : new Date();
-  const hatUst = document.getElementById('dr-ust')?.checked ?? false;
-  return { betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung, startdatum, hatUst };
+  // Erste Abbuchung: fehlt sie oder liegt sie vor dem Beginn, gilt das
+  // übliche Raster "ein Monat nach Beginn" (= 30 Zinstage, kein Sondereffekt).
+  const beginnISO = fmt.dateISO(startdatum.toISOString());
+  const ersteRateWert = document.getElementById('dr-erste-rate')?.value;
+  const ersteRateISO = ersteRateWert && ersteRateWert >= beginnISO
+    ? ersteRateWert : drIsoPlusMonate(beginnISO, 1);
+  const ersteRate = new Date(ersteRateISO);
+  const zinstageErsteRate = drZinstage360(beginnISO, ersteRateISO);
+  const tilgungsfreieMonate = Math.min(360, Math.max(0,
+    Math.floor(Number(document.getElementById('dr-tilgungsfrei')?.value) || 0)));
+  return {
+    betrag, zinssatzDezimal: zinssatzPct / 100, typ, sondertilgung, startdatum, tilgungsfreieMonate,
+    ersteRate, zinstageErsteRate,
+  };
+}
+
+// Datums-Helfer auf 'YYYY-MM-DD'-Strings (zeitzonenfrei): k Monate weiter,
+// Tag bleibt erhalten und wird am Monatsende gekappt (30.1. → 28.2.).
+function drIsoPlusMonate(iso, k) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const ziel = new Date(Date.UTC(y, m - 1 + k, 1));
+  const letzterTag = new Date(Date.UTC(ziel.getUTCFullYear(), ziel.getUTCMonth() + 1, 0)).getUTCDate();
+  ziel.setUTCDate(Math.min(d, letzterTag));
+  return ziel.toISOString().slice(0, 10);
+}
+
+// Zinstage nach deutscher Methode 30/360 (30E/360): jeder Monat 30 Tage —
+// so rechnen Banken bei Baufinanzierungen die Teilperiode bis zur ersten Rate.
+function drZinstage360(vonIso, bisIso) {
+  const [y1, m1, d1] = vonIso.split('-').map(Number);
+  const [y2, m2, d2] = bisIso.split('-').map(Number);
+  return (y2 - y1) * 360 + (m2 - m1) * 30 + (Math.min(d2, 30) - Math.min(d1, 30));
+}
+
+// Solange der Nutzer die erste Rate nicht selbst gesetzt hat, wandert sie mit
+// dem Darlehensbeginn mit (Standard: ein Monat später).
+let drErsteRateManuell = false;
+
+window.drBeginnChanged = function() {
+  const beginn = document.getElementById('dr-startdatum').value;
+  const ersteRateInput = document.getElementById('dr-erste-rate');
+  if (beginn && (!drErsteRateManuell || !ersteRateInput.value || ersteRateInput.value < beginn)) {
+    ersteRateInput.value = drIsoPlusMonate(beginn, 1);
+    drErsteRateManuell = false;
+  }
+  drRecalc();
+};
+
+window.drErsteRateChanged = function() {
+  drErsteRateManuell = true;
+  drRecalc();
+};
+
+// Bei tilgungsfreier Anlaufphase gilt die eingegebene Rate erst danach —
+// das Label sagt es, damit sie nicht als Startrate missverstanden wird.
+function drRateLabelAktualisieren(typ, tilgungsfreieMonate) {
+  document.getElementById('dr-rate-label').textContent =
+    typ === 'tilgungsdarlehen' ? 'Monatliche Tilgung (€)'
+    : tilgungsfreieMonate > 0 ? 'Rate ab Tilgung (€)' : 'Monatliche Rate (€)';
 }
 
 window.drTypChanged = function() {
-  const typ = document.getElementById('dr-typ').value;
-  document.getElementById('dr-rate-label').textContent =
-    typ === 'tilgungsdarlehen' ? 'Monatliche Tilgung (€)' : 'Monatliche Rate (€)';
   drRecalc();
 };
 
@@ -1299,7 +1346,8 @@ window.drSonderInputChanged = function(wert) {
 // damit die Eingabe nicht auf den Server wartet — und holt danach (debounced)
 // den vollständigen Tilgungsplan vom Server.
 window.drRecalc = function(nurTabelle = false) {
-  const { betrag, zinssatzDezimal, typ, sondertilgung } = drLesenFelder();
+  const { betrag, zinssatzDezimal, typ, sondertilgung, tilgungsfreieMonate } = drLesenFelder();
+  drRateLabelAktualisieren(typ, tilgungsfreieMonate);
 
   // Sondertilgungs-Slider-Obergrenze an die Darlehenssumme anpassen — aber
   // einen bewusst höher getippten Wert im Zahlenfeld nicht stillschweigend
@@ -1317,11 +1365,12 @@ window.drRecalc = function(nurTabelle = false) {
   if (drAnchor === 'laufzeit') {
     const laufzeitJahre = (parseFloat(laufzeitJahreInput.value) || 0)
       + (parseFloat(laufzeitMonateInput.value) || 0) / 12;
-    const rate = drRateAusLaufzeit(betrag, zinssatzDezimal, laufzeitJahre, typ);
+    const rate = drRateAusLaufzeit(betrag, zinssatzDezimal, laufzeitJahre - tilgungsfreieMonate / 12, typ);
     if (rate > 0) rateInput.value = rate.toFixed(0);
   } else {
     const rate = parseFloat(rateInput.value) || 0;
-    const monate = drLaufzeitAusRate(betrag, zinssatzDezimal, rate, typ);
+    const tilgungsMonate = drLaufzeitAusRate(betrag, zinssatzDezimal, rate, typ);
+    const monate = tilgungsMonate ? tilgungsMonate + tilgungsfreieMonate : null;
     if (monate) {
       laufzeitJahreInput.value = Math.floor(monate / 12);
       laufzeitMonateInput.value = monate % 12;
@@ -1344,7 +1393,7 @@ function setKpi(id, hatWert, text) {
 // Kompakte Fließtext-Zusammenfassung der Rahmenbedingungen für den Ausdruck —
 // ersetzt dort die Eingabekarte (die bleibt nur auf dem Bildschirm sichtbar),
 // damit die Kurve mehr Platz bekommt statt zeilenweise abgeschnittener Werte.
-function drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, rate, monateDiff, zinsenDiff, hatUst, ustGesamt }) {
+function drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, ersteRate, rate, monateDiff, zinsenDiff, tilgungsfreieMonate, zinsrate }) {
   const el = document.getElementById('dr-print-summary');
   if (!el) return;
   const jahre = document.getElementById('dr-laufzeit-jahre').value || 0;
@@ -1359,12 +1408,20 @@ function drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgu
     ['Darlehenssumme', fmt.eur(betrag)],
     ['Zinssatz', fmt.pct(zinssatzDezimal * 100) + ' p. a.'],
     ['Darlehenstyp', typLabel],
-    ['Startdatum', fmt.date(startdatum.toISOString())],
-    ['Monatliche Rate', fmt.eur(rate)],
-    ['Laufzeit', `${jahre} Jahre ${monate} Monate`],
+    ['Darlehensbeginn', fmt.date(startdatum.toISOString())],
+    ['Erste Rate', fmt.date(ersteRate.toISOString())],
   ];
+  if (tilgungsfreieMonate > 0) {
+    felder.push(['Tilgungsfreie Zeit', `${tilgungsfreieMonate} ${tilgungsfreieMonate === 1 ? 'Monat' : 'Monate'}`]);
+    felder.push(['Rate tilgungsfrei', fmt.eur(zinsrate)]);
+    felder.push([typ === 'tilgungsdarlehen' ? 'Tilgung danach' : 'Rate danach', fmt.eur(rate)]);
+  } else {
+    felder.push(['Monatliche Rate', fmt.eur(rate)]);
+  }
+  // Die Laufzeit-Felder rechnen ohne Sondertilgung — mit Sondertilgung steht
+  // die tatsächliche Laufzeit in der Kennzahl darunter, also hier benennen.
+  felder.push([sondertilgung > 0 ? 'Laufzeit ohne Sondertilg.' : 'Laufzeit', `${jahre} Jahre ${monate} Monate`]);
   if (sondertilgung > 0) felder.push(['Sondertilgung', fmt.eur(sondertilgung) + ' / Jahr']);
-  if (hatUst) felder.push(['Umsatzsteuer', '19 % auf Zinsen']);
 
   let html = '<div class="dr-print-fakten">' + felder.map(([label, wert]) => `
     <div><span class="dr-print-fakten-label">${escapeHtml(label)}</span><span class="dr-print-fakten-value">${escapeHtml(wert)}</span></div>
@@ -1373,9 +1430,6 @@ function drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgu
   const notizen = [];
   if (sondertilgung > 0 && monateDiff > 0) {
     notizen.push(`Durch die Sondertilgung ${formatRestlaufzeit(monateDiff)} früher abbezahlt, ${fmt.eur(zinsenDiff)} Zinsersparnis.`);
-  }
-  if (hatUst) {
-    notizen.push(`USt auf Zinsen gesamt: ${fmt.eur(ustGesamt)} — als Vorsteuer erstattungsfähig.`);
   }
   if (notizen.length) {
     html += `<div class="dr-print-fakten-notiz">${notizen.map(escapeHtml).join('<br>')}</div>`;
@@ -1507,12 +1561,60 @@ function renderDrRestschuldChart(jahre, baselineJahre, betrag, startJahr) {
   });
 }
 
+// Aufgeklappte Planjahre der Tabelle — bleiben über Neuberechnungen hinweg
+// offen, damit man beim Verstellen von Werten die Monatsansicht behält.
+const drOffeneJahre = new Set();
+
+function drJahrSetzen(jahr, offen) {
+  if (offen) drOffeneJahre.add(jahr); else drOffeneJahre.delete(jahr);
+  const zeile = document.querySelector(`#dr-tabelle-container .dr-jahr-row[data-jahr="${jahr}"]`);
+  if (!zeile) return;
+  zeile.classList.toggle('is-open', offen);
+  zeile.setAttribute('aria-expanded', String(offen));
+  document.querySelectorAll(`#dr-tabelle-container .dr-monat-row[data-jahr-von="${jahr}"]`)
+    .forEach(tr => { tr.hidden = !offen; });
+}
+
+function drPlanJahre() {
+  return [...document.querySelectorAll('#dr-tabelle-container .dr-jahr-row')].map(tr => Number(tr.dataset.jahr));
+}
+
+// Knopf über der Tabelle: zeigt "Alle Raten anzeigen", solange mindestens
+// ein Jahr zu ist — sonst "Raten ausblenden".
+function drAlleKnopfAktualisieren() {
+  const btn = document.getElementById('dr-alle-btn');
+  if (!btn) return;
+  const jahre = drPlanJahre();
+  const alleOffen = jahre.length > 0 && jahre.every(j => drOffeneJahre.has(j));
+  btn.querySelector('span').textContent = alleOffen ? 'Raten ausblenden' : 'Alle Raten anzeigen';
+  btn.setAttribute('aria-pressed', String(alleOffen));
+  btn.disabled = jahre.length === 0;
+}
+
+window.drJahrToggle = function(jahr) {
+  drJahrSetzen(jahr, !drOffeneJahre.has(jahr));
+  drAlleKnopfAktualisieren();
+};
+
+window.drAlleRatenToggle = function() {
+  const jahre = drPlanJahre();
+  const oeffnen = !jahre.every(j => drOffeneJahre.has(j));
+  jahre.forEach(j => drJahrSetzen(j, oeffnen));
+  drAlleKnopfAktualisieren();
+};
+
 async function drLadeUndRender() {
   const container = document.getElementById('dr-tabelle-container');
   if (!container) return;
-  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum, hatUst } = drLesenFelder();
+  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum, tilgungsfreieMonate,
+          ersteRate, zinstageErsteRate } = drLesenFelder();
   const rate = parseFloat(document.getElementById('dr-rate').value) || 0;
-  const startJahr = startdatum.getFullYear();
+  // Planjahr 1 beginnt mit der ersten Rate, nicht mit der Auszahlung.
+  const startJahr = ersteRate.getUTCFullYear();
+  const ersteRateISO = ersteRate.toISOString().slice(0, 10);
+  // Letzte Abbuchung = erste Rate + (Anzahl Raten − 1) Monate.
+  const letzteRate = (monate) => monate != null
+    ? fmt.date(drIsoPlusMonate(ersteRateISO, monate - 1)) : '—';
 
   if (betrag <= 0 || rate <= 0) {
     container.innerHTML = '<p class="form-hint">Bitte Darlehenssumme und Rate eingeben.</p>';
@@ -1521,6 +1623,8 @@ async function drLadeUndRender() {
 
   const params = {
     betrag, zinssatz: zinssatzDezimal, darlehen_typ: typ, sondertilgung_jahr: sondertilgung,
+    tilgungsfreie_monate: tilgungsfreieMonate,
+    zinstage_erste_rate: zinstageErsteRate,
     ...(typ === 'tilgungsdarlehen' ? { tilgungsrate_monatlich: rate } : { rate_monatlich: rate }),
   };
 
@@ -1535,31 +1639,25 @@ async function drLadeUndRender() {
     document.getElementById('dr-out-laufzeit').textContent =
       plan.monate_gesamt != null ? formatRestlaufzeit(plan.monate_gesamt) : '> 60 Jahre';
     document.getElementById('dr-out-enddatum').textContent =
-      plan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, plan.monate_gesamt)) : '—';
+      letzteRate(plan.monate_gesamt);
     document.getElementById('dr-out-enddatum-label').textContent =
       baselinePlan ? 'Abbezahlt am (mit Sondertilgung)' : 'Abbezahlt am';
     const enddatumOhneCard = document.getElementById('dr-out-enddatum-ohne-card');
     enddatumOhneCard.style.display = baselinePlan ? '' : 'none';
     if (baselinePlan) {
       document.getElementById('dr-out-enddatum-ohne').textContent =
-        baselinePlan.monate_gesamt != null ? fmt.date(datumNachMonaten(startdatum, baselinePlan.monate_gesamt)) : '—';
+        letzteRate(baselinePlan.monate_gesamt);
     }
     document.getElementById('dr-out-zinsen').textContent = fmt.eur(plan.zinsen_gesamt);
-    // zinsen_gesamt ist immer die Nettozinssumme (USt fließt separat, s. unten)
-    // — bei gewerblichen Darlehen wird das im Label explizit gemacht, damit
-    // die Zahl nicht als Bruttoaufwand missverstanden wird.
-    document.getElementById('dr-out-zinsen-label').textContent = hatUst ? 'Gesamtzinsen (netto)' : 'Gesamtzinsen';
-    // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die Bank
-    // fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur schneller
-    // dieselbe Summe; sie wirkt hier ausschließlich über geringere Zinsen.
-    // Die USt zählt hier nicht mit — bei gewerblichen Darlehen ist sie via
-    // Vorsteuerabzug erstattungsfähig, tilgt aber ebenfalls nicht die Schuld,
-    // s. Restlaufzeit-Logik der gespeicherten Darlehen (immer Nettorate).
+    // Gesamtkosten = Darlehenssumme + Zinsen — was am Ende insgesamt an die
+    // Bank fließt. Die Sondertilgung ändert daran nichts, sie tilgt nur
+    // schneller dieselbe Summe; sie wirkt hier ausschließlich über geringere Zinsen.
     document.getElementById('dr-out-gesamtkosten').textContent = fmt.eur(betrag + plan.zinsen_gesamt);
 
-    const ustGesamt = hatUst ? plan.zinsen_gesamt * 0.19 : 0;
-    document.getElementById('dr-out-ust-card').style.display = hatUst ? '' : 'none';
-    if (hatUst) document.getElementById('dr-out-ust').textContent = fmt.eur(ustGesamt);
+    // In der tilgungsfreien Zeit sind nur die Zinsen auf die volle Summe fällig.
+    const zinsrate = betrag * zinssatzDezimal / 12;
+    document.getElementById('dr-out-zinsrate-card').style.display = tilgungsfreieMonate > 0 ? '' : 'none';
+    if (tilgungsfreieMonate > 0) document.getElementById('dr-out-zinsrate').textContent = fmt.eur(zinsrate);
 
     const { monate_gesamt: monateMit, monate_ohne_sondertilgung: monateOhne,
             zinsen_gesamt: zinsenMit, zinsen_ohne_sondertilgung: zinsenOhne } = plan;
@@ -1568,7 +1666,7 @@ async function drLadeUndRender() {
     setKpi('dr-out-monate-diff', monateDiff > 0, monateDiff > 0 ? formatRestlaufzeit(monateDiff) : '—');
     setKpi('dr-out-zinsen-diff', zinsenDiff > 0, zinsenDiff > 0 ? fmt.eur(zinsenDiff) : '—');
 
-    drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, rate, monateDiff, zinsenDiff, hatUst, ustGesamt });
+    drPrintSummaryAktualisieren({ betrag, zinssatzDezimal, typ, sondertilgung, startdatum, ersteRate, rate, monateDiff, zinsenDiff, tilgungsfreieMonate, zinsrate });
 
     // Der Untertitel darf keinen Vergleich versprechen, den es ohne
     // Sondertilgung gar nicht gibt.
@@ -1587,29 +1685,53 @@ async function drLadeUndRender() {
     }
 
     const zeigtSonder = sondertilgung > 0;
+    const tilgungZelle = (betrag, istTilgungsfrei) =>
+      istTilgungsfrei ? '<span class="jahr-nr">tilgungsfrei</span>' : fmt.eur(betrag);
+    const sonderZelle = (betrag) => zeigtSonder
+      ? `<td class="right mono dr-col-sonder" style="color:#4ADE80">${betrag > 0 ? fmt.eur(betrag) : '—'}</td>` : '';
+
+    // Pro Planjahr eine klickbare Zeile, darunter die einzelnen Raten als
+    // (eingeklappte) Unterzeilen in denselben Spalten.
+    const zeilen = plan.jahre.map(j => {
+      const offen = drOffeneJahre.has(j.jahr);
+      const monate = (j.monate || []).map(m => `
+            <tr class="dr-monat-row" data-jahr-von="${j.jahr}"${offen ? '' : ' hidden'}>
+              <td class="mono">${fmt.date(drIsoPlusMonate(ersteRateISO, m.monat - 1))}<span class="jahr-nr">Rate ${m.monat}</span></td>
+              <td class="right mono">${fmt.eur(m.zins + m.tilgung)}</td>
+              <td class="right mono dr-col-zins" style="color:#F0A030">${fmt.eur(m.zins)}</td>
+              <td class="right mono">${tilgungZelle(m.tilgung, m.monat <= tilgungsfreieMonate)}</td>
+              ${sonderZelle(m.sondertilgung)}
+              <td class="right mono">${fmt.eur(m.restschuld_ende)}</td>
+            </tr>`).join('');
+      return `
+            <tr class="dr-jahr-row${offen ? ' is-open' : ''}" data-jahr="${j.jahr}" tabindex="0" role="button"
+                aria-expanded="${offen}" onclick="drJahrToggle(${j.jahr})"
+                onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); drJahrToggle(${j.jahr}); }">
+              <td class="mono"><svg class="dr-jahr-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>${planKalenderjahr(j.jahr - 1, startJahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
+              <td class="right mono">${fmt.eur(j.zins + j.tilgung)}</td>
+              <td class="right mono dr-col-zins" style="color:#F0A030">${fmt.eur(j.zins)}</td>
+              <td class="right mono">${tilgungZelle(j.tilgung, j.jahr * 12 <= tilgungsfreieMonate)}</td>
+              ${sonderZelle(j.sondertilgung)}
+              <td class="right mono">${fmt.eur(j.restschuld_ende)}</td>
+            </tr>${monate}`;
+    }).join('');
+
     container.innerHTML = `
-      <table class="data-table">
+      <table class="data-table dr-plan-table">
         <thead>
           <tr>
-            <th>Jahr</th><th class="right">Zinsen</th>
-            ${hatUst ? '<th class="right">USt (19 %)</th>' : ''}
+            <th>Jahr / Abbuchung</th>
+            <th class="right">Rate</th>
+            <th class="right">Zinsen</th>
             <th class="right">Tilgung</th>
             ${zeigtSonder ? '<th class="right">Sondertilgung</th>' : ''}
-            <th class="right">Restschuld z. Jahresende</th>
+            <th class="right">Restschuld</th>
           </tr>
         </thead>
-        <tbody>
-          ${plan.jahre.map(j => `
-            <tr>
-              <td class="mono">${planKalenderjahr(j.jahr - 1, startJahr)}<span class="jahr-nr">J. ${j.jahr}</span></td>
-              <td class="right mono" style="color:#F0A030">${fmt.eur(j.zins)}</td>
-              ${hatUst ? `<td class="right mono" style="color:#F0A030">${fmt.eur(j.zins * 0.19)}</td>` : ''}
-              <td class="right mono">${fmt.eur(j.tilgung)}</td>
-              ${zeigtSonder ? `<td class="right mono" style="color:#4ADE80">${j.sondertilgung > 0 ? fmt.eur(j.sondertilgung) : '—'}</td>` : ''}
-              <td class="right mono">${fmt.eur(j.restschuld_ende)}</td>
-            </tr>`).join('')}
+        <tbody>${zeilen}
         </tbody>
       </table>`;
+    drAlleKnopfAktualisieren();
   } catch (e) {
     container.innerHTML = `<p class="form-hint">Fehler beim Laden: ${escapeHtml(e.message)}</p>`;
   }
@@ -1983,6 +2105,8 @@ function renderRechnerDarlehen() {
   document.querySelectorAll('#view-rechner-darlehen .range-slider').forEach(syncRangeFill);
   const startdatumInput = document.getElementById('dr-startdatum');
   if (startdatumInput && !startdatumInput.value) startdatumInput.value = fmt.dateISO(new Date().toISOString());
+  const ersteRateInput = document.getElementById('dr-erste-rate');
+  if (ersteRateInput && !ersteRateInput.value) ersteRateInput.value = drIsoPlusMonate(startdatumInput.value, 1);
   drRecalc(true);
   drSzenarioListeRendern();
 }
@@ -2000,7 +2124,7 @@ window.drSzenarioSpeichern = async function() {
   const name = nameInput.value.trim();
   if (!name) { nameInput.focus(); return; }
 
-  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum, hatUst } = drLesenFelder();
+  const { betrag, zinssatzDezimal, typ, sondertilgung, startdatum, tilgungsfreieMonate, ersteRate } = drLesenFelder();
   const rate = parseFloat(document.getElementById('dr-rate').value) || 0;
   if (betrag <= 0 || rate <= 0) return;
 
@@ -2009,7 +2133,8 @@ window.drSzenarioSpeichern = async function() {
       name, betrag, zinssatz: zinssatzDezimal, darlehen_typ: typ,
       rate_monatlich: rate, sondertilgung_jahr: sondertilgung,
       startdatum: fmt.dateISO(startdatum.toISOString()) || null,
-      hat_ust_auf_zinsen: hatUst,
+      tilgungsfreie_monate: tilgungsfreieMonate,
+      erste_rate_datum: ersteRate.toISOString().slice(0, 10),
     });
     nameInput.value = '';
     await drSzenarioListeRendern();
@@ -2024,12 +2149,15 @@ function drSzenarioLaden(s) {
   document.getElementById('dr-betrag').value = s.betrag;
   document.getElementById('dr-zinssatz').value = (s.zinssatz * 100).toFixed(2);
   document.getElementById('dr-typ').value = s.darlehen_typ;
-  drTypChanged();
+  document.getElementById('dr-tilgungsfrei').value = s.tilgungsfreie_monate || 0;
   document.getElementById('dr-startdatum').value = fmt.dateISO(s.startdatum) || fmt.dateISO(new Date().toISOString());
+  // Ältere Szenarien ohne eigenes Datum: Standard "ein Monat nach Beginn".
+  document.getElementById('dr-erste-rate').value =
+    fmt.dateISO(s.erste_rate_datum) || drIsoPlusMonate(document.getElementById('dr-startdatum').value, 1);
+  drErsteRateManuell = !!s.erste_rate_datum;
   document.getElementById('dr-rate').value = s.rate_monatlich;
   document.getElementById('dr-sonder-input').value = s.sondertilgung_jahr || 0;
   window.drSonderInputChanged(s.sondertilgung_jahr || 0);
-  document.getElementById('dr-ust').checked = !!s.hat_ust_auf_zinsen;
   drAnchor = 'rate';
   drRecalc(true);
   document.getElementById('dr-print-titel').textContent = s.name;

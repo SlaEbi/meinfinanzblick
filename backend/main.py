@@ -57,7 +57,8 @@ def _migrate():
         ("steuer_bescheide", "vorlaeufig",               "BOOLEAN DEFAULT 0"),
         ("sparziele", "aufbewahrungsort", "TEXT"),
         ("steuer_prognosen", "gewinn_gewerbebetrieb_ehefrau", "NUMERIC DEFAULT 0"),
-        ("darlehens_szenarien", "hat_ust_auf_zinsen", "BOOLEAN DEFAULT 0"),
+        ("darlehens_szenarien", "tilgungsfreie_monate", "INTEGER DEFAULT 0"),
+        ("darlehens_szenarien", "erste_rate_datum", "DATE"),
     ]
     with engine.connect() as conn:
         for table, col, typ in migrations:

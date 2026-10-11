@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -22,12 +22,16 @@ def _berechne_restlaufzeit(darlehen: Darlehen) -> None:
 
 def _tilgungsplan_response(
     betrag: float, zinssatz: float, rate_monatlich: float, sondertilgung_jahr: float,
-    darlehen_typ: str, tilgungsrate_monatlich: float,
+    darlehen_typ: str, tilgungsrate_monatlich: float, tilgungsfreie_monate: int = 0,
+    zinstage_erste_rate: int = 30,
 ) -> TilgungsplanResponse:
     """Baut den Tilgungsplan plus Baseline ohne Sondertilgung — gemeinsame
     Grundlage für den Plan eines gespeicherten Darlehens UND den freien
     Darlehensrechner (der keinen gespeicherten Datensatz braucht)."""
-    kwargs = dict(darlehen_typ=darlehen_typ, tilgungsrate_monatlich=tilgungsrate_monatlich)
+    kwargs = dict(
+        darlehen_typ=darlehen_typ, tilgungsrate_monatlich=tilgungsrate_monatlich,
+        tilgungsfreie_monate=tilgungsfreie_monate, zinstage_erste_rate=zinstage_erste_rate,
+    )
     plan = tilgungsplan(betrag, zinssatz, rate_monatlich, sondertilgung_jahr=sondertilgung_jahr, **kwargs)
     baseline = plan if sondertilgung_jahr <= 0 else tilgungsplan(
         betrag, zinssatz, rate_monatlich, sondertilgung_jahr=0, **kwargs,
@@ -51,6 +55,8 @@ def simulate_darlehen(
     darlehen_typ: str = 'annuitaet',
     tilgungsrate_monatlich: float = 0.0,
     sondertilgung_jahr: float = 0.0,
+    tilgungsfreie_monate: int = Query(0, ge=0, le=360),
+    zinstage_erste_rate: int = Query(30, ge=0, le=360),
 ):
     """Freier Darlehensrechner — simuliert einen Tilgungsplan aus frei
     eingegebenen Werten, ohne dass dafür ein Darlehen gespeichert sein muss.
@@ -59,6 +65,7 @@ def simulate_darlehen(
     """
     return _tilgungsplan_response(
         betrag, zinssatz, rate_monatlich, sondertilgung_jahr, darlehen_typ, tilgungsrate_monatlich,
+        tilgungsfreie_monate, zinstage_erste_rate,
     )
 
 
